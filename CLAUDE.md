@@ -53,3 +53,43 @@ response = MIDAS.MidasAPI("GET", "/db/STOR")  # REST 호출
 MIDAS API는 중첩된 dict를 반환함. `_to_excel.py`의 유틸리티로 변환:
 - `dict_to_rows(data, id_col="ID")` → list of dicts
 - `to_dataframe(data, id_col="ID")` → pandas DataFrame
+
+## 웹 대시보드
+
+### 백엔드 실행 (FastAPI, 포트 8000)
+```bash
+cd backend && ../.venv/Scripts/uvicorn main:app --reload --port 8000
+```
+
+### 프론트엔드 실행 (Next.js, 포트 3000)
+```bash
+cd frontend && npm run dev
+```
+
+### 구조
+```
+backend/          # FastAPI 서버
+  main.py         # 앱 진입점, CORS, .env 로드
+  routers/
+    midas.py      # GET/POST/PUT/DELETE /api/midas/{path}
+  requirements.txt
+
+frontend/         # Next.js 앱
+  app/
+    layout.tsx    # 사이드바 포함 공통 레이아웃
+    page.tsx      # 대시보드 (STOR 데이터, 차트, 테이블)
+    explorer/
+      page.tsx    # 엔드포인트 탐색기
+  components/
+    Sidebar.tsx   # 사이드바 네비게이션
+    DataTable.tsx # TanStack Table 기반 정렬/필터 테이블
+    ChartPanel.tsx# Recharts 막대차트 래퍼
+    EndpointForm.tsx # API 호출 폼 (메서드/경로/Body)
+```
+
+### API 엔드포인트 (백엔드)
+- `GET  /api/midas/{path}` → MIDAS API GET /db/{path}
+- `POST /api/midas/{path}` → MIDAS API POST /db/{path}
+- `PUT  /api/midas/{path}` → MIDAS API PUT /db/{path}
+- `DELETE /api/midas/{path}` → MIDAS API DELETE /db/{path}
+- `GET /health` → 서버 상태 확인

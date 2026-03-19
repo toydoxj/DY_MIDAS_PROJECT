@@ -2,3 +2,8 @@
 .venv/
 __pycache__/
 *.pyc
+backend/__pycache__/
+backend/routers/__pycache__/
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
