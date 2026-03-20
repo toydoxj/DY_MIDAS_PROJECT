@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Search, Settings } from "lucide-react";
+import { LayoutDashboard, Search } from "lucide-react";
 import ConnectionStatus from "./ConnectionStatus";
 
 const navItems = [
   { href: "/", label: "대시보드", icon: LayoutDashboard },
   { href: "/explorer", label: "탐색기", icon: Search },
-  { href: "/settings", label: "설정", icon: Settings },
 ];
 
 export default function Sidebar() {
