@@ -15,6 +15,14 @@ interface ProjectData {
 
 type TestResult = { connected: boolean; message: string } | null;
 
+interface StoryRow {
+  id: string;
+  STORY_NAME: string;
+  STORY_LEVEL: number;
+  HEIGHT: number;          // 계산값: 현재층 - 아래층 레벨
+  bFLOOR_DIAPHRAGM: boolean;
+}
+
 // ── 프로젝트 정보 섹션 ─────────────────────────────────────────────────
 function ProjectSection() {
   const [data, setData] = useState<ProjectData>({ PROJECT: "", CLIENT: "", ADDRESS: "", COMMENT: "" });
@@ -27,6 +35,7 @@ function ProjectSection() {
     setSaved(false);
     try {
       const r = await fetch(`${BACKEND_URL}/api/project`);
+      if (!r.ok) throw new Error(`서버 오류: ${r.status}`);
       const d = await r.json();
       setData({ PROJECT: d.PROJECT ?? "", CLIENT: d.CLIENT ?? "", ADDRESS: d.ADDRESS ?? "", COMMENT: d.COMMENT ?? "" });
     } finally {
@@ -39,12 +48,14 @@ function ProjectSection() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setSaved(false);
     try {
-      await fetch(`${BACKEND_URL}/api/project`, {
+      const res = await fetch(`${BACKEND_URL}/api/project`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+      if (!res.ok) throw new Error(`저장 실패: ${res.status}`);
       setSaved(true);
     } finally {
       setSaving(false);
@@ -114,18 +125,24 @@ function SettingsSection() {
     e.preventDefault();
     setSaving(true);
     setSaved(false);
-    const body: Record<string, string> = {};
-    if (baseUrl) body.base_url = baseUrl;
-    if (apiKey) body.api_key = apiKey;
-    await fetch(`${BACKEND_URL}/api/settings`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-    });
-    setSaved(true);
-    setApiKey("");
-    const res = await fetch(`${BACKEND_URL}/api/settings`);
-    const d = await res.json();
-    setMaskedKey(d.api_key_masked ?? "");
-    setSaving(false);
+    try {
+      const body: Record<string, string> = {};
+      if (baseUrl) body.base_url = baseUrl;
+      if (apiKey) body.api_key = apiKey;
+      const saveRes = await fetch(`${BACKEND_URL}/api/settings`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+      if (!saveRes.ok) throw new Error(`저장 실패: ${saveRes.status}`);
+      setSaved(true);
+      setApiKey("");
+      const res = await fetch(`${BACKEND_URL}/api/settings`);
+      if (res.ok) {
+        const d = await res.json();
+        setMaskedKey(d.api_key_masked ?? "");
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleTest = async () => {
@@ -187,6 +204,98 @@ function SettingsSection() {
   );
 }
 
+// ── 층 설정 섹션 ────────────────────────────────────────────────────────
+function StorySection() {
+  const [rows, setRows] = useState<StoryRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch_ = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await fetch(`${BACKEND_URL}/api/midas/db/STOR`);
+      const d = await r.json();
+      const stor: Record<string, Record<string, unknown>> = d?.STOR ?? {};
+
+      // STORY_LEVEL 오름차순 정렬 후 HEIGHT 계산
+      const sorted = Object.entries(stor)
+        .map(([id, v]) => ({
+          id,
+          STORY_NAME:       String(v.STORY_NAME       ?? ""),
+          STORY_LEVEL:      Number(v.STORY_LEVEL       ?? 0),
+          bFLOOR_DIAPHRAGM: Boolean(v.bFLOOR_DIAPHRAGM ?? false),
+        }))
+        .sort((a, b) => a.STORY_LEVEL - b.STORY_LEVEL);
+
+      const parsed: StoryRow[] = sorted.map((row, i) => ({
+        ...row,
+        HEIGHT: i === 0
+          ? row.STORY_LEVEL                          // 최하층: 레벨 자체
+          : row.STORY_LEVEL - sorted[i - 1].STORY_LEVEL,
+      }));
+
+      setRows(parsed.reverse()); // 화면은 상층부터 표시
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetch_(); }, []);
+
+  return (
+    <div className="rounded-xl bg-gray-800 border border-gray-700 p-5 space-y-3">
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-base font-semibold text-white">층 설정</h2>
+        <button onClick={fetch_} disabled={loading}
+          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white disabled:opacity-50 transition-colors">
+          <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+          새로고침
+        </button>
+      </div>
+
+      {error && (
+        <p className="text-xs text-red-400">{error}</p>
+      )}
+
+      {rows.length === 0 && !loading && !error && (
+        <p className="text-xs text-gray-500">데이터 없음</p>
+      )}
+
+      {rows.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs text-left">
+            <thead>
+              <tr className="border-b border-gray-700">
+                <th className="pb-2 pr-4 font-medium text-gray-400">StoryName</th>
+                <th className="pb-2 pr-4 font-medium text-gray-400 text-right">StoryLevel</th>
+                <th className="pb-2 pr-4 font-medium text-gray-400 text-right">StoryHeight</th>
+                <th className="pb-2 font-medium text-gray-400 text-center">Diaphragm</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-b border-gray-700/50 hover:bg-gray-700/30">
+                  <td className="py-1.5 pr-4 text-white">{r.STORY_NAME}</td>
+                  <td className="py-1.5 pr-4 text-gray-300 text-right">{r.STORY_LEVEL.toFixed(3)}</td>
+                  <td className="py-1.5 pr-4 text-gray-300 text-right">{r.HEIGHT.toFixed(3)}</td>
+                  <td className="py-1.5 text-center">
+                    {r.bFLOOR_DIAPHRAGM
+                      ? <span className="text-green-400">●</span>
+                      : <span className="text-gray-600">○</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── 메인 대시보드 ──────────────────────────────────────────────────────
 export default function DashboardPage() {
   return (
@@ -200,6 +309,8 @@ export default function DashboardPage() {
         <ProjectSection />
         <SettingsSection />
       </div>
+
+      <StorySection />
     </div>
   );
 }

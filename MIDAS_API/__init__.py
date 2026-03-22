@@ -2,7 +2,7 @@ import requests
 from colorama import Fore, Style
 from ._midas_api import *
 from ._to_excel import *
-from ._proectDB import projectDB
+from ._projectDB import projectDB
 
 _version_ = "0.0.1"
 _author_ = "Jeong, Jihun"
