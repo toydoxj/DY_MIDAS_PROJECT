@@ -1,14 +1,62 @@
-.env
-.venv/
+# Python
 __pycache__/
-*.pyc
-backend/__pycache__/
-backend/routers/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+.env.local
+
+# Results (generated)
+results/
+
+# Cache
+.cache/
+.pytest_cache/
+.mypy_cache/
+
+# Project build artifacts
 backend/build/
 backend/dist/
-frontend/node_modules/
 frontend/.next/
 frontend/out/
-frontend/.env.local
+frontend/node_modules/
 electron/node_modules/
 electron/dist/
+
+# Claude Code
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db

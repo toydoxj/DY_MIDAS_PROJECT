@@ -1,0 +1,259 @@
+{
+  "mcpServer": {
+    "name": "MIDAS API Connector",
+    "version": "1.0.0",
+    "description": "MIDAS GEN NX REST API 통신 및 모델 데이터 설정",
+    "baseUrl": "http://localhost:8080/api",
+    "authentication": {
+      "type": "apiKey",
+      "keyHeader": "X-API-Key"
+    },
+    "tools": [
+      {
+        "name": "midas_set_data",
+        "description": "MIDAS GEN NX에 모델 데이터 설정 (ModelingInfo, LoadCase, Member, Section, Material 등)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "project_id": {
+              "type": "string",
+              "description": "MIDAS 프로젝트 ID"
+            },
+            "model_type": {
+              "type": "string",
+              "enum": [
+                "ModelingInfo",
+                "LoadCase",
+                "Member",
+                "Section",
+                "Material",
+                "Boundary"
+              ],
+              "description": "설정할 모델 타입"
+            },
+            "data_payload": {
+              "type": "object",
+              "description": "모델별 데이터 페이로드"
+            }
+          },
+          "required": [
+            "project_id",
+            "model_type",
+            "data_payload"
+          ]
+        },
+        "endpoint": "POST /projects/{project_id}/models/{model_type}",
+        "example": {
+          "request": {
+            "project_id": "proj_001",
+            "model_type": "LoadCase",
+            "data_payload": {
+              "loadCaseId": "LC_DL",
+              "name": "Dead Load",
+              "loadType": "Static",
+              "forces": {
+                "Fy": -50.0
+              }
+            }
+          },
+          "response": {
+            "status": "success",
+            "modelId": "LC_DL",
+            "message": "LoadCase 설정 완료"
+          }
+        }
+      },
+      {
+        "name": "midas_run_analysis",
+        "description": "MIDAS에서 해석 실행 (Static, Eigen, ResponseSpectrum, TimeHistory)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "project_id": {
+              "type": "string",
+              "description": "MIDAS 프로젝트 ID"
+            },
+            "loadcase_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "실행할 loadcase ID 목록"
+            },
+            "analysis_type": {
+              "type": "string",
+              "enum": [
+                "static",
+                "eigen",
+                "response_spectrum",
+                "time_history"
+              ],
+              "description": "해석 유형"
+            },
+            "options": {
+              "type": "object",
+              "description": "추가 옵션 (소수점 이하 자릿수, 수렴 기준 등)",
+              "properties": {
+                "precision": {
+                  "type": "integer",
+                  "default": 6
+                },
+                "convergence_tol": {
+                  "type": "number",
+                  "default": 0.001
+                }
+              }
+            }
+          },
+          "required": [
+            "project_id",
+            "loadcase_ids"
+          ]
+        },
+        "endpoint": "POST /projects/{project_id}/analysis",
+        "example": {
+          "request": {
+            "project_id": "proj_001",
+            "loadcase_ids": [
+              "LC_DL",
+              "LC_LL"
+            ],
+            "analysis_type": "static"
+          },
+          "response": {
+            "status": "success",
+            "analysis_id": "analysis_001",
+            "loadcases_analyzed": 2,
+            "duration_seconds": 15.3
+          }
+        }
+      },
+      {
+        "name": "midas_get_results",
+        "description": "해석 결과 조회 (변위, 응력, 반력 등)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "project_id": {
+              "type": "string",
+              "description": "MIDAS 프로젝트 ID"
+            },
+            "result_type": {
+              "type": "string",
+              "enum": [
+                "displacement",
+                "stress",
+                "reaction",
+                "internal_force"
+              ],
+              "description": "결과 타입"
+            },
+            "loadcase_id": {
+              "type": "string",
+              "description": "특정 loadcase 결과 조회"
+            },
+            "filter": {
+              "type": "object",
+              "description": "필터링 조건 (노드 범위, 부재 ID 등)",
+              "properties": {
+                "node_range": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                "member_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "project_id",
+            "result_type"
+          ]
+        },
+        "endpoint": "GET /projects/{project_id}/results/{result_type}"
+      },
+      {
+        "name": "midas_export_model",
+        "description": "MIDAS 모델을 파일로 내보내기 (MCT, MGB, XLSX, etc.)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "project_id": {
+              "type": "string",
+              "description": "MIDAS 프로젝트 ID"
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "mct",
+                "mgb",
+                "xlsx",
+                "json",
+                "pdf"
+              ],
+              "description": "내보내기 포맷"
+            },
+            "include_results": {
+              "type": "boolean",
+              "default": true,
+              "description": "해석 결과 포함 여부"
+            },
+            "output_path": {
+              "type": "string",
+              "description": "저장 경로"
+            }
+          },
+          "required": [
+            "project_id",
+            "format"
+          ]
+        },
+        "endpoint": "POST /projects/{project_id}/export"
+      },
+      {
+        "name": "midas_get_project",
+        "description": "MIDAS 프로젝트 정보 조회",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "project_id": {
+              "type": "string",
+              "description": "MIDAS 프로젝트 ID"
+            }
+          },
+          "required": [
+            "project_id"
+          ]
+        },
+        "endpoint": "GET /projects/{project_id}"
+      }
+    ],
+    "errorHandling": {
+      "retryPolicy": {
+        "maxRetries": 3,
+        "backoffFactor": 2.0,
+        "initialDelay": 1000,
+        "maxDelay": 10000
+      },
+      "errorCodes": {
+        "400": "Bad Request - 요청 형식 오류",
+        "401": "Unauthorized - 인증 실패",
+        "403": "Forbidden - 권한 부족",
+        "404": "Not Found - 프로젝트/리소스 없음",
+        "500": "Server Error - MIDAS 서버 오류",
+        "503": "Service Unavailable - 서비스 불가"
+      }
+    },
+    "rateLimiting": {
+      "requestsPerSecond": 10,
+      "requestsPerMinute": 500,
+      "burstSize": 20
+    }
+  }
+}
