@@ -41,6 +41,7 @@ import MIDAS_API as MIDAS
 
 base_url = os.environ.get("MIDAS_BASE_URL", "")
 api_key = os.environ.get("MIDAS_API_KEY", "")
+google_api_key = os.environ.get("GOOGLE_API_KEY", "")
 
 if base_url:
     MIDAS.MIDAS_API_BASEURL(base_url)
@@ -66,6 +67,11 @@ app.include_router(midas_router.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
 app.include_router(project_router.router, prefix="/api")
 app.include_router(loadcase_router.router, prefix="/api")
+
+
+@app.get("/api/gmaps-key")
+def get_gmaps_key():
+    return {"key": google_api_key}
 
 
 @app.get("/health")

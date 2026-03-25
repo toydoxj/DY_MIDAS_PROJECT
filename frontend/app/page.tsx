@@ -4,7 +4,17 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { RefreshCw, CheckCircle, XCircle, Loader2, MapPin, Search } from "lucide-react";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
-const GMAPS_KEY = process.env.NEXT_PUBLIC_GMAPS_KEY ?? "";
+
+let _gmapsKey = "";
+async function getGmapsKey(): Promise<string> {
+  if (_gmapsKey) return _gmapsKey;
+  try {
+    const r = await fetch(`${BACKEND_URL}/api/gmaps-key`);
+    const d = await r.json();
+    _gmapsKey = d.key ?? "";
+  } catch { /* ignore */ }
+  return _gmapsKey;
+}
 
 // ── 타입 ──────────────────────────────────────────────────────────────
 interface ProjectData {
@@ -130,24 +140,33 @@ const DARK_MAP_STYLES = [
   { featureType: "transit", stylers: [{ visibility: "off" }] },
 ];
 
+let _loadPromise: Promise<void> | null = null;
 function loadGoogleMaps(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (typeof google !== "undefined" && google.maps) { resolve(); return; }
+  if (typeof google !== "undefined" && google.maps) return Promise.resolve();
+  if (_loadPromise) return _loadPromise;
+  _loadPromise = (async () => {
+    // 이전 HMR로 남은 스크립트가 있으면 재사용
     if (document.getElementById("gmaps-script")) {
-      const check = setInterval(() => {
-        if (typeof google !== "undefined" && google.maps) { clearInterval(check); resolve(); }
-      }, 100);
+      await new Promise<void>((resolve) => {
+        const check = setInterval(() => {
+          if (typeof google !== "undefined" && google.maps) { clearInterval(check); resolve(); }
+        }, 100);
+      });
       return;
     }
-    const script = document.createElement("script");
-    script.id = "gmaps-script";
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&libraries=places&language=ko&region=KR`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Google Maps 로드 실패"));
-    document.head.appendChild(script);
-  });
+    const key = await getGmapsKey();
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.id = "gmaps-script";
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&language=ko&region=KR&loading=async`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => resolve();
+      script.onerror = () => { _loadPromise = null; reject(new Error("Google Maps 로드 실패")); };
+      document.head.appendChild(script);
+    });
+  })();
+  return _loadPromise;
 }
 
 declare const google: any;   // eslint-disable-line @typescript-eslint/no-explicit-any
