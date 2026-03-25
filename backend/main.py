@@ -60,10 +60,12 @@ app.add_middleware(
 from routers import midas as midas_router
 from routers import settings as settings_router
 from routers import project as project_router
+from routers import loadcase as loadcase_router
 
 app.include_router(midas_router.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
 app.include_router(project_router.router, prefix="/api")
+app.include_router(loadcase_router.router, prefix="/api")
 
 
 @app.get("/health")

@@ -3,6 +3,7 @@ from colorama import Fore, Style
 from ._midas_api import *
 from ._to_excel import *
 from ._projectDB import projectDB
+from ._loadCaseDB import loadCaseDB
 
 _version_ = "0.0.1"
 _author_ = "Jeong, Jihun"
