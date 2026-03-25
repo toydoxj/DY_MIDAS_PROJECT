@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { RefreshCw, CheckCircle, XCircle, Loader2, MapPin, Search } from "lucide-react";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
-const GMAPS_KEY = "AIzaSyASWyn_2d_GsDk0a8yNJTTGK30LTSAFRNY";
+const GMAPS_KEY = process.env.NEXT_PUBLIC_GMAPS_KEY ?? "";
 
 // ── 타입 ──────────────────────────────────────────────────────────────
 interface ProjectData {
