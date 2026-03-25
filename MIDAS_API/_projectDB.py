@@ -22,3 +22,14 @@ class projectDB:
             raise RuntimeError("PJCF 데이터가 없습니다. get()으로 먼저 데이터를 가져오세요.")
         body = {"Assign": pjcf}
         return MidasAPI("PUT", "/db/PJCF", body)
+
+
+class structureTypeDB:
+    _data: dict = {}
+
+    @classmethod
+    def get(cls) -> dict:
+        """MIDAS GEN NX API에서 Structure Type(STYP) 정보를 가져와 클래스 변수에 저장"""
+        result = MidasAPI("GET", "/db/STYP")
+        cls._data = result
+        return result

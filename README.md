@@ -11,7 +11,7 @@ Task_MIDAS/
 ├── MIDAS_API/                  # Python API 래퍼 라이브러리
 │   ├── _midas_api.py           # REST API 클라이언트 (핵심)
 │   ├── _projectDB.py           # 프로젝트 DB 클래스
-│   ├── _loadCaseDB.py          # Static Load Case DB 클래스
+│   ├── _staticloads.py         # Static Load Case / Self-Weight DB 클래스
 │   └── _to_excel.py            # JSON → DataFrame 변환
 │
 ├── backend/                    # FastAPI 백엔드
@@ -60,7 +60,7 @@ cd frontend && npm run dev
 
 ## 주요 기능
 
-- **대시보드**: 프로젝트 정보, API 설정, 풍속 등치선 지도, 층 설정 조회
+- **대시보드**: 프로젝트 정보, API 설정, 자중입력 확인, 풍속 등치선 지도, 층 설정 조회
 - **하중정보**: Static Load Case 편집 (추가/수정/삭제 → MIDAS 동기화)
 - **탐색기**: MIDAS API 엔드포인트 직접 테스트
 

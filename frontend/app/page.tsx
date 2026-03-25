@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { RefreshCw, CheckCircle, XCircle, Loader2, MapPin, Search } from "lucide-react";
+import { RefreshCw, CheckCircle, XCircle, Loader2, MapPin, Search, Settings2 } from "lucide-react";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 
@@ -34,12 +34,57 @@ interface StoryRow {
   bFLOOR_DIAPHRAGM: boolean;
 }
 
+// ── 층 데이터에서 자동 계산 ─────────────────────────────────────────────
+function calcFromStory(rows: StoryRow[]) {
+  let aboveFloors = 0;
+  let belowFloors = 0;
+  let maxLevel = 0;
+
+  for (const r of rows) {
+    const name = r.STORY_NAME.trim();
+    // 지상층: {숫자}F 패턴
+    const aboveMatch = name.match(/^(\d+)F$/i);
+    if (aboveMatch) aboveFloors = Math.max(aboveFloors, parseInt(aboveMatch[1]));
+    // 지하층: B{숫자} 또는 B{숫자}F 패턴
+    const belowMatch = name.match(/^B(\d+)F?$/i);
+    if (belowMatch) belowFloors = Math.max(belowFloors, parseInt(belowMatch[1]));
+    // 해석높이: 최대 STORY_LEVEL
+    if (r.STORY_LEVEL > maxLevel) maxLevel = r.STORY_LEVEL;
+  }
+
+  return { aboveFloors, belowFloors, analysisHeight: maxLevel };
+}
+
+// COMMENT JSON 파싱/생성 유틸
+function parseComment(comment: string): { projectCode: string; floorArea: string; actualHeight: string } {
+  try {
+    const obj = JSON.parse(comment);
+    return {
+      projectCode: obj["PROJECT_CODE"] ?? "",
+      floorArea: obj["FLOOR_AREA"] ?? "",
+      actualHeight: obj["ACTUAL_HEIGHT"] ?? "",
+    };
+  } catch {
+    // 기존 문자열 COMMENT → projectCode로 사용
+    return { projectCode: comment, floorArea: "", actualHeight: "" };
+  }
+}
+
+function buildComment(projectCode: string, floorArea: string, actualHeight: string): string {
+  return JSON.stringify({ PROJECT_CODE: projectCode, FLOOR_AREA: floorArea, ACTUAL_HEIGHT: actualHeight });
+}
+
 // ── 프로젝트 정보 섹션 ─────────────────────────────────────────────────
-function ProjectSection({ onAddressChange }: { onAddressChange: (addr: string) => void }) {
+function ProjectSection({ onAddressChange, storyRows }: { onAddressChange: (addr: string) => void; storyRows: StoryRow[] }) {
   const [data, setData] = useState<ProjectData>({ PROJECT: "", CLIENT: "", ADDRESS: "", COMMENT: "" });
+  const [projectCode, setProjectCode] = useState("");
+  const [floorArea, setFloorArea] = useState("");
+  const [actualHeight, setActualHeight] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const { aboveFloors, belowFloors, analysisHeight } = calcFromStory(storyRows);
 
   const fetch_ = async () => {
     setLoading(true);
@@ -51,6 +96,10 @@ function ProjectSection({ onAddressChange }: { onAddressChange: (addr: string) =
       const newData = { PROJECT: d.PROJECT ?? "", CLIENT: d.CLIENT ?? "", ADDRESS: d.ADDRESS ?? "", COMMENT: d.COMMENT ?? "" };
       setData(newData);
       if (newData.ADDRESS) onAddressChange(newData.ADDRESS);
+      const parsed = parseComment(newData.COMMENT);
+      setProjectCode(parsed.projectCode);
+      setFloorArea(parsed.floorArea);
+      setActualHeight(parsed.actualHeight);
     } finally {
       setLoading(false);
     }
@@ -63,10 +112,14 @@ function ProjectSection({ onAddressChange }: { onAddressChange: (addr: string) =
     setSaving(true);
     setSaved(false);
     try {
+      const saveData = {
+        ...data,
+        COMMENT: buildComment(projectCode, floorArea, actualHeight),
+      };
       const res = await fetch(`${BACKEND_URL}/api/project`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(saveData),
       });
       if (!res.ok) throw new Error(`저장 실패: ${res.status}`);
       setSaved(true);
@@ -76,7 +129,6 @@ function ProjectSection({ onAddressChange }: { onAddressChange: (addr: string) =
   };
 
   const fields: { key: keyof ProjectData; label: string }[] = [
-    { key: "COMMENT", label: "Project CODE" },
     { key: "PROJECT", label: "프로젝트명" },
     { key: "CLIENT",  label: "발주처" },
     { key: "ADDRESS", label: "주소" },
@@ -91,6 +143,13 @@ function ProjectSection({ onAddressChange }: { onAddressChange: (addr: string) =
           <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
           새로고침
         </button>
+      </div>
+
+      {/* Project CODE (별도 관리) */}
+      <div>
+        <label className="block text-xs font-medium text-gray-400 mb-1">Project CODE</label>
+        <input value={projectCode} onChange={(e) => setProjectCode(e.target.value)}
+          className="w-full rounded-lg bg-gray-700 border border-gray-600 px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -108,6 +167,40 @@ function ProjectSection({ onAddressChange }: { onAddressChange: (addr: string) =
             />
           </div>
         ))}
+        <div>
+          <label className="block text-xs font-medium text-gray-400 mb-1">연면적 (m²)</label>
+          <input value={floorArea} onChange={(e) => setFloorArea(e.target.value)}
+            placeholder="수동 입력"
+            className="w-full rounded-lg bg-gray-700 border border-gray-600 px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+      </div>
+
+      {/* 층수/높이 정보 */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div>
+          <label className="block text-xs font-medium text-gray-400 mb-1">지상층수</label>
+          <div className="rounded-lg bg-gray-700/50 border border-gray-600 px-3 py-1.5 text-sm text-gray-300">
+            {aboveFloors > 0 ? `${aboveFloors}F` : "-"}
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-400 mb-1">지하층수</label>
+          <div className="rounded-lg bg-gray-700/50 border border-gray-600 px-3 py-1.5 text-sm text-gray-300">
+            {belowFloors > 0 ? `B${belowFloors}` : "-"}
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-400 mb-1">해석높이 (m)</label>
+          <div className="rounded-lg bg-gray-700/50 border border-gray-600 px-3 py-1.5 text-sm text-gray-300">
+            {analysisHeight > 0 ? analysisHeight.toFixed(3) : "-"}
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-400 mb-1">실제높이 (m)</label>
+          <input value={actualHeight} onChange={(e) => setActualHeight(e.target.value)}
+            placeholder="수동 입력"
+            className="w-full rounded-lg bg-gray-700 border border-gray-600 px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
       </div>
 
       <div className="flex items-center gap-3 pt-1">
@@ -142,14 +235,14 @@ const DARK_MAP_STYLES = [
 
 let _loadPromise: Promise<void> | null = null;
 function loadGoogleMaps(): Promise<void> {
-  if (typeof google !== "undefined" && google.maps) return Promise.resolve();
+  if (typeof google !== "undefined" && google.maps?.Map) return Promise.resolve();
   if (_loadPromise) return _loadPromise;
   _loadPromise = (async () => {
     // 이전 HMR로 남은 스크립트가 있으면 재사용
     if (document.getElementById("gmaps-script")) {
       await new Promise<void>((resolve) => {
         const check = setInterval(() => {
-          if (typeof google !== "undefined" && google.maps) { clearInterval(check); resolve(); }
+          if (typeof google !== "undefined" && google.maps?.Map) { clearInterval(check); resolve(); }
         }, 100);
       });
       return;
@@ -161,7 +254,15 @@ function loadGoogleMaps(): Promise<void> {
       script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&language=ko&region=KR&loading=async`;
       script.async = true;
       script.defer = true;
-      script.onload = () => resolve();
+      script.onload = () => {
+        // loading=async 모드에서는 script onload 후에도 google.maps.Map이 아직 없을 수 있음
+        const wait = setInterval(() => {
+          if (typeof google !== "undefined" && google.maps && google.maps.Map) {
+            clearInterval(wait);
+            resolve();
+          }
+        }, 50);
+      };
       script.onerror = () => { _loadPromise = null; reject(new Error("Google Maps 로드 실패")); };
       document.head.appendChild(script);
     });
@@ -208,12 +309,16 @@ function MapSection({ address }: { address: string }) {
       class ContourOverlay extends google.maps.OverlayView {
         _opacity = 0.95;
         div: HTMLDivElement | null = null;
+        bg: HTMLDivElement | null = null;
         img = new Image();
         constructor() { super(); this.img.src = "/windloadmap_warped.png"; }
         onAdd() {
           this.div = document.createElement("div");
           this.div.style.cssText = "position:absolute;";
+          this.bg = document.createElement("div");
+          this.bg.style.cssText = `width:100%;height:100%;position:absolute;background:white;opacity:${this._opacity};`;
           this.img.style.cssText = `width:100%;height:100%;position:absolute;opacity:${this._opacity};`;
+          this.div.appendChild(this.bg);
           this.div.appendChild(this.img);
           this.getPanes().overlayLayer.appendChild(this.div);
         }
@@ -228,7 +333,11 @@ function MapSection({ address }: { address: string }) {
           this.div.style.height = (sw.y - ne.y) + "px";
         }
         onRemove() { this.div?.remove(); }
-        setOpacity(v: number) { this._opacity = v; if (this.img) this.img.style.opacity = String(v); }
+        setOpacity(v: number) {
+          this._opacity = v;
+          if (this.img) this.img.style.opacity = String(v);
+          if (this.bg) this.bg.style.opacity = String(v);
+        }
       }
 
       const overlay = new ContourOverlay();
@@ -336,6 +445,198 @@ function MapSection({ address }: { address: string }) {
   );
 }
 
+// ── 자중입력 확인 섹션 ──────────────────────────────────────────────────
+interface SelfWeightRow {
+  id: string;
+  LCNAME: string;
+  GROUP_NAME: string;
+  FV: number[];
+  factor: number | null;
+  valid: boolean;
+}
+
+interface StructureMass {
+  MASS_LABEL: string;
+  SMASS_LABEL: string;
+}
+
+interface LoadToMassData {
+  DIR_X: boolean;
+  DIR_Y: boolean;
+  DIR_Z: boolean;
+  bNODAL: boolean;
+  bBEAM: boolean;
+  bFLOOR: boolean;
+  bPRES: boolean;
+  vLC: { LCNAME: string; FACTOR: number }[];
+}
+
+function SelfWeightSection() {
+  const [rows, setRows] = useState<SelfWeightRow[]>([]);
+  const [massDat, setMassDat] = useState<StructureMass | null>(null);
+  const [ltomDat, setLtomDat] = useState<LoadToMassData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [swRes, massRes, ltomRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/selfweight`),
+        fetch(`${BACKEND_URL}/api/structure-mass`),
+        fetch(`${BACKEND_URL}/api/load-to-mass`),
+      ]);
+      if (!swRes.ok) throw new Error(`서버 오류: ${swRes.status}`);
+      setRows(await swRes.json());
+      if (massRes.ok) setMassDat(await massRes.json());
+      if (ltomRes.ok) setLtomDat(await ltomRes.json());
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  return (
+    <div className="rounded-xl bg-gray-800 border border-gray-700 p-5 space-y-3">
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-base font-semibold text-white flex items-center gap-2">
+          <Settings2 size={16} />
+          SETTING
+        </h2>
+        <button onClick={fetchData} disabled={loading}
+          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white disabled:opacity-50 transition-colors">
+          <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+          새로고침
+        </button>
+      </div>
+
+      {error && <p className="text-xs text-red-400">{error}</p>}
+
+      {/* Structure Mass */}
+      {massDat && (
+        <div className="rounded-lg bg-gray-700/40 border border-gray-600/50 p-3 space-y-2">
+          <h3 className="text-xs font-semibold text-blue-400">Structure Mass</h3>
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="rounded-md bg-gray-800/60 px-3 py-2">
+              <span className="text-gray-500 text-[10px] uppercase tracking-wide">Mass Type</span>
+              <div className="text-white font-medium mt-0.5">{massDat.MASS_LABEL}</div>
+            </div>
+            <div className="rounded-md bg-gray-800/60 px-3 py-2">
+              <span className="text-gray-500 text-[10px] uppercase tracking-wide">Convert Mass</span>
+              <div className="text-white font-medium mt-0.5">{massDat.SMASS_LABEL}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 자중입력 확인 */}
+      <div className="rounded-lg bg-gray-700/40 border border-gray-600/50 p-3 space-y-2">
+        <h3 className="text-xs font-semibold text-blue-400">자중입력 확인</h3>
+
+        {rows.length === 0 && !loading && !error && (
+          <p className="text-xs text-gray-500">데이터 없음</p>
+        )}
+
+        {rows.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="border-b border-gray-600/50">
+                  <th className="pb-2 pr-4 font-medium text-gray-400">Load Case</th>
+                  <th className="pb-2 pr-4 font-medium text-gray-400 text-right">Factor</th>
+                  <th className="pb-2 font-medium text-gray-400 text-center w-10"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className="border-b border-gray-700/30 hover:bg-gray-600/20">
+                    <td className="py-1.5 pr-4 text-white">{r.LCNAME}</td>
+                    <td className="py-1.5 pr-4 text-gray-300 text-right">
+                      {r.factor !== null ? r.factor : "-"}
+                    </td>
+                    <td className="py-1.5 text-center text-lg">
+                      {r.valid
+                        ? <span className="text-green-400">●</span>
+                        : <span className="text-red-400">●</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Loads to Masses */}
+      <div className="rounded-lg bg-gray-700/40 border border-gray-600/50 p-3 space-y-2">
+        <h3 className="text-xs font-semibold text-blue-400">Loads to Masses</h3>
+
+        {!ltomDat && !loading && (
+          <p className="text-xs text-gray-500">데이터 없음</p>
+        )}
+
+        {ltomDat && (
+          <>
+            {/* Direction & Load Types */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Mass Direction</span>
+                <div className="flex gap-1.5">
+                  {(["X", "Y", "Z"] as const).map((d) => (
+                    <span key={d} className={ltomDat[`DIR_${d}`] ? "text-green-400" : "text-gray-600"}>
+                      {ltomDat[`DIR_${d}`] ? "\u2713" : "\u2717"}{d}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div />
+              {([
+                ["bNODAL", "Nodal Load"],
+                ["bBEAM", "Beam Load"],
+                ["bFLOOR", "Floor Load"],
+                ["bPRES", "Pressure"],
+              ] as const).map(([key, label]) => (
+                <div key={key} className="flex items-center justify-between">
+                  <span className="text-gray-400">{label}</span>
+                  <span className={ltomDat[key] ? "text-green-400" : "text-gray-600"}>
+                    {ltomDat[key] ? "\u2713" : "\u2717"}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Load Case List */}
+            {ltomDat.vLC.length > 0 && (
+              <div className="mt-2">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="border-b border-gray-600/50">
+                      <th className="pb-1 pr-4 font-medium text-gray-400">Load Case</th>
+                      <th className="pb-1 font-medium text-gray-400 text-right">Scale Factor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ltomDat.vLC.map((lc, i) => (
+                      <tr key={i} className="border-b border-gray-700/30">
+                        <td className="py-1 pr-4 text-white">{lc.LCNAME}</td>
+                        <td className="py-1 text-gray-300 text-right">{lc.FACTOR}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── 설정 섹션 ──────────────────────────────────────────────────────────
 function SettingsSection() {
   const [baseUrl, setBaseUrl] = useState("");
@@ -437,7 +738,7 @@ function SettingsSection() {
 }
 
 // ── 층 설정 섹션 ────────────────────────────────────────────────────────
-function StorySection() {
+function StorySection({ onRowsChange }: { onRowsChange: (rows: StoryRow[]) => void }) {
   const [rows, setRows] = useState<StoryRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -467,7 +768,9 @@ function StorySection() {
           : row.STORY_LEVEL - sorted[i - 1].STORY_LEVEL,
       }));
 
-      setRows(parsed.reverse()); // 화면은 상층부터 표시
+      const reversed = parsed.reverse(); // 화면은 상층부터 표시
+      setRows(reversed);
+      onRowsChange(reversed);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -531,6 +834,7 @@ function StorySection() {
 // ── 메인 대시보드 ──────────────────────────────────────────────────────
 export default function DashboardPage() {
   const [address, setAddress] = useState("");
+  const [storyRows, setStoryRows] = useState<StoryRow[]>([]);
 
   return (
     <div className="space-y-6">
@@ -540,13 +844,14 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <ProjectSection onAddressChange={setAddress} />
+        <ProjectSection onAddressChange={setAddress} storyRows={storyRows} />
         <SettingsSection />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <MapSection address={address} />
-        <StorySection />
+        <SelfWeightSection />
+        <StorySection onRowsChange={setStoryRows} />
       </div>
     </div>
   );
