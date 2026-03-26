@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
 import { BACKEND_URL, StoryRow } from "@/lib/types";
+import SectionCard from "@/components/ui/SectionCard";
+import RefreshButton from "@/components/ui/RefreshButton";
+import { ErrorText } from "@/components/ui/StatusMessage";
 
 export default function StorySection({ onRowsChange }: { onRowsChange: (rows: StoryRow[]) => void }) {
   const [rows, setRows] = useState<StoryRow[]>([]);
@@ -27,38 +29,38 @@ export default function StorySection({ onRowsChange }: { onRowsChange: (rows: St
 
   useEffect(() => { fetch_(); }, []);
 
+  const headerAction = <RefreshButton onClick={fetch_} loading={loading} />;
+
   return (
-    <div className="rounded-xl bg-gray-800 border border-gray-700 p-5 space-y-3">
-      <div className="flex items-center justify-between mb-1">
-        <h2 className="text-base font-semibold text-white">층 설정</h2>
-        <button onClick={fetch_} disabled={loading} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white disabled:opacity-50 transition-colors">
-          <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> 새로고침
-        </button>
-      </div>
-      {error && <p className="text-xs text-red-400">{error}</p>}
+    <SectionCard title="층 설정" action={headerAction}>
+      {error && <ErrorText message={error} />}
       {rows.length === 0 && !loading && !error && <p className="text-xs text-gray-500">데이터 없음</p>}
       {rows.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
-            <thead><tr className="border-b border-gray-700">
-              <th className="pb-2 pr-4 font-medium text-gray-400">StoryName</th>
-              <th className="pb-2 pr-4 font-medium text-gray-400 text-right">StoryLevel</th>
-              <th className="pb-2 pr-4 font-medium text-gray-400 text-right">StoryHeight</th>
-              <th className="pb-2 font-medium text-gray-400 text-center">Diaphragm</th>
-            </tr></thead>
+            <thead>
+              <tr className="border-b border-gray-700">
+                <th className="pb-2 pr-4 font-medium text-gray-400">StoryName</th>
+                <th className="pb-2 pr-4 font-medium text-gray-400 text-right">StoryLevel</th>
+                <th className="pb-2 pr-4 font-medium text-gray-400 text-right">StoryHeight</th>
+                <th className="pb-2 font-medium text-gray-400 text-center">Diaphragm</th>
+              </tr>
+            </thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-b border-gray-700/50 hover:bg-gray-700/30">
                   <td className="py-1.5 pr-4 text-white">{r.STORY_NAME}</td>
                   <td className="py-1.5 pr-4 text-gray-300 text-right">{r.STORY_LEVEL.toFixed(3)}</td>
                   <td className="py-1.5 pr-4 text-gray-300 text-right">{r.HEIGHT.toFixed(3)}</td>
-                  <td className="py-1.5 text-center">{r.bFLOOR_DIAPHRAGM ? <span className="text-green-400">●</span> : <span className="text-gray-600">○</span>}</td>
+                  <td className="py-1.5 text-center">
+                    {r.bFLOOR_DIAPHRAGM ? <span className="text-green-400">●</span> : <span className="text-gray-600">○</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
-    </div>
+    </SectionCard>
   );
 }

@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RefreshCw, CheckCircle, Save, Plus, Trash2, ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { Save, Plus, Trash2 } from "lucide-react";
 import { BACKEND_URL } from "@/lib/types";
+import PageHeader from "@/components/ui/PageHeader";
+import SectionCard from "@/components/ui/SectionCard";
+import Button from "@/components/ui/Button";
+import RefreshButton from "@/components/ui/RefreshButton";
+import { SavedBadge, ErrorText } from "@/components/ui/StatusMessage";
 
 const TYPE_MAP: Record<string, string> = {
   D: "Dead Load",
@@ -68,35 +72,28 @@ export default function StaticLoadCasePage() {
     finally { setSaving(false); }
   };
 
+  const headerAction = (
+    <>
+      {saved && <SavedBadge label="업데이트됨" />}
+      <RefreshButton onClick={fetchData} loading={loading} />
+      <Button
+        size="xs"
+        onClick={handleSave}
+        disabled={rows.length === 0}
+        loading={saving}
+        icon={<Save size={13} />}
+      >
+        {saving ? "업데이트 중..." : "MIDAS에 업데이트"}
+      </Button>
+    </>
+  );
+
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <Link href="/loadcase" className="text-gray-400 hover:text-white transition-colors">
-          <ArrowLeft size={20} />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-white">Static Load Case</h1>
-          <p className="text-gray-400 mt-1">정적 하중 케이스 관리</p>
-        </div>
-      </div>
+      <PageHeader title="Static Load Case" subtitle="정적 하중 케이스 관리" backHref="/loadcase" />
 
-      <div className="rounded-xl bg-gray-800 border border-gray-700 p-5 space-y-3">
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="text-base font-semibold text-white">Load Case 목록</h2>
-          <div className="flex items-center gap-3">
-            {saved && <span className="text-xs text-green-400 flex items-center gap-1"><CheckCircle size={13} />업데이트됨</span>}
-            <button onClick={fetchData} disabled={loading}
-              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white disabled:opacity-50 transition-colors">
-              <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> 새로고침
-            </button>
-            <button onClick={handleSave} disabled={saving || rows.length === 0}
-              className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors">
-              <Save size={13} /> {saving ? "업데이트 중..." : "MIDAS에 업데이트"}
-            </button>
-          </div>
-        </div>
-
-        {error && <p className="text-xs text-red-400">{error}</p>}
+      <SectionCard title="Load Case 목록" action={headerAction}>
+        {error && <ErrorText message={error} />}
 
         {rows.length === 0 && !loading && !error && (
           <p className="text-xs text-gray-500">데이터 없음</p>
@@ -150,7 +147,7 @@ export default function StaticLoadCasePage() {
         <button onClick={addRow} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors mt-2">
           <Plus size={13} /> Load Case 추가
         </button>
-      </div>
+      </SectionCard>
     </div>
   );
 }
