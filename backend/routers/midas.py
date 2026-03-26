@@ -1,7 +1,7 @@
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Body
-from typing import Any
 import MIDAS_API as MIDAS
 
 from exceptions import MidasApiError
@@ -20,7 +20,7 @@ def get_midas(path: str) -> Any:
 
 
 @router.post("/midas/{path:path}")
-def post_midas(path: str, body: dict = Body(default={})) -> Any:
+def post_midas(path: str, body: dict[str, Any] = Body(default={})) -> Any:
     try:
         return MIDAS.MidasAPI("POST", f"/{path}", body)
     except Exception as e:
@@ -29,7 +29,7 @@ def post_midas(path: str, body: dict = Body(default={})) -> Any:
 
 
 @router.put("/midas/{path:path}")
-def put_midas(path: str, body: dict = Body(default={})) -> Any:
+def put_midas(path: str, body: dict[str, Any] = Body(default={})) -> Any:
     try:
         return MIDAS.MidasAPI("PUT", f"/{path}", body)
     except Exception as e:
