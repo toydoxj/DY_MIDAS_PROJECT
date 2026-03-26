@@ -1,7 +1,7 @@
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException
-from typing import Any
 import MIDAS_API as MIDAS
 
 router = APIRouter()
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 @router.get("/midas/{path:path}")
 def get_midas(path: str) -> Any:
     try:
-        result = MIDAS.MidasAPI("GET", f"/{path}")
+        result: Any = MIDAS.MidasAPI("GET", f"/{path}")
         return result
     except Exception as e:
         logger.error("MIDAS API 오류 [GET /%s]: %s", path, e)
@@ -19,9 +19,9 @@ def get_midas(path: str) -> Any:
 
 
 @router.post("/midas/{path:path}")
-def post_midas(path: str, body: dict = Body(default={})) -> Any:
+def post_midas(path: str, body: dict[str, Any] = Body(default={})) -> Any:
     try:
-        result = MIDAS.MidasAPI("POST", f"/{path}", body)
+        result: Any = MIDAS.MidasAPI("POST", f"/{path}", body)
         return result
     except Exception as e:
         logger.error("MIDAS API 오류 [POST /%s]: %s", path, e)
@@ -29,9 +29,9 @@ def post_midas(path: str, body: dict = Body(default={})) -> Any:
 
 
 @router.put("/midas/{path:path}")
-def put_midas(path: str, body: dict = Body(default={})) -> Any:
+def put_midas(path: str, body: dict[str, Any] = Body(default={})) -> Any:
     try:
-        result = MIDAS.MidasAPI("PUT", f"/{path}", body)
+        result: Any = MIDAS.MidasAPI("PUT", f"/{path}", body)
         return result
     except Exception as e:
         logger.error("MIDAS API 오류 [PUT /%s]: %s", path, e)
@@ -41,7 +41,7 @@ def put_midas(path: str, body: dict = Body(default={})) -> Any:
 @router.delete("/midas/{path:path}")
 def delete_midas(path: str) -> Any:
     try:
-        result = MIDAS.MidasAPI("DELETE", f"/{path}")
+        result: Any = MIDAS.MidasAPI("DELETE", f"/{path}")
         return result
     except Exception as e:
         logger.error("MIDAS API 오류 [DELETE /%s]: %s", path, e)
