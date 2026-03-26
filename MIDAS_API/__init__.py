@@ -2,6 +2,7 @@ import requests
 from colorama import Fore, Style
 from ._midas_api import *
 from ._to_excel import *
+from ._client import MidasClient
 from ._project import projectDB
 from ._loads import loadCaseDB, selfWeightDB, loadToMassDB
 from ._analysis import structureTypeDB
