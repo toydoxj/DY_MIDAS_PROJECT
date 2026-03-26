@@ -100,56 +100,6 @@
     "liveLoad": "3"
   },
   {
-    "id": 4,
-    "floor": "지붕층",
-    "roomName": "평지붕(태양광, 실외기, 공조기)",
-    "desc": "",
-    "finishes": [
-      {
-        "material": "장비 PAD",
-        "density": "200",
-        "thickness": "24",
-        "load": "4.80"
-      },
-      {
-        "material": "기타",
-        "density": "",
-        "thickness": "",
-        "load": "0.3"
-      },
-      {
-        "material": "",
-        "density": "",
-        "thickness": "",
-        "load": ""
-      },
-      {
-        "material": "",
-        "density": "",
-        "thickness": "",
-        "load": ""
-      },
-      {
-        "material": "",
-        "density": "",
-        "thickness": "",
-        "load": ""
-      },
-      {
-        "material": "",
-        "density": "",
-        "thickness": "",
-        "load": ""
-      }
-    ],
-    "slabType": "철근콘크리트 슬래브",
-    "slabThickness": "150",
-    "slabLoad": "3.60",
-    "usageCategory": "지붕",
-    "usageDetail": "점유⋅사용하지 않는 지붕(지붕활하중)",
-    "liveLoad": "1"
-  },
-  {
     "id": 6,
     "floor": "지상3~5층",
     "roomName": "교사실 및 협의실",

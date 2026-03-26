@@ -247,6 +247,7 @@ def import_from_midas():
 def export_excel():
     """등록 목록을 동양구조 양식 Excel로 내보내기"""
     import openpyxl
+    from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
     from openpyxl.utils import get_column_letter
 
     entries = _read()
@@ -260,17 +261,15 @@ def export_excel():
     wb = openpyxl.load_workbook(template_path)
     ws = wb.active
 
-    # 8행의 스타일을 참조용으로 복사
-    ref_styles = {}
+    # 8행의 폰트/정렬/숫자포맷을 참조용으로 복사
+    ref_fonts = {}
+    ref_aligns = {}
+    ref_numfmts = {}
     for col in range(2, 11):  # B~J
         cell = ws.cell(8, col)
-        ref_styles[col] = {
-            "font": copy(cell.font),
-            "border": copy(cell.border),
-            "alignment": copy(cell.alignment),
-            "fill": copy(cell.fill),
-            "number_format": cell.number_format,
-        }
+        ref_fonts[col] = copy(cell.font)
+        ref_aligns[col] = copy(cell.alignment)
+        ref_numfmts[col] = cell.number_format
 
     # 샘플 데이터의 병합 셀 해제 후 행 삭제
     merges_to_remove = [m for m in ws.merged_cells.ranges if m.min_row >= 8]
@@ -289,19 +288,46 @@ def export_excel():
     except Exception:
         pass
 
-    def apply_style(cell, col, bold=False):
-        """참조 스타일 적용"""
-        s = ref_styles.get(col, {})
-        if s:
-            cell.font = copy(s["font"])
-            if bold:
-                cell.font = copy(s["font"])
-                cell.font = openpyxl.styles.Font(
-                    name=s["font"].name, size=s["font"].size, bold=True
-                )
-            cell.border = copy(s["border"])
-            cell.alignment = copy(s["alignment"])
-            cell.number_format = s.get("number_format", "General")
+    # ── 테두리/채우기 스타일 정의 ──
+    thin = Side(style='thin')
+    dotted = Side(style='dotted')
+    no_side = Side(style=None)
+
+    # 열별 좌/우 테두리 (템플릿 기준)
+    col_sides = {
+        2: (thin, dotted),    # B
+        3: (dotted, thin),    # C
+        4: (thin, dotted),    # D
+        5: (dotted, dotted),  # E
+        6: (dotted, dotted),  # F
+        7: (dotted, thin),    # G
+        8: (thin, thin),      # H
+        9: (thin, thin),      # I
+        10: (thin, thin),     # J
+    }
+
+    # 마감하중 소계: 흰색배경 25% 더 어둡게
+    subtotal_fill = PatternFill(patternType='solid', fgColor='BFBFBF')
+
+    def make_border(col, is_first, is_last):
+        """실명 블록 내 위치에 따라 테두리 생성 (내부 수평 테두리 없음)"""
+        left, right = col_sides.get(col, (thin, thin))
+        top = thin if is_first else no_side
+        bottom = thin if is_last else no_side
+        return Border(left=left, right=right, top=top, bottom=bottom)
+
+    def style_cell(cell, col, is_first=False, is_last=False, bold=False, fill=None):
+        """셀 스타일 적용"""
+        ref_font = ref_fonts.get(col)
+        if bold and ref_font:
+            cell.font = Font(name=ref_font.name, size=ref_font.size, bold=True)
+        elif ref_font:
+            cell.font = copy(ref_font)
+        cell.border = make_border(col, is_first, is_last)
+        cell.alignment = copy(ref_aligns.get(col, Alignment()))
+        cell.number_format = ref_numfmts.get(col, "General")
+        if fill:
+            cell.fill = fill
 
     row = 8  # 데이터 시작 행
 
@@ -322,8 +348,9 @@ def export_excel():
 
         # 항목 행 수 계산: 마감재 + 마감하중소계 + (슬래브) + 고정하중계
         has_slab = slab_type != "없음" and slab_load_str
-        row_count = len(active_finishes) + 1 + (1 if has_slab else 0) + 1  # finishes + subtotal + slab? + total
+        total_rows = len(active_finishes) + 1 + (1 if has_slab else 0) + 1
         start_row = row
+        end_row = start_row + total_rows - 1
 
         # 마감하중 합계
         finish_total = 0.0
@@ -349,15 +376,17 @@ def export_excel():
 
         # ── 마감재 행들 ──
         for i, f in enumerate(active_finishes):
+            is_first = (row == start_row)
+            is_last = (row == end_row)
             for col in range(2, 11):
-                apply_style(ws.cell(row, col), col)
+                style_cell(ws.cell(row, col), col, is_first=is_first, is_last=is_last)
 
             if i == 0:
                 ws.cell(row, 2).value = floor        # B: 층수
                 ws.cell(row, 3).value = room_name     # C: 실명
                 h_cell = ws.cell(row, 8)
                 h_cell.value = f"[{usage_detail}]" if usage_detail else ""  # H: 용도(활하중 근거)
-                h_cell.font = openpyxl.styles.Font(name=ref_styles[8]["font"].name, size=7)
+                h_cell.font = Font(name=ref_fonts[8].name, size=7)
 
             ws.cell(row, 4).value = f.get("material", "")  # D: 재료마감
             thick = f.get("thickness", "")
@@ -380,17 +409,24 @@ def export_excel():
                     ws.cell(row, 7).value = load
             row += 1
 
-        # ── 마감하중 소계 행 ──
+        # ── 마감하중 소계 행: D~G 25% 회색 배경, G열만 bold ──
+        is_first = (row == start_row)
+        is_last = (row == end_row)
         for col in range(2, 11):
-            apply_style(ws.cell(row, col), col, bold=True)
+            fill = subtotal_fill if 4 <= col <= 7 else None
+            bold = (col == 7)
+            style_cell(ws.cell(row, col), col, is_first=is_first, is_last=is_last,
+                       bold=bold, fill=fill)
         ws.cell(row, 4).value = "마감하중 소계"
         ws.cell(row, 7).value = round(finish_total, 2)
         row += 1
 
         # ── 슬래브 행 ──
         if has_slab:
+            is_first = (row == start_row)
+            is_last = (row == end_row)
             for col in range(2, 11):
-                apply_style(ws.cell(row, col), col)
+                style_cell(ws.cell(row, col), col, is_first=is_first, is_last=is_last)
             ws.cell(row, 4).value = slab_type
             if slab_thickness:
                 try:
@@ -405,9 +441,11 @@ def export_excel():
             ws.cell(row, 7).value = round(slab_load, 2)
             row += 1
 
-        # ── 고정하중 계 행 ──
+        # ── 고정하중 계 행: D~G 흰색 배경(채우기 없음), G~J bold ──
         for col in range(2, 11):
-            apply_style(ws.cell(row, col), col, bold=True)
+            bold = (col >= 7)  # G~J 값 bold
+            style_cell(ws.cell(row, col), col, is_first=(row == start_row),
+                       is_last=True, bold=bold)
         ws.cell(row, 4).value = "고정하중 계"
         ws.cell(row, 7).value = round(dead_load, 2)
         ws.cell(row, 8).value = round(live_load, 2) if live_load else None
@@ -416,7 +454,6 @@ def export_excel():
         row += 1
 
         # ── 셀 병합: 층수(B), 실명(C), 활하중근거(H), 사용하중(I), 계수하중(J) ──
-        end_row = row - 1
         if end_row > start_row:
             for merge_col in ["B", "C"]:
                 ws.merge_cells(f"{merge_col}{start_row}:{merge_col}{end_row}")
@@ -434,8 +471,89 @@ def export_excel():
     wb.save(buf)
     buf.seek(0)
 
+    # openpyxl이 누락시킨 리소스(drawing, richData, media 등)를 템플릿에서 복원
+    import zipfile
+
+    template_zip = zipfile.ZipFile(template_path, 'r')
+    out_buf = io.BytesIO()
+
+    with zipfile.ZipFile(buf, 'r') as saved_zip, \
+         zipfile.ZipFile(out_buf, 'w', zipfile.ZIP_DEFLATED) as out_zip:
+
+        saved_names = set(saved_zip.namelist())
+        tmpl_names = set(template_zip.namelist())
+
+        # openpyxl이 누락시키는 파일 목록 (drawing, media, richData, metadata)
+        restore_prefixes = ('xl/drawings/', 'xl/media/', 'xl/richData/')
+        restore_files = {n for n in tmpl_names
+                         if any(n.startswith(p) for p in restore_prefixes)
+                         or n == 'xl/metadata.xml'}
+
+        # 저장된 파일 복사 + 패치
+        import re
+
+        for item in saved_zip.namelist():
+            data = saved_zip.read(item)
+
+            if item == '[Content_Types].xml':
+                # 템플릿의 Content_Types 사용 (누락된 타입 포함)
+                data = template_zip.read(item)
+
+            elif item == 'xl/worksheets/sheet1.xml':
+                content = data.decode('utf-8')
+                # r: namespace 추가
+                if 'xmlns:r=' not in content:
+                    content = content.replace(
+                        'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"',
+                        'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+                        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"')
+                # drawing 참조 삽입
+                if '<drawing' not in content:
+                    content = content.replace(
+                        '</worksheet>',
+                        '<drawing r:id="rId2"/></worksheet>')
+                # I2 셀의 vm 속성 복원 (richData 셀 이미지 참조)
+                content = re.sub(
+                    r'(<c r="I2" [^>]*)(t="e")',
+                    r'\1\2 vm="1"',
+                    content)
+                data = content.encode('utf-8')
+
+            elif item == 'xl/_rels/workbook.xml.rels':
+                # openpyxl rels에 템플릿의 richData/metadata 관계 추가
+                content = data.decode('utf-8')
+                tmpl_rels = template_zip.read(item).decode('utf-8')
+                # 템플릿에서 richData/metadata 관계 추출
+                extra_rels = re.findall(
+                    r'<Relationship [^>]*(?:richdata|richvalue|rdRich|metadata)[^>]*/?>',
+                    tmpl_rels, re.IGNORECASE)
+                if extra_rels:
+                    # 기존 최대 rId 번호 찾기
+                    existing_ids = [int(x) for x in re.findall(r'Id="rId(\d+)"', content)]
+                    next_id = max(existing_ids) + 1 if existing_ids else 10
+                    for rel in extra_rels:
+                        # rId를 충돌 없는 번호로 재할당
+                        new_rel = re.sub(r'Id="rId\d+"', f'Id="rId{next_id}"', rel)
+                        # Target 경로를 상대경로로 통일
+                        new_rel = new_rel.replace('Target="/xl/', 'Target="')
+                        content = content.replace(
+                            '</Relationships>',
+                            new_rel + '</Relationships>')
+                        next_id += 1
+                data = content.encode('utf-8')
+
+            out_zip.writestr(item, data)
+
+        # 템플릿에만 있는 파일 복원 (rels, drawing, richData, media, metadata)
+        for tf in tmpl_names:
+            if tf not in saved_names:
+                out_zip.writestr(tf, template_zip.read(tf))
+
+    template_zip.close()
+    out_buf.seek(0)
+
     return StreamingResponse(
-        buf,
+        out_buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=floor_load_table.xlsx"},
     )

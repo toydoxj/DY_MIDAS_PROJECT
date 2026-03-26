@@ -265,7 +265,7 @@ const ENDPOINTS: Record<string, { label: string; groups: EndpointGroup[] }> = {
     ]}],
   },
   post: {
-    label: "/post/",
+    label: "/post/TABLE",
     groups: [{ group: "Design", codes: [
       { code: "PM",                    desc: "P-M Interaction Diagram" },
       { code: "STEES_CODECHECK",       desc: "Steel Code Check" },
@@ -278,22 +278,61 @@ const ENDPOINTS: Record<string, { label: string; groups: EndpointGroup[] }> = {
   },
 };
 
-// ── 응답 평탄화 ────────────────────────────────────────────────────────
+// ── /post/TABLE 기본 Body 템플릿 ──────────────────────────────────────
+// TABLE_TYPE별 기본 COMPONENTS 매핑
+const TABLE_COMPONENTS: Record<string, string[]> = {
+  BEAMDESIGNFORCES:      ["Memb", "Part", "LComName", "Type", "Fz", "Mx", "My(-)", "My(+)"],
+  COLUMNDESIGNFORCES:    ["Memb", "Part", "LComName", "Type", "Fz", "Mx", "My", "Mz"],
+  WALLDESIGNFORCES:      ["Memb", "Part", "LComName", "Type", "Fz", "Mx", "My"],
+  SPCBEAMDESIGNFORCES:   ["Memb", "Part", "LComName", "Type", "Fz", "Mx", "My(-)", "My(+)"],
+  SPCCOLUMNDESIGNFORCES: ["Memb", "Part", "LComName", "Type", "Fz", "Mx", "My", "Mz"],
+};
+
+function buildPostTableBody(tableType: string) {
+  return JSON.stringify({
+    Argument: {
+      TABLE_TYPE: tableType,
+      UNIT: { FORCE: "KN", DIST: "M" },
+      STYLES: { FORMAT: "Fixed", PLACE: 3 },
+      NODE_ELEMS: { KEYS: [] },
+      PARTS: ["PartI", "PartJ"],
+      COMPONENTS: TABLE_COMPONENTS[tableType] ?? [],
+    },
+  }, null, 2);
+}
+
+// ── 응답 평탄화 (HEAD+DATA 형식 지원) ─────────────────────────────────
 function flattenResponse(data: unknown): Record<string, unknown>[] {
+  if (!data || typeof data !== "object") return [];
   if (Array.isArray(data)) return data as Record<string, unknown>[];
-  if (data && typeof data === "object") {
-    const obj = data as Record<string, unknown>;
-    const firstKey = Object.keys(obj)[0];
-    if (firstKey && typeof obj[firstKey] === "object" && !Array.isArray(obj[firstKey])) {
-      const inner = obj[firstKey] as Record<string, unknown>;
-      const values = Object.values(inner);
-      if (values.length > 0 && typeof values[0] === "object" && values[0] !== null) {
-        return Object.entries(inner).map(([k, v]) => ({ KEY: k, ...(v as Record<string, unknown>) }));
-      }
-    }
-    return [obj];
+
+  const obj = data as Record<string, unknown>;
+
+  // HEAD + DATA 형식 감지 (직접 또는 중첩)
+  const target = obj.HEAD && obj.DATA ? obj : Object.values(obj).find(
+    (v) => v && typeof v === "object" && !Array.isArray(v) && (v as Record<string, unknown>).HEAD && (v as Record<string, unknown>).DATA
+  ) as Record<string, unknown> | undefined;
+
+  if (target) {
+    const head = target.HEAD as string[];
+    const rows = target.DATA as unknown[][];
+    return rows.map((row) => {
+      const record: Record<string, unknown> = {};
+      head.forEach((col, i) => { record[col] = row[i] ?? ""; });
+      return record;
+    });
   }
-  return [];
+
+  // 기존 중첩 dict 처리
+  const firstKey = Object.keys(obj)[0];
+  if (firstKey && typeof obj[firstKey] === "object" && !Array.isArray(obj[firstKey])) {
+    const inner = obj[firstKey] as Record<string, unknown>;
+    const values = Object.values(inner);
+    if (values.length > 0 && typeof values[0] === "object" && values[0] !== null) {
+      return Object.entries(inner).map(([k, v]) => ({ KEY: k, ...(v as Record<string, unknown>) }));
+    }
+  }
+  return [obj];
 }
 
 // ── 컴포넌트 ──────────────────────────────────────────────────────────
@@ -311,9 +350,23 @@ export default function EndpointForm() {
 
   const handlePrefixChange = (p: string) => {
     setPrefix(p);
-    setCode(ENDPOINTS[p].groups[0].codes[0].code);
+    const firstCode = ENDPOINTS[p].groups[0].codes[0].code;
+    setCode(firstCode);
     setResponse(null);
     setError("");
+    if (p === "post") {
+      setMethod("POST");
+      setBody(buildPostTableBody(firstCode));
+    }
+  };
+
+  const handleCodeChange = (c: string) => {
+    setCode(c);
+    setResponse(null);
+    setError("");
+    if (prefix === "post") {
+      setBody(buildPostTableBody(c));
+    }
   };
 
   const handleCancel = () => abortRef.current?.abort();
@@ -323,8 +376,9 @@ export default function EndpointForm() {
     setError("");
     setResponse(null);
 
+    const effectiveMethod = prefix === "post" ? "POST" : method;
     let parsedBody: unknown = {};
-    if (method !== "GET" && method !== "DELETE") {
+    if (effectiveMethod !== "GET" && effectiveMethod !== "DELETE") {
       try {
         parsedBody = JSON.parse(body);
         setBodyError("");
@@ -336,19 +390,20 @@ export default function EndpointForm() {
 
     const controller = new AbortController();
     abortRef.current = controller;
-    const timeout = setTimeout(() => controller.abort(), 30000);
+    const timeout = setTimeout(() => controller.abort(), 120000);
 
     setLoading(true);
     try {
       const opts: RequestInit = {
-        method,
+        method: effectiveMethod,
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
       };
-      if (method !== "GET" && method !== "DELETE") {
+      if (effectiveMethod !== "GET" && effectiveMethod !== "DELETE") {
         opts.body = JSON.stringify(parsedBody);
       }
-      const res = await fetch(`${BACKEND_URL}/api/midas/${prefix}/${code}`, opts);
+      const apiPath = prefix === "post" ? `${prefix}/TABLE` : `${prefix}/${code}`;
+      const res = await fetch(`${BACKEND_URL}/api/midas/${apiPath}`, opts);
       const json = await res.json();
       if (!res.ok) {
         setError(json?.detail ?? `HTTP ${res.status}`);
@@ -357,7 +412,7 @@ export default function EndpointForm() {
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") {
-        setError("요청이 취소되었습니다 (30초 타임아웃).");
+        setError("요청이 취소되었습니다 (120초 타임아웃).");
       } else {
         setError(String(err));
       }
@@ -404,7 +459,7 @@ export default function EndpointForm() {
           {/* Code (그룹화된 optgroup) */}
           <select
             value={code}
-            onChange={(e) => { setCode(e.target.value); setResponse(null); setError(""); }}
+            onChange={(e) => handleCodeChange(e.target.value)}
             className="flex-1 min-w-0 rounded-lg bg-gray-700 border border-gray-600 px-3 py-2 text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {ENDPOINTS[prefix].groups.map(({ group, codes }) => (
@@ -436,12 +491,13 @@ export default function EndpointForm() {
 
         {/* 현재 경로 표시 */}
         <p className="text-xs text-gray-500 font-mono">
-          → <span className="text-gray-300">/{prefix}/{code}</span>
+          → <span className="text-gray-300">{prefix === "post" ? `/post/TABLE` : `/${prefix}/${code}`}</span>
           {currentDesc && <span className="text-gray-600 ml-2">({currentDesc})</span>}
+          {prefix === "post" && <span className="text-blue-400 ml-2">[POST · TABLE_TYPE: {code}]</span>}
         </p>
 
         {/* Body (POST/PUT) */}
-        {(method === "POST" || method === "PUT") && (
+        {(method === "POST" || method === "PUT" || prefix === "post") && (
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">
               Request Body (JSON)

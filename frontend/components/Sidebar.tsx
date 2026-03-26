@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Search, Weight } from "lucide-react";
+import { LayoutDashboard, Search, Weight, ClipboardCheck } from "lucide-react";
 import ConnectionStatus from "./ConnectionStatus";
 
 const navItems = [
   { href: "/", label: "대시보드", icon: LayoutDashboard },
   { href: "/loadcase", label: "하중정보", icon: Weight },
+  { href: "/member-check", label: "부재검토", icon: ClipboardCheck },
   { href: "/explorer", label: "탐색기", icon: Search },
 ];
 

@@ -64,6 +64,7 @@ from routers import project as project_router
 from routers import loadcase as loadcase_router
 from routers import analysis as analysis_router
 from routers import floorload as floorload_router
+from routers import member as member_router
 
 app.include_router(midas_router.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
@@ -71,6 +72,7 @@ app.include_router(project_router.router, prefix="/api")
 app.include_router(loadcase_router.router, prefix="/api")
 app.include_router(analysis_router.router, prefix="/api")
 app.include_router(floorload_router.router, prefix="/api")
+app.include_router(member_router.router, prefix="/api")
 
 
 @app.get("/api/gmaps-key")
