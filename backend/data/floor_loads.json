@@ -1,0 +1,302 @@
+[
+  {
+    "id": 2,
+    "floor": "옥탑지붕",
+    "roomName": "평지붕",
+    "desc": "",
+    "finishes": [
+      {
+        "material": "기타",
+        "density": "",
+        "thickness": "",
+        "load": "0.3"
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      }
+    ],
+    "slabType": "철근콘크리트 슬래브",
+    "slabThickness": "180",
+    "slabLoad": "4.32",
+    "usageCategory": "지붕",
+    "usageDetail": "점유⋅사용하지 않는 지붕(지붕활하중)",
+    "liveLoad": "1"
+  },
+  {
+    "id": 3,
+    "floor": "지붕층",
+    "roomName": "평지붕",
+    "desc": "",
+    "finishes": [
+      {
+        "material": "기타",
+        "density": "",
+        "thickness": "",
+        "load": "0.2"
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      }
+    ],
+    "slabType": "철근콘크리트 슬래브",
+    "slabThickness": "150",
+    "slabLoad": "3.60",
+    "usageCategory": "지붕",
+    "usageDetail": "산책로 용도",
+    "liveLoad": "3"
+  },
+  {
+    "id": 4,
+    "floor": "지붕층",
+    "roomName": "평지붕(태양광, 실외기, 공조기)",
+    "desc": "",
+    "finishes": [
+      {
+        "material": "장비 PAD",
+        "density": "200",
+        "thickness": "24",
+        "load": "4.80"
+      },
+      {
+        "material": "기타",
+        "density": "",
+        "thickness": "",
+        "load": "0.3"
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      }
+    ],
+    "slabType": "철근콘크리트 슬래브",
+    "slabThickness": "150",
+    "slabLoad": "3.60",
+    "usageCategory": "지붕",
+    "usageDetail": "점유⋅사용하지 않는 지붕(지붕활하중)",
+    "liveLoad": "1"
+  },
+  {
+    "id": 6,
+    "floor": "지상3~5층",
+    "roomName": "교사실 및 협의실",
+    "desc": "",
+    "finishes": [
+      {
+        "material": "몰탈 및 마감",
+        "density": "60",
+        "thickness": "20",
+        "load": "1.20"
+      },
+      {
+        "material": "기타",
+        "density": "",
+        "thickness": "",
+        "load": "0.3"
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      }
+    ],
+    "slabType": "철근콘크리트 슬래브",
+    "slabThickness": "150",
+    "slabLoad": "3.60",
+    "usageCategory": "사무실",
+    "usageDetail": "일반 사무실 (경량 벽체 하중 포함)",
+    "liveLoad": "3.5"
+  },
+  {
+    "id": 7,
+    "floor": "지상3~5층",
+    "roomName": "미술실, 음악실, 융합교육실, 준비실(미술음악)",
+    "desc": "",
+    "finishes": [
+      {
+        "material": "몰탈 및 마감",
+        "density": "60",
+        "thickness": "20",
+        "load": "1.20"
+      },
+      {
+        "material": "기타",
+        "density": "",
+        "thickness": "",
+        "load": "0.3"
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      }
+    ],
+    "slabType": "철근콘크리트 슬래브",
+    "slabThickness": "150",
+    "slabLoad": "3.60",
+    "usageCategory": "학교",
+    "usageDetail": "교실",
+    "liveLoad": "3"
+  },
+  {
+    "id": 8,
+    "floor": "지상3~5층",
+    "roomName": "동아리실, 다목적실(노작,체험)",
+    "desc": "",
+    "finishes": [
+      {
+        "material": "몰탈 및 마감",
+        "density": "30",
+        "thickness": "20",
+        "load": "0.60"
+      },
+      {
+        "material": "기타",
+        "density": "",
+        "thickness": "",
+        "load": "0.3"
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      }
+    ],
+    "slabType": "철근콘크리트 슬래브",
+    "slabThickness": "150",
+    "slabLoad": "3.60",
+    "usageCategory": "학교",
+    "usageDetail": "교실",
+    "liveLoad": "5"
+  }
+]

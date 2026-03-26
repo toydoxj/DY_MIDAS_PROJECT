@@ -64,7 +64,7 @@ cd frontend && npm run dev
 ## 주요 기능
 
 - **대시보드**: 프로젝트 정보, API 설정, 자중입력 확인, 풍속 등치선 지도, 층 설정 조회
-- **하중정보**: Static Load Case 편집 (추가/수정/삭제 → MIDAS 동기화)
+- **하중정보**: 카드형 메뉴 (Static Load Case / Floor Load / Wind Load / Seismic Load / Earth Pressure)
 - **탐색기**: MIDAS API 엔드포인트 직접 테스트
 
 ## 환경 설정

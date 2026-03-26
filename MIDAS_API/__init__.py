@@ -5,6 +5,7 @@ from ._to_excel import *
 from ._project import projectDB
 from ._loads import loadCaseDB, selfWeightDB, loadToMassDB
 from ._analysis import structureTypeDB
+from ._floorload import floorLoadDB
 
 _version_ = "0.0.1"
 _author_ = "Jeong, Jihun"
