@@ -2,8 +2,9 @@ import requests
 from colorama import Fore, Style
 from ._midas_api import *
 from ._to_excel import *
-from ._projectDB import projectDB, structureTypeDB
-from ._staticloads import loadCaseDB, selfWeightDB, loadToMassDB
+from ._project import projectDB
+from ._loads import loadCaseDB, selfWeightDB, loadToMassDB
+from ._analysis import structureTypeDB
 
 _version_ = "0.0.1"
 _author_ = "Jeong, Jihun"

@@ -8,19 +8,22 @@ MIDAS GEN NX REST API를 Python에서 사용하기 위한 래퍼 라이브러리
 
 ```
 Task_MIDAS/
-├── MIDAS_API/                  # Python API 래퍼 라이브러리
+├── MIDAS_API/                  # Python API 래퍼 라이브러리 (도메인별 구성)
 │   ├── _midas_api.py           # REST API 클라이언트 (핵심)
-│   ├── _projectDB.py           # 프로젝트 DB 클래스
-│   ├── _staticloads.py         # Static Load Case / Self-Weight DB 클래스
+│   ├── _project.py             # 프로젝트 DB (PJCF)
+│   ├── _loads.py               # 하중 DB (STLD, BODF, LTOM)
+│   ├── _analysis.py            # 해석 설정 DB (STYP)
 │   └── _to_excel.py            # JSON → DataFrame 변환
 │
 ├── backend/                    # FastAPI 백엔드
 │   ├── main.py
-│   └── routers/                # midas, project, settings, loadcase 라우터
+│   └── routers/                # midas, project, settings, loadcase, analysis
 │
 ├── frontend/                   # Next.js 프론트엔드
-│   ├── app/                    # 대시보드, 하중정보, 탐색기, 프로젝트, 설정
-│   └── components/             # Sidebar, DataTable, ChartPanel 등
+│   ├── app/                    # 대시보드, 하중정보, 탐색기
+│   ├── components/dashboard/   # 대시보드 섹션별 컴포넌트
+│   ├── components/             # 공통 컴포넌트 (Sidebar, DataTable 등)
+│   └── lib/                    # 공통 타입, Google Maps 유틸
 │
 ├── electron/                   # Electron 데스크톱 앱 패키징
 ├── config/templates/           # MIDAS 모델 템플릿 (YAML)
