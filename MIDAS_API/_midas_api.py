@@ -19,6 +19,13 @@ class MIDAS_API_KEY:
         return MIDAS_API_KEY.api_Key
 
 def MidasAPI(method:str, command:str, body:dict={})->dict:
+    # 1순위: ContextVar에 MidasClient가 설정된 경우 해당 인스턴스 사용
+    from ._client import MidasClient
+    _ctx_client = MidasClient.get_current()
+    if _ctx_client is not None:
+        return _ctx_client.request(method, command, body)
+
+    # 2순위: 기존 전역 클래스 변수 방식 (하위 호환)
     base_url = MIDAS_API_BASEURL.get_url()
     url = base_url + command
     key = MIDAS_API_KEY.get_key()
@@ -26,7 +33,7 @@ def MidasAPI(method:str, command:str, body:dict={})->dict:
         "Content-Type": "application/json",
         "MAPI-Key" : key
     }
-    
+
     start_time = time.perf_counter()
 
     if method == "POST":
@@ -44,6 +51,6 @@ def MidasAPI(method:str, command:str, body:dict={})->dict:
     elapsed_time = end_time - start_time
 
     print(f"Time taken: {elapsed_time:.2f} seconds")
-    
+
     return response.json()
 
