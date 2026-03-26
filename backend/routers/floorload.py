@@ -3,10 +3,12 @@ import csv
 import json
 import io
 from copy import copy
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, Body
 from fastapi.responses import StreamingResponse
 from typing import List
 import MIDAS_API as MIDAS
+
+from exceptions import MidasApiError, MidasError, MidasValidationError
 
 router = APIRouter()
 
@@ -127,7 +129,7 @@ def sync_floor_loads_to_midas():
     """저장된 Floor Load 데이터를 MIDAS FBLD로 동기화 (NAME 기준 매칭, 없으면 신규)"""
     entries = _read()
     if not entries:
-        raise HTTPException(status_code=400, detail="동기화할 데이터가 없습니다.")
+        raise MidasValidationError("동기화할 데이터가 없습니다")
 
     dead_lc = _find_dead_lc()
     live_lc = _find_live_lc()
@@ -165,7 +167,7 @@ def sync_floor_loads_to_midas():
         MIDAS.floorLoadDB._data = {"FBLD": updated_fbld}
         MIDAS.floorLoadDB.sync()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"MIDAS API 오류: {e}")
+        raise MidasApiError("Floor Load MIDAS 동기화 실패", cause=str(e))
 
     return {"status": "synced", "count": len(updated_fbld)}
 
@@ -176,7 +178,7 @@ def import_from_midas():
     try:
         raw = MIDAS.floorLoadDB.get()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"MIDAS API 오류: {e}")
+        raise MidasApiError("Floor Load MIDAS 불러오기 실패", cause=str(e))
 
     fbld = raw.get("FBLD", {})
 
@@ -252,11 +254,11 @@ def export_excel():
 
     entries = _read()
     if not entries:
-        raise HTTPException(status_code=400, detail="내보낼 데이터가 없습니다.")
+        raise MidasValidationError("내보낼 데이터가 없습니다")
 
     template_path = os.path.join(_DATA_DIR, "floor_load_template.xlsx")
     if not os.path.isfile(template_path):
-        raise HTTPException(status_code=500, detail="템플릿 파일이 없습니다.")
+        raise MidasError("Excel 템플릿 파일을 찾을 수 없습니다")
 
     wb = openpyxl.load_workbook(template_path)
     ws = wb.active

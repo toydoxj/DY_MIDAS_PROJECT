@@ -1,5 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 import MIDAS_API as MIDAS
+
+from exceptions import MidasApiError
 
 router = APIRouter()
 
@@ -10,7 +12,7 @@ def get_selfweight():
     try:
         raw = MIDAS.selfWeightDB.get()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"MIDAS API 오류: {e}")
+        raise MidasApiError("Self-Weight 조회 실패", cause=str(e))
 
     bodf = raw.get("BODF", {})
     rows = []
@@ -44,7 +46,7 @@ def get_structure_mass():
     try:
         raw = MIDAS.structureTypeDB.get()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"MIDAS API 오류: {e}")
+        raise MidasApiError("Structure Mass 조회 실패", cause=str(e))
 
     styp = raw.get("STYP", {})
     data = next((v for v in styp.values() if isinstance(v, dict)), {})
@@ -66,7 +68,7 @@ def get_load_to_mass():
     try:
         raw = MIDAS.loadToMassDB.get()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"MIDAS API 오류: {e}")
+        raise MidasApiError("Loads to Masses 조회 실패", cause=str(e))
 
     ltom = raw.get("LTOM", {})
     data = next((v for v in ltom.values() if isinstance(v, dict)), {})

@@ -14,8 +14,9 @@ else:
 sys.path.insert(0, _BASE_DIR)
 sys.path.insert(0, _PROJECT_ROOT)
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
@@ -48,7 +49,20 @@ if base_url:
 if api_key:
     MIDAS.MIDAS_API_KEY(api_key)
 
+from exceptions import MidasError
+
 app = FastAPI(title="MIDAS GEN NX Dashboard API", version="1.0.0")
+
+
+@app.exception_handler(MidasError)
+async def midas_error_handler(request: Request, exc: MidasError) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error_code": exc.error_code,
+            "message": exc.message,
+        },
+    )
 
 app.add_middleware(
     CORSMiddleware,

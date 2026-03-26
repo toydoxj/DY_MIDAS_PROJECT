@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "midas-api"
+version = "0.1.0"
+description = "MIDAS GEN NX REST API Python wrapper — (주)동양구조"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Proprietary" }
+authors = [
+    { name = "(주)동양구조" },
+]
+keywords = ["midas", "structural", "analysis", "api"]
+dependencies = [
+    "requests",
+    "pandas",
+    "colorama",
+    "openpyxl",
+]
+
+[project.optional-dependencies]
+server = [
+    "fastapi",
+    "uvicorn[standard]",
+    "python-dotenv",
+]
+build = [
+    "pyinstaller",
+]
+dev = [
+    "pytest",
+    "httpx",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["MIDAS_API"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "MIDAS_API/",
+    "README.md",
+    "pyproject.toml",
+]
