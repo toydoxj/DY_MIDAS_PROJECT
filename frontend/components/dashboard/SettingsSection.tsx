@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { BACKEND_URL, TestResult } from "@/lib/types";
+import SectionCard from "@/components/ui/SectionCard";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import FormField from "@/components/ui/FormField";
+import { SavedBadge, AlertBanner } from "@/components/ui/StatusMessage";
 
 export default function SettingsSection() {
   const [baseUrl, setBaseUrl] = useState("");
@@ -41,35 +45,28 @@ export default function SettingsSection() {
   };
 
   return (
-    <form onSubmit={handleSave} className="rounded-xl bg-gray-800 border border-gray-700 p-5 space-y-3">
-      <h2 className="text-base font-semibold text-white mb-1">API 설정</h2>
-      <div>
-        <label className="block text-xs font-medium text-gray-400 mb-1">Base URL</label>
-        <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="http://localhost:8090"
-          className="w-full rounded-lg bg-gray-700 border border-gray-600 px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-gray-400 mb-1">API Key</label>
-        {maskedKey && !apiKey && <p className="text-xs text-gray-500 mb-1">현재: <span className="font-mono">{maskedKey}</span></p>}
-        <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} type="password" placeholder="새 API Key 입력 (변경 시에만)"
-          className="w-full rounded-lg bg-gray-700 border border-gray-600 px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-      </div>
+    <SectionCard as="form" title="API 설정" onSubmit={handleSave}>
+      <FormField label="Base URL">
+        <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="http://localhost:8090" />
+      </FormField>
+      <FormField label="API Key">
+        {maskedKey && !apiKey && (
+          <p className="text-xs text-gray-500 mb-1">현재: <span className="font-mono">{maskedKey}</span></p>
+        )}
+        <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} type="password" placeholder="새 API Key 입력 (변경 시에만)" />
+      </FormField>
       {testResult && (
-        <div className={`rounded-lg border px-3 py-2 flex items-center gap-2 ${testResult.connected ? "bg-green-900/30 border-green-700" : "bg-red-900/30 border-red-700"}`}>
-          {testResult.connected ? <CheckCircle size={14} className="text-green-400 flex-shrink-0" /> : <XCircle size={14} className="text-red-400 flex-shrink-0" />}
-          <p className={`text-xs ${testResult.connected ? "text-green-300" : "text-red-300"}`}>{testResult.message}</p>
-        </div>
+        <AlertBanner type={testResult.connected ? "success" : "error"} message={testResult.message} />
       )}
       <div className="flex items-center gap-3 pt-1">
-        {saved && <span className="text-xs text-green-400 flex items-center gap-1"><CheckCircle size={13} />저장됨</span>}
-        <button type="button" onClick={handleTest} disabled={testState === "loading"}
-          className="flex items-center gap-1.5 rounded-lg bg-gray-700 border border-gray-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-600 disabled:opacity-50 transition-colors">
-          {testState === "loading" && <Loader2 size={13} className="animate-spin" />} 연결 테스트
-        </button>
-        <button type="submit" disabled={saving} className="ml-auto rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors">
+        {saved && <SavedBadge />}
+        <Button type="button" variant="secondary" size="xs" onClick={handleTest} disabled={testState === "loading"} loading={testState === "loading"}>
+          연결 테스트
+        </Button>
+        <Button type="submit" size="xs" loading={saving} className="ml-auto">
           {saving ? "저장 중..." : "저장"}
-        </button>
+        </Button>
       </div>
-    </form>
+    </SectionCard>
   );
 }

@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RefreshCw, Settings2 } from "lucide-react";
+import { Settings2 } from "lucide-react";
 import { BACKEND_URL, SelfWeightRow, StructureMass, LoadToMassData } from "@/lib/types";
+import SectionCard from "@/components/ui/SectionCard";
+import RefreshButton from "@/components/ui/RefreshButton";
+import { ErrorText } from "@/components/ui/StatusMessage";
 
 export default function SettingSection() {
   const [rows, setRows] = useState<SelfWeightRow[]>([]);
@@ -30,15 +33,15 @@ export default function SettingSection() {
   useEffect(() => { fetchData(); }, []);
 
   return (
-    <div className="rounded-xl bg-gray-800 border border-gray-700 p-5 space-y-3">
+    <SectionCard>
       <div className="flex items-center justify-between mb-1">
-        <h2 className="text-base font-semibold text-white flex items-center gap-2"><Settings2 size={16} /> SETTING</h2>
-        <button onClick={fetchData} disabled={loading} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white disabled:opacity-50 transition-colors">
-          <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> 새로고침
-        </button>
+        <h2 className="text-base font-semibold text-white flex items-center gap-2">
+          <Settings2 size={16} /> SETTING
+        </h2>
+        <RefreshButton onClick={fetchData} loading={loading} />
       </div>
 
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {error && <ErrorText message={error} />}
 
       {/* Structure Mass */}
       {massDat && (
@@ -129,6 +132,6 @@ export default function SettingSection() {
           </>
         )}
       </div>
-    </div>
+    </SectionCard>
   );
 }
