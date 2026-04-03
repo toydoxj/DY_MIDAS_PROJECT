@@ -248,5 +248,55 @@
     "usageCategory": "학교",
     "usageDetail": "교실",
     "liveLoad": "5"
+  },
+  {
+    "id": 9,
+    "floor": "지상2층",
+    "roomName": "교실",
+    "desc": "",
+    "finishes": [
+      {
+        "material": "몰탈 및 마감",
+        "density": "30",
+        "thickness": "20",
+        "load": "0.60"
+      },
+      {
+        "material": "기타",
+        "density": "",
+        "thickness": "",
+        "load": "0.3"
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      },
+      {
+        "material": "",
+        "density": "",
+        "thickness": "",
+        "load": ""
+      }
+    ],
+    "slabType": "철근콘크리트 슬래브",
+    "slabThickness": "150",
+    "slabLoad": "3.60",
+    "usageCategory": "체육시설",
+    "usageDetail": "스탠드 (고정 좌석)",
+    "liveLoad": "5"
   }
 ]

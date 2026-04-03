@@ -18,14 +18,15 @@ export default function SettingSection() {
     setLoading(true); setError(null);
     try {
       const [swRes, massRes, ltomRes] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/selfweight`),
-        fetch(`${BACKEND_URL}/api/structure-mass`),
-        fetch(`${BACKEND_URL}/api/load-to-mass`),
+        fetch(`${BACKEND_URL}/api/selfweight`).catch(() => null),
+        fetch(`${BACKEND_URL}/api/structure-mass`).catch(() => null),
+        fetch(`${BACKEND_URL}/api/load-to-mass`).catch(() => null),
       ]);
-      if (!swRes.ok) throw new Error(`서버 오류: ${swRes.status}`);
-      setRows(await swRes.json());
-      if (massRes.ok) setMassDat(await massRes.json());
-      if (ltomRes.ok) setLtomDat(await ltomRes.json());
+      if (swRes?.ok) setRows(await swRes.json());
+      else if (swRes) setError(`자중 조회 오류: ${swRes.status}`);
+      if (massRes?.ok) setMassDat(await massRes.json());
+      if (ltomRes?.ok) setLtomDat(await ltomRes.json());
+      if (!swRes && !massRes && !ltomRes) setError("백엔드 연결 실패");
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
   };

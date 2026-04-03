@@ -25,8 +25,20 @@ interface LoadCaseRow {
   DESC: string;
 }
 
-export default function StaticLoadCasePage() {
+interface SPLCRow {
+  id: string;
+  NAME: string;
+  DIR: string;
+  ANGLE: number;
+  aFUNCNAME: string[];
+  COMTYPE: string;
+  bADDSIGN: boolean;
+  bACCECC: boolean;
+}
+
+export default function LoadCasePage() {
   const [rows, setRows] = useState<LoadCaseRow[]>([]);
+  const [splcRows, setSplcRows] = useState<SPLCRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -35,9 +47,13 @@ export default function StaticLoadCasePage() {
   const fetchData = async () => {
     setLoading(true); setError(null); setSaved(false);
     try {
-      const r = await fetch(`${BACKEND_URL}/api/loadcase`);
-      if (!r.ok) throw new Error(`서버 오류: ${r.status}`);
-      setRows(await r.json());
+      const [lcRes, splcRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/loadcase`).catch(() => null),
+        fetch(`${BACKEND_URL}/api/splc`).catch(() => null),
+      ]);
+      if (lcRes?.ok) setRows(await lcRes.json());
+      else if (lcRes) setError(`서버 오류: ${lcRes.status}`);
+      if (splcRes?.ok) setSplcRows(await splcRes.json());
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
   };
@@ -90,9 +106,9 @@ export default function StaticLoadCasePage() {
 
   return (
     <div className="p-6 space-y-6">
-      <PageHeader title="Static Load Case" subtitle="정적 하중 케이스 관리" backHref="/loadcase" />
+      <PageHeader title="Load Case" subtitle="하중 케이스 관리" backHref="/loadcase" />
 
-      <SectionCard title="Load Case 목록" action={headerAction}>
+      <SectionCard title="Static Load Case" action={headerAction}>
         {error && <ErrorText message={error} />}
 
         {rows.length === 0 && !loading && !error && (
@@ -147,6 +163,47 @@ export default function StaticLoadCasePage() {
         <button onClick={addRow} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors mt-2">
           <Plus size={13} /> Load Case 추가
         </button>
+      </SectionCard>
+
+      <SectionCard title="Response Spectrum Load Case">
+        {splcRows.length === 0 && !loading && (
+          <p className="text-xs text-gray-500">데이터 없음</p>
+        )}
+
+        {splcRows.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="border-b border-gray-700">
+                  <th className="pb-2 pr-4 font-medium text-gray-400">하중조합</th>
+                  <th className="pb-2 pr-4 font-medium text-gray-400 text-center">방향</th>
+                  <th className="pb-2 pr-4 font-medium text-gray-400 text-right">각도</th>
+                  <th className="pb-2 pr-4 font-medium text-gray-400">응답스펙트럼</th>
+                  <th className="pb-2 pr-4 font-medium text-gray-400 text-center">조합Type</th>
+                  <th className="pb-2 pr-4 font-medium text-gray-400 text-center">부호조합</th>
+                  <th className="pb-2 font-medium text-gray-400 text-center">우발편심</th>
+                </tr>
+              </thead>
+              <tbody>
+                {splcRows.map((r) => (
+                  <tr key={r.id} className="border-b border-gray-700/50 hover:bg-gray-700/20">
+                    <td className="py-1.5 pr-4 text-white">{r.NAME}</td>
+                    <td className="py-1.5 pr-4 text-gray-300 text-center">{r.DIR}</td>
+                    <td className="py-1.5 pr-4 text-gray-300 text-right">{r.ANGLE}°</td>
+                    <td className="py-1.5 pr-4 text-gray-300">{r.aFUNCNAME.join(", ")}</td>
+                    <td className="py-1.5 pr-4 text-gray-300 text-center">{r.COMTYPE}</td>
+                    <td className="py-1.5 pr-4 text-center">
+                      <span className={r.bADDSIGN ? "text-green-400" : "text-gray-600"}>{r.bADDSIGN ? "✓" : "✗"}</span>
+                    </td>
+                    <td className="py-1.5 text-center">
+                      <span className={r.bACCECC ? "text-green-400" : "text-gray-600"}>{r.bACCECC ? "✓" : "✗"}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </SectionCard>
     </div>
   );

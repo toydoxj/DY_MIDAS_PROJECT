@@ -52,6 +52,8 @@ export default function SettingsPage() {
       const res = await fetch(`${BACKEND_URL}/api/settings`);
       const d = await res.json();
       setMaskedKey(d.api_key_masked ?? "");
+    } catch (err) {
+      setTestResult({ connected: false, message: String(err) });
     } finally {
       setSaving(false);
     }

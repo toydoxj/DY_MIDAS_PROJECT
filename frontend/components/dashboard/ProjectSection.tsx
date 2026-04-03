@@ -62,6 +62,8 @@ export default function ProjectSection({ onAddressChange, storyRows }: { onAddre
       setProjectCode(parsed.projectCode);
       setFloorArea(parsed.floorArea);
       setActualHeight(parsed.actualHeight);
+    } catch (err) {
+      console.warn("프로젝트 정보 조회 실패:", err);
     } finally { setLoading(false); }
   };
 
@@ -76,6 +78,8 @@ export default function ProjectSection({ onAddressChange, storyRows }: { onAddre
       const res = await fetch(`${BACKEND_URL}/api/project`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(saveData) });
       if (!res.ok) throw new Error(`저장 실패: ${res.status}`);
       setSaved(true);
+    } catch (err) {
+      console.warn("프로젝트 정보 저장 실패:", err);
     } finally { setSaving(false); }
   };
 

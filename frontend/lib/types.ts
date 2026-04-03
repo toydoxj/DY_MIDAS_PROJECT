@@ -40,4 +40,39 @@ export interface LoadToMassData {
   vLC: { LCNAME: string; FACTOR: number }[];
 }
 
+export interface StoryWeightData {
+  total_weight: number;
+  gl_story: string;
+  gl_level: number;
+}
+
+export interface StoryShearRow {
+  story: string;
+  level: number;
+  rx_shear_x: number;
+  rx_shear_y: number;
+  rx_story_force: number;
+  ry_shear_x: number;
+  ry_shear_y: number;
+  ry_story_force: number;
+}
+
+export interface EigenvalueRow {
+  mode: number;
+  frequency: number;
+  period: number;
+  mass_x: number;
+  mass_y: number;
+  mass_rotn_z: number;
+  mass_z: number;
+  mass_rotn_x: number;
+  mass_rotn_y: number;
+  sum_x: number;
+  sum_y: number;
+  sum_rotn_z: number;
+  sum_z: number;
+  sum_rotn_x: number;
+  sum_rotn_y: number;
+}
+
 export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";

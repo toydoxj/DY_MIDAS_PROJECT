@@ -5,10 +5,10 @@ import PageHeader from "@/components/ui/PageHeader";
 import CategoryGrid, { CategoryItem } from "@/components/ui/CategoryGrid";
 
 const loadCategories: CategoryItem[] = [
-  { href: "/loadcase/static", label: "Static Load Case", desc: "정적 하중 케이스 관리", icon: Layers, ready: true },
+  { href: "/loadcase/static", label: "Load Case", desc: "하중 케이스 관리", icon: Layers, ready: true },
   { href: "/loadcase/floor", label: "Floor Load", desc: "바닥 하중 산정", icon: Building2, ready: true },
   { href: "/loadcase/wind", label: "Wind Load", desc: "풍하중", icon: Wind, ready: false },
-  { href: "/loadcase/seismic", label: "Seismic Load", desc: "지진하중", icon: Activity, ready: false },
+  { href: "/loadcase/seismic", label: "Seismic Load", desc: "지진하중", icon: Activity, ready: true },
   { href: "/loadcase/earth", label: "Earth Pressure", desc: "토압", icon: Mountain, ready: false },
 ];
 

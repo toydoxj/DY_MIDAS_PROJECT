@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import DataTable from "./DataTable";
-import { flattenResponse } from "@/lib/utils";
+import { flattenResponse, extractSubTables, SubTableData } from "@/lib/utils";
 
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
@@ -267,29 +267,79 @@ const ENDPOINTS: Record<string, { label: string; groups: EndpointGroup[] }> = {
   },
   post: {
     label: "/post/TABLE",
-    groups: [{ group: "Design", codes: [
-      { code: "PM",                    desc: "P-M Interaction Diagram" },
-      { code: "STEES_CODECHECK",       desc: "Steel Code Check" },
-      { code: "BEAMDESIGNFORCES",      desc: "Concrete - Beam Design Forces" },
-      { code: "COLUMNDESIGNFORCES",    desc: "Concrete - Column Design Forces" },
-      { code: "WALLDESIGNFORCES",      desc: "Concrete - Wall Design Forces" },
-      { code: "SPCBEAMDESIGNFORCES",   desc: "SRC - Beam Design Forces" },
-      { code: "SPCCOLUMNDESIGNFORCES", desc: "SRC - Column Design Forces" },
-    ]}],
+    groups: [
+      { group: "Eigenvalue", codes: [
+        { code: "EIGENVALUEMODE",           desc: "Eigenvalue Analysis" },
+        { code: "PARTICIPATIONVECTORMODE",  desc: "Participation Vector" },
+      ]},
+      { group: "Story Results", codes: [
+        { code: "STORY_SHEAR_FOR_RS",      desc: "Story Shear (Response Spectrum)" },
+      ]},
+      { group: "Design", codes: [
+        { code: "PM",                    desc: "P-M Interaction Diagram" },
+        { code: "STEES_CODECHECK",       desc: "Steel Code Check" },
+        { code: "BEAMDESIGNFORCES",      desc: "Concrete - Beam Design Forces" },
+        { code: "COLUMNDESIGNFORCES",    desc: "Concrete - Column Design Forces" },
+        { code: "WALLDESIGNFORCES",      desc: "Concrete - Wall Design Forces" },
+        { code: "SPCBEAMDESIGNFORCES",   desc: "SRC - Beam Design Forces" },
+        { code: "SPCCOLUMNDESIGNFORCES", desc: "SRC - Column Design Forces" },
+      ]},
+    ],
   },
 };
 
 // ── /post/TABLE 기본 Body 템플릿 ──────────────────────────────────────
 // TABLE_TYPE별 기본 COMPONENTS 매핑
 const TABLE_COMPONENTS: Record<string, string[]> = {
-  BEAMDESIGNFORCES:      ["Memb", "Part", "LComName", "Type", "Fz", "Mx", "My(-)", "My(+)"],
-  COLUMNDESIGNFORCES:    ["Memb", "Part", "LComName", "Type", "Fz", "Mx", "My", "Mz"],
-  WALLDESIGNFORCES:      ["Memb", "Part", "LComName", "Type", "Fz", "Mx", "My"],
-  SPCBEAMDESIGNFORCES:   ["Memb", "Part", "LComName", "Type", "Fz", "Mx", "My(-)", "My(+)"],
-  SPCCOLUMNDESIGNFORCES: ["Memb", "Part", "LComName", "Type", "Fz", "Mx", "My", "Mz"],
+  EIGENVALUEMODE:          ["All"],
+  PARTICIPATIONVECTORMODE: ["All"],
+  BEAMDESIGNFORCES:        ["Memb", "Part", "LComName", "Type", "Fz", "Mx", "My(-)", "My(+)"],
+  COLUMNDESIGNFORCES:      ["Memb", "Part", "LComName", "Type", "Fz", "Mx", "My", "Mz"],
+  WALLDESIGNFORCES:        ["Memb", "Part", "LComName", "Type", "Fz", "Mx", "My"],
+  SPCBEAMDESIGNFORCES:     ["Memb", "Part", "LComName", "Type", "Fz", "Mx", "My(-)", "My(+)"],
+  SPCCOLUMNDESIGNFORCES:   ["Memb", "Part", "LComName", "Type", "Fz", "Mx", "My", "Mz"],
 };
 
+const EIGEN_TYPES = new Set(["EIGENVALUEMODE", "PARTICIPATIONVECTORMODE"]);
+
 function buildPostTableBody(tableType: string) {
+  if (tableType === "EIGENVALUEMODE") {
+    return JSON.stringify({
+      Argument: {
+        TABLE_NAME: "EigenvalueMode",
+        TABLE_TYPE: "EIGENVALUEMODE",
+        UNIT: { FORCE: "kN", DIST: "m" },
+        STYLES: { FORMAT: "Scientific", PLACE: 12 },
+        COMPONENTS: ["Node", "Mode", "UX", "UY", "UZ", "RX", "RY", "RZ"],
+        NODE_ELEMS: { KEYS: [] },
+        MODES: [],
+      },
+    }, null, 2);
+  }
+  if (tableType === "PARTICIPATIONVECTORMODE") {
+    return JSON.stringify({
+      Argument: {
+        TABLE_NAME: "ParticipationVectorMode",
+        TABLE_TYPE: "PARTICIPATIONVECTORMODE",
+        UNIT: { FORCE: "kN", DIST: "m" },
+        STYLES: { FORMAT: "Scientific", PLACE: 12 },
+        COMPONENTS: ["Node", "Mode", "UX", "UY", "UZ", "RX", "RY", "RZ"],
+        NODE_ELEMS: { KEYS: [] },
+        MODES: [],
+      },
+    }, null, 2);
+  }
+  if (tableType === "STORY_SHEAR_FOR_RS") {
+    return JSON.stringify({
+      Argument: {
+        TABLE_NAME: "Example",
+        TABLE_TYPE: "STORY_SHEAR_FOR_RS",
+        UNIT: { FORCE: "N", DIST: "MM" },
+        STYLES: { FORMAT: "Fixed", PLACE: 12 },
+        LOAD_CASE_NAMES: ["Rx(RS)", "Ry(RS)"],
+      },
+    }, null, 2);
+  }
   return JSON.stringify({
     Argument: {
       TABLE_TYPE: tableType,
@@ -391,6 +441,7 @@ export default function EndpointForm() {
 
   const rows = response ? flattenResponse(response) : [];
   const columns = rows.length > 0 ? Object.keys(rows[0]).map((k) => ({ key: k, label: k })) : [];
+  const subTables: SubTableData[] = response ? extractSubTables(response) : [];
 
   const currentDesc = ENDPOINTS[prefix].groups
     .flatMap((g) => g.codes)
@@ -506,6 +557,18 @@ export default function EndpointForm() {
             <pre className="overflow-x-auto rounded-lg bg-gray-900 p-4 text-xs text-green-400 font-mono max-h-96">
               {JSON.stringify(response, null, 2)}
             </pre>
+          ) : subTables.length > 0 ? (
+            <div className="space-y-4">
+              {subTables.map((st) => {
+                const stCols = st.rows.length > 0 ? Object.keys(st.rows[0]).map((k) => ({ key: k, label: k })) : [];
+                return (
+                  <div key={st.name}>
+                    <h3 className="text-xs font-semibold text-blue-400 mb-2">{st.name}</h3>
+                    <DataTable columns={stCols} rows={st.rows} />
+                  </div>
+                );
+              })}
+            </div>
           ) : rows.length > 0 ? (
             <DataTable columns={columns} rows={rows} />
           ) : (
