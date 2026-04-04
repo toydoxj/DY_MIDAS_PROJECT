@@ -127,14 +127,61 @@ function sectionMatchesStory(sectName: string, storyName: string): boolean {
 }
 
 /** 선택된 층에 해당하는 RC 보 sections 필터 */
+/** 구분자 정렬 순서: Beam류 → Girder류 */
+const SEP_ORDER: Record<string, number> = {
+  B: 0, LB: 1, TB: 2, FB: 3,
+  G: 10, WG: 11, TG: 12, FG: 13,
+};
+
+/** 번호 정렬: 숫자 먼저, 같은 숫자면 알파벳 순 (3 < 3A < 11) */
+function numSortKey(num: string): [number, string] {
+  const m = num.match(/^(\d+)(.*)/);
+  if (m) return [parseInt(m[1]), m[2]];
+  return [9999, num];
+}
+
+/** 층 표기 정렬키 (level 기반) */
+function floorLevelKey(floor: string, stories: Set<string>): number {
+  const nf = normalizeFloor(floor);
+  // 범위인 경우 첫 숫자
+  const rm = nf.match(/^(-?\d+)/);
+  if (rm) return parseInt(rm[1]);
+  if (nf === "R") return 9000;
+  if (nf === "PH") return 9100;
+  if (nf === "PHR") return 9200;
+  return 9999;
+}
+
 function filterSectionsByStories(sects: SectionInfo[], stories: Set<string>): SectionInfo[] {
   if (stories.size === 0) return [];
   const rcSects = filterRcBeamSections(sects);
-  return rcSects.filter((s) => {
+  const filtered = rcSects.filter((s) => {
     for (const st of stories) {
       if (sectionMatchesStory(s.name, st)) return true;
     }
     return false;
+  });
+
+  // 정렬: 층 → Beam/Girder → 번호
+  return filtered.sort((a, b) => {
+    const pa = parseBeamName(a.name)!;
+    const pb = parseBeamName(b.name)!;
+
+    // 1. 층 정렬
+    const fa = floorLevelKey(pa.floor, stories);
+    const fb = floorLevelKey(pb.floor, stories);
+    if (fa !== fb) return fa - fb;
+
+    // 2. 구분자 정렬 (B류 → G류)
+    const sa = SEP_ORDER[pa.sep] ?? 50;
+    const sb = SEP_ORDER[pb.sep] ?? 50;
+    if (sa !== sb) return sa - sb;
+
+    // 3. 번호 정렬 (3 < 3A < 11)
+    const [na, xa] = numSortKey(pa.num);
+    const [nb, xb] = numSortKey(pb.num);
+    if (na !== nb) return na - nb;
+    return xa.localeCompare(xb);
   });
 }
 
