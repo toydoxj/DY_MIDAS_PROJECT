@@ -286,9 +286,11 @@ export default function SeismicLoadPage() {
   const [eigenRows, setEigenRows] = useState<EigenvalueRow[]>([]);
   const [eigenLoading, setEigenLoading] = useState(false);
   const [eigenTime, setEigenTime] = useState<Date | null>(null);
+  const [eigenFetchFailed, setEigenFetchFailed] = useState(false);
   const [shearRows, setShearRows] = useState<StoryShearRow[]>([]);
   const [shearLoading, setShearLoading] = useState(false);
   const [shearTime, setShearTime] = useState<Date | null>(null);
+  const [shearFetchFailed, setShearFetchFailed] = useState(false);
   const [eigenDisplayN, setEigenDisplayN] = useState(5);
   const [storyWeight, setStoryWeight] = useState<StoryWeightData | null>(null);
 
@@ -296,13 +298,10 @@ export default function SeismicLoadPage() {
   const [projectComment, setProjectComment] = useState<ProjectComment>({});
   const [analysisHeight, setAnalysisHeight] = useState(0);
 
-  // 정적해석 결과 상태
-  const [displacements, setDisplacements] = useState<StoryDisplacement[]>([]);
-  const [drifts, setDrifts] = useState<StoryDrift[]>([]);
-  const [reactions, setReactions] = useState<ReactionSum[]>([]);
-  const [dispLoading, setDispLoading] = useState(false);
-  const [driftLoading, setDriftLoading] = useState(false);
-  const [rxnLoading, setRxnLoading] = useState(false);
+  // 정적해석 결과 상태 (백엔드 미구현 - API 준비 시 활성화)
+  const [displacements] = useState<StoryDisplacement[]>([]);
+  const [drifts] = useState<StoryDrift[]>([]);
+  const [reactions] = useState<ReactionSum[]>([]);
 
   const fetchData = async () => {
     setLoading(true); setError(null);
@@ -315,27 +314,27 @@ export default function SeismicLoadPage() {
   };
 
   const fetchEigenvalue = async () => {
-    setEigenLoading(true);
+    setEigenLoading(true); setEigenFetchFailed(false);
     try {
       const res = await fetch(`${BACKEND_URL}/api/eigenvalue`);
-      if (!res.ok) return;
+      if (!res.ok) { setEigenFetchFailed(eigenRows.length > 0); return; }
       const rows = await res.json();
       setEigenRows(rows);
       if (rows.length > 0) setEigenTime(new Date());
       fetchStoryWeight();
-    } catch { /* 해석 미완료 시 캐시 유지 */ }
+    } catch { setEigenFetchFailed(eigenRows.length > 0); }
     finally { setEigenLoading(false); }
   };
 
   const fetchStoryShear = async () => {
-    setShearLoading(true);
+    setShearLoading(true); setShearFetchFailed(false);
     try {
       const res = await fetch(`${BACKEND_URL}/api/story-shear`);
-      if (!res.ok) return;
+      if (!res.ok) { setShearFetchFailed(shearRows.length > 0); return; }
       const rows = await res.json();
       setShearRows(rows);
       if (rows.length > 0) setShearTime(new Date());
-    } catch { /* 해석 미완료 시 캐시 유지 */ }
+    } catch { setShearFetchFailed(shearRows.length > 0); }
     finally { setShearLoading(false); }
   };
 
@@ -373,34 +372,12 @@ export default function SeismicLoadPage() {
     } catch { /* ignore */ }
   };
 
-  const fetchDisplacements = async () => {
-    setDispLoading(true);
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/results/story-displacement`);
-      if (res.ok) setDisplacements(await res.json());
-    } catch { /* ignore */ }
-    finally { setDispLoading(false); }
-  };
+  // TODO: 백엔드 /api/results/* 구현 후 활성화
+  // const fetchDisplacements = async () => { ... };
+  // const fetchDrifts = async () => { ... };
+  // const fetchReactions = async () => { ... };
 
-  const fetchDrifts = async () => {
-    setDriftLoading(true);
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/results/story-drift`);
-      if (res.ok) setDrifts(await res.json());
-    } catch { /* ignore */ }
-    finally { setDriftLoading(false); }
-  };
-
-  const fetchReactions = async () => {
-    setRxnLoading(true);
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/results/reactions`);
-      if (res.ok) setReactions(await res.json());
-    } catch { /* ignore */ }
-    finally { setRxnLoading(false); }
-  };
-
-  useEffect(() => { fetchData(); fetchEigenvalue(); fetchStoryShear(); fetchStoryWeight(); fetchProjectInfo(); fetchDisplacements(); fetchDrifts(); fetchReactions(); }, []);
+  useEffect(() => { fetchData(); fetchEigenvalue(); fetchStoryShear(); fetchStoryWeight(); fetchProjectInfo(); }, []);
 
   const headerAction = <RefreshButton onClick={fetchData} loading={loading} />;
 
@@ -612,181 +589,7 @@ export default function SeismicLoadPage() {
         );
       })()}
 
-      {/* ════════ 정적해석 결과 섹션 ════════ */}
-      {(() => {
-        const maxDriftX = drifts.length > 0 ? Math.max(...drifts.map((d) => d.ratio_x)) : 0;
-        const maxDriftY = drifts.length > 0 ? Math.max(...drifts.map((d) => d.ratio_y)) : 0;
-        const maxDriftStoryX = drifts.length > 0 ? drifts.reduce((a, b) => (b.ratio_x > a.ratio_x ? b : a)).story : "-";
-        const maxDriftStoryY = drifts.length > 0 ? drifts.reduce((a, b) => (b.ratio_y > a.ratio_y ? b : a)).story : "-";
-        const driftOkX = maxDriftX <= DRIFT_LIMIT;
-        const driftOkY = maxDriftY <= DRIFT_LIMIT;
-        const maxDispX = displacements.length > 0 ? Math.max(...displacements.map((d) => Math.abs(d.dx))) : 0;
-        const maxDispY = displacements.length > 0 ? Math.max(...displacements.map((d) => Math.abs(d.dy))) : 0;
-        const driftChartData = [...drifts].reverse();
-        const dispChartData = [...displacements].reverse();
-
-        return (
-          <>
-            {/* 요약 카드 */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <StatCard label="Max Drift X" value={maxDriftX > 0 ? `1/${Math.round(1 / maxDriftX)}` : "-"} unit={`(${maxDriftStoryX})`} status={maxDriftX > 0 ? (driftOkX ? "ok" : "fail") : "info"} />
-              <StatCard label="Max Drift Y" value={maxDriftY > 0 ? `1/${Math.round(1 / maxDriftY)}` : "-"} unit={`(${maxDriftStoryY})`} status={maxDriftY > 0 ? (driftOkY ? "ok" : "fail") : "info"} />
-              <StatCard label="Max Disp X" value={maxDispX > 0 ? maxDispX.toFixed(2) : "-"} unit="mm" status="info" />
-              <StatCard label="Max Disp Y" value={maxDispY > 0 ? maxDispY.toFixed(2) : "-"} unit="mm" status="info" />
-            </div>
-
-            {/* 층간변위비 차트 + 층변위 차트 */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <SectionCard
-                title="Story Drift Ratio"
-                action={
-                  <div className="flex items-center gap-3">
-                    {drifts.length > 0 && (
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded ${driftOkX && driftOkY ? "bg-green-900/40 text-green-400" : "bg-red-900/40 text-red-400"}`}>
-                        {driftOkX && driftOkY ? "허용치 이내" : "허용치 초과"}
-                      </span>
-                    )}
-                    <RefreshButton onClick={fetchDrifts} loading={driftLoading} />
-                  </div>
-                }
-              >
-                {drifts.length === 0 && !driftLoading && (
-                  <p className="text-sm text-gray-500">데이터 없음</p>
-                )}
-                {drifts.length > 0 && (
-                  <ResponsiveContainer width="100%" height={Math.max(300, drifts.length * 28)}>
-                    <BarChart data={driftChartData} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis type="number" tick={{ fill: "#9ca3af", fontSize: 11 }} domain={[0, "auto"]} />
-                      <YAxis type="category" dataKey="story" tick={{ fill: "#9ca3af", fontSize: 11 }} width={50} />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: "#1f2937", border: "1px solid #374151", borderRadius: "8px", color: "#f3f4f6" }}
-                        formatter={(value: number) => [`1/${Math.round(1 / value)}  (${value.toFixed(5)})`, ""]}
-                      />
-                      <Legend />
-                      <ReferenceLine x={DRIFT_LIMIT} stroke="#ef4444" strokeDasharray="5 5" label={{ value: "1/200", fill: "#ef4444", fontSize: 10 }} />
-                      <Bar dataKey="ratio_x" name="X Dir" fill="#60a5fa" barSize={10} />
-                      <Bar dataKey="ratio_y" name="Y Dir" fill="#34d399" barSize={10} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </SectionCard>
-
-              <SectionCard
-                title="Story Displacement"
-                action={<RefreshButton onClick={fetchDisplacements} loading={dispLoading} />}
-              >
-                {displacements.length === 0 && !dispLoading && (
-                  <p className="text-sm text-gray-500">데이터 없음</p>
-                )}
-                {displacements.length > 0 && (
-                  <ResponsiveContainer width="100%" height={Math.max(300, displacements.length * 28)}>
-                    <BarChart data={dispChartData} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis type="number" tick={{ fill: "#9ca3af", fontSize: 11 }} />
-                      <YAxis type="category" dataKey="story" tick={{ fill: "#9ca3af", fontSize: 11 }} width={50} />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: "#1f2937", border: "1px solid #374151", borderRadius: "8px", color: "#f3f4f6" }}
-                        formatter={(value: number) => [value.toFixed(3), ""]}
-                      />
-                      <Legend />
-                      <Bar dataKey="dx" name="X Dir (mm)" fill="#60a5fa" barSize={10} />
-                      <Bar dataKey="dy" name="Y Dir (mm)" fill="#34d399" barSize={10} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </SectionCard>
-            </div>
-
-            {/* 층간변위비 상세 테이블 */}
-            <SectionCard title="Story Drift Detail">
-              {drifts.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-gray-700">
-                        <th className="px-3 py-2 text-center text-gray-400 font-medium">Story</th>
-                        <th className="px-3 py-2 text-right text-gray-400 font-medium">Level (m)</th>
-                        <th className="px-3 py-2 text-right text-gray-400 font-medium">Height (m)</th>
-                        <th className="px-3 py-2 text-right text-gray-400 font-medium">Drift X</th>
-                        <th className="px-3 py-2 text-right text-gray-400 font-medium">Drift Y</th>
-                        <th className="px-3 py-2 text-right text-gray-400 font-medium">Ratio X</th>
-                        <th className="px-3 py-2 text-right text-gray-400 font-medium">Ratio Y</th>
-                        <th className="px-3 py-2 text-center text-gray-400 font-medium">Check</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {drifts.map((r) => {
-                        const okX = r.ratio_x <= DRIFT_LIMIT;
-                        const okY = r.ratio_y <= DRIFT_LIMIT;
-                        const ok = okX && okY;
-                        const td = "px-3 py-1 text-right text-gray-300 font-mono";
-                        return (
-                          <tr key={r.story} className="border-b border-gray-700/30 hover:bg-gray-700/20">
-                            <td className="px-3 py-1 text-center text-white font-medium">{r.story}</td>
-                            <td className={td}>{r.level.toFixed(2)}</td>
-                            <td className={td}>{r.height.toFixed(2)}</td>
-                            <td className={td}>{r.drift_x.toFixed(3)}</td>
-                            <td className={td}>{r.drift_y.toFixed(3)}</td>
-                            <td className={`${td} ${okX ? "" : "text-red-400 font-semibold"}`}>1/{r.ratio_x > 0 ? Math.round(1 / r.ratio_x) : "∞"}</td>
-                            <td className={`${td} ${okY ? "" : "text-red-400 font-semibold"}`}>1/{r.ratio_y > 0 ? Math.round(1 / r.ratio_y) : "∞"}</td>
-                            <td className="px-3 py-1 text-center">
-                              <span className={ok ? "text-green-400" : "text-red-400"}>{ok ? "OK" : "NG"}</span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </SectionCard>
-
-            {/* 반력 합계 테이블 */}
-            <SectionCard
-              title="Reaction Summary"
-              action={<RefreshButton onClick={fetchReactions} loading={rxnLoading} />}
-            >
-              {reactions.length === 0 && !rxnLoading && (
-                <p className="text-sm text-gray-500">데이터 없음</p>
-              )}
-              {reactions.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-gray-700">
-                        <th className="px-3 py-2 text-left text-gray-400 font-medium">Load Case</th>
-                        <th className="px-3 py-2 text-right text-gray-400 font-medium">FX (kN)</th>
-                        <th className="px-3 py-2 text-right text-gray-400 font-medium">FY (kN)</th>
-                        <th className="px-3 py-2 text-right text-gray-400 font-medium">FZ (kN)</th>
-                        <th className="px-3 py-2 text-right text-gray-400 font-medium">MX (kN·m)</th>
-                        <th className="px-3 py-2 text-right text-gray-400 font-medium">MY (kN·m)</th>
-                        <th className="px-3 py-2 text-right text-gray-400 font-medium">MZ (kN·m)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {reactions.map((r) => {
-                        const td = "px-3 py-1 text-right text-gray-300 font-mono";
-                        return (
-                          <tr key={r.lcName} className="border-b border-gray-700/30 hover:bg-gray-700/20">
-                            <td className="px-3 py-1 text-white font-medium">{r.lcName}</td>
-                            <td className={td}>{r.fx.toFixed(2)}</td>
-                            <td className={td}>{r.fy.toFixed(2)}</td>
-                            <td className={td}>{r.fz.toFixed(2)}</td>
-                            <td className={td}>{r.mx.toFixed(2)}</td>
-                            <td className={td}>{r.my.toFixed(2)}</td>
-                            <td className={td}>{r.mz.toFixed(2)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </SectionCard>
-          </>
-        );
-      })()}
+      {/* ════════ 정적해석 결과 섹션 (TODO: 백엔드 /api/results/* 구현 후 활성화) ════════ */}
 
       {/* ════════ 지진하중 섹션 ════════ */}
       {error && <ErrorText message={error} />}
@@ -870,6 +673,9 @@ export default function SeismicLoadPage() {
         title="Eigenvalue Analysis"
         action={
           <div className="flex items-center gap-3">
+            {eigenFetchFailed && (
+              <span className="text-[10px] text-yellow-400">갱신 실패</span>
+            )}
             {eigenTime && (
               <span className="text-[10px] text-gray-500">{formatTime(eigenTime)}</span>
             )}
@@ -1058,6 +864,9 @@ export default function SeismicLoadPage() {
         title="Story Shear (Response Spectrum)"
         action={
           <div className="flex items-center gap-3">
+            {shearFetchFailed && (
+              <span className="text-[10px] text-yellow-400">갱신 실패</span>
+            )}
             {shearTime && (
               <span className="text-[10px] text-gray-500">{formatTime(shearTime)}</span>
             )}

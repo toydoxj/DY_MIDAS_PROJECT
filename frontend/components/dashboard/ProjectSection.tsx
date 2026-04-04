@@ -63,11 +63,13 @@ interface CommentData {
   importance: string; shearWaveVelocity: string; bedrockDepth: string;
   structTypeX: string; structTypeY: string;
   sfrsX: string; sfrsY: string;
+  legacyComment: string;
 }
 
 function parseComment(comment: string): CommentData {
   try {
     const obj = JSON.parse(comment);
+    // JSON 파싱 성공 = 이미 구조화된 데이터
     return {
       projectCode: obj["PROJECT_CODE"] ?? "",
       floorArea: obj["FLOOR_AREA"] ?? "",
@@ -79,19 +81,28 @@ function parseComment(comment: string): CommentData {
       structTypeY: obj["STRUCT_TYPE_Y"] ?? "0",
       sfrsX: obj["SFRS_X"] ?? "1-a",
       sfrsY: obj["SFRS_Y"] ?? "1-a",
+      legacyComment: obj["LEGACY_COMMENT"] ?? "",
     };
   } catch {
-    return { projectCode: comment, floorArea: "", actualHeight: "", importance: "(1)", shearWaveVelocity: "", bedrockDepth: "", structTypeX: "0", structTypeY: "0", sfrsX: "1-a", sfrsY: "1-a" };
+    // 레거시 자유 텍스트 → LEGACY_COMMENT에 보존
+    return {
+      projectCode: "", floorArea: "", actualHeight: "", importance: "(1)",
+      shearWaveVelocity: "", bedrockDepth: "",
+      structTypeX: "0", structTypeY: "0", sfrsX: "1-a", sfrsY: "1-a",
+      legacyComment: comment,
+    };
   }
 }
 
 function buildComment(d: CommentData): string {
-  return JSON.stringify({
+  const obj: Record<string, string> = {
     PROJECT_CODE: d.projectCode, FLOOR_AREA: d.floorArea, ACTUAL_HEIGHT: d.actualHeight,
     IMPORTANCE: d.importance, SHEAR_WAVE_VELOCITY: d.shearWaveVelocity, BEDROCK_DEPTH: d.bedrockDepth,
     STRUCT_TYPE_X: d.structTypeX, STRUCT_TYPE_Y: d.structTypeY,
     SFRS_X: d.sfrsX, SFRS_Y: d.sfrsY,
-  });
+  };
+  if (d.legacyComment) obj.LEGACY_COMMENT = d.legacyComment;
+  return JSON.stringify(obj);
 }
 
 export default function ProjectSection({ onAddressChange, storyRows }: { onAddressChange: (addr: string) => void; storyRows: StoryRow[] }) {
@@ -100,6 +111,7 @@ export default function ProjectSection({ onAddressChange, storyRows }: { onAddre
     projectCode: "", floorArea: "", actualHeight: "", importance: "(1)",
     shearWaveVelocity: "", bedrockDepth: "",
     structTypeX: "0", structTypeY: "0", sfrsX: "1-a", sfrsY: "1-a",
+    legacyComment: "",
   });
   const updateCd = (patch: Partial<CommentData>) => setCd((p) => ({ ...p, ...patch }));
   const [loading, setLoading] = useState(false);
