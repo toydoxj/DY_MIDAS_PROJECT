@@ -244,13 +244,13 @@ function MaxTableIntegrated({
             <th className={thCls}>Type</th>
             <th className={thCls}>위치</th>
             <th className={thCls}>표기</th>
-            <th className={thCls}>My(-)</th>
+            <th className={`${thCls} border-l border-gray-600`}>My(-)</th>
             <th className={thCls}>상부근</th>
             {hasResults && <th className={thCls}>휨DCR</th>}
-            <th className={thCls}>My(+)</th>
+            <th className={`${thCls} border-l border-gray-600`}>My(+)</th>
             <th className={thCls}>하부근</th>
             {hasResults && <th className={thCls}>휨DCR</th>}
-            <th className={thCls}>Fz</th>
+            <th className={`${thCls} border-l border-gray-600`}>Fz</th>
             <th className={thCls}>스터럽</th>
             {hasResults && <th className={thCls}>전단DCR</th>}
           </tr>
@@ -337,7 +337,7 @@ function MaxTableIntegrated({
                     )}
                   </td>
                   {/* My(-) + 상부근 (n-Dxx) */}
-                  <td className={`${tdCls} font-mono`}>
+                  <td className={`${tdCls} font-mono border-l border-gray-600`}>
                     <div className="text-white">{myNeg.val.toFixed(1)}</div>
                     <div className="text-gray-400 text-[10px] truncate max-w-[80px]" title={myNeg.lc}>{myNeg.lc}</div>
                   </td>
@@ -372,7 +372,7 @@ function MaxTableIntegrated({
                   </td>
                   {hasResults && (cr ? dcrCell(cr.neg_flexure_dcr, cr.neg_flexure_ok) : <td className={tdCls}></td>)}
                   {/* My(+) + 하부근 (n-Dxx) */}
-                  <td className={`${tdCls} font-mono`}>
+                  <td className={`${tdCls} font-mono border-l border-gray-600`}>
                     <div className="text-white">{myPos.val.toFixed(1)}</div>
                     <div className="text-gray-400 text-[10px] truncate max-w-[80px]" title={myPos.lc}>{myPos.lc}</div>
                   </td>
@@ -388,7 +388,7 @@ function MaxTableIntegrated({
                   </td>
                   {hasResults && (cr ? dcrCell(cr.pos_flexure_dcr, cr.pos_flexure_ok) : <td className={tdCls}></td>)}
                   {/* Fz + 스터럽 (Dxx@nnn) */}
-                  <td className={`${tdCls} font-mono`}>
+                  <td className={`${tdCls} font-mono border-l border-gray-600`}>
                     <div className="text-white">{fz.val.toFixed(1)}</div>
                     <div className="text-gray-400 text-[10px] truncate max-w-[80px]" title={fz.lc}>{fz.lc}</div>
                   </td>
