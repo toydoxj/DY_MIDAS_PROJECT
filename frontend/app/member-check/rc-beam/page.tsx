@@ -335,14 +335,14 @@ export default function RcBeamCheckPage() {
     [selectedSections],
   );
 
-  const handleFetch = () => {
+  const handleFetch = (forceRefresh = false) => {
     if (selectedIds.size === 0) {
       setError("Section을 선택하세요.");
       return;
     }
     setDropdownOpen(false);
     setResult(null); // 전체 데이터 캐시 초기화
-    fetchDesignResult(selectedNames);
+    fetchDesignResult(selectedNames, forceRefresh);
   };
 
   const handleTabChange = (tab: ViewMode) => {
@@ -467,13 +467,23 @@ export default function RcBeamCheckPage() {
             <p className="text-xs text-gray-500">
               선택: {selectedSections.map((s) => s.name).join(", ")} · 총 {totalElements}개 부재
             </p>
-            <button
-              onClick={handleFetch}
-              disabled={loadingResult}
-              className="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-500 transition-colors disabled:opacity-50"
-            >
-              {loadingResult ? "조회 중..." : "조회"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleFetch(false)}
+                disabled={loadingResult}
+                className="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-500 transition-colors disabled:opacity-50"
+              >
+                {loadingResult ? "조회 중..." : "조회"}
+              </button>
+              <button
+                onClick={() => handleFetch(true)}
+                disabled={loadingResult}
+                className="px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 text-sm font-medium hover:bg-gray-600 transition-colors disabled:opacity-50"
+                title="MIDAS에서 최신 데이터 재조회"
+              >
+                <RefreshCw size={14} />
+              </button>
+            </div>
           </div>
         )}
       </SectionCard>

@@ -106,14 +106,14 @@ def get_beam_force_max(req: BeamForceMaxRequest) -> list[Union[BeamForceMaxRow, 
         return []
 
     try:
+        MIDAS.sectionDB.ensure_loaded()
+        MIDAS.elementDB.ensure_loaded()
         if req.force_refresh:
             MIDAS.sectionDB.get()
             MIDAS.elementDB.get()
             MIDAS.beamForceDB.get(keys=None)  # 전체 재조회
         else:
-            MIDAS.sectionDB.ensure_loaded()
-            MIDAS.elementDB.ensure_loaded()
-            MIDAS.beamForceDB.ensure_loaded_all()  # 전체 캐시 사용
+            MIDAS.beamForceDB.ensure_loaded_all()  # 전체 캐시 사용 (비어있으면 자동 로드)
         df = MIDAS.beamForceDB.to_max_dataframe(
             group_by=req.group_by,
             section_names=req.section_names if req.section_names else None,
