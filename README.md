@@ -84,7 +84,9 @@ cd frontend && npm run dev
 
 ### 대시보드
 - 프로젝트 정보 (중요도, 전단파속도, 기반암깊이, 구조물형식/지진력저항시스템 X/Y)
+- 재료 강도 (콘크리트 층별, 철근 지름별, 강재)
 - API 설정, 자중입력 확인, 풍속 등치선 지도, 층 설정 조회
+- 다크/라이트 모드 전환 (shadcn/ui)
 
 ### 지진하중 (Seismic Load)
 - 등가정적 지진하중 검토 (X/Y 방향 독립)
@@ -95,13 +97,16 @@ cd frontend && npm run dev
 - Story Shear (Response Spectrum)
 
 ### RC보 설계 검토 (Beam Design Check)
-- STOR 기반 층 선택 → RC 보/거더 필터링 (네이밍 규칙 기반)
+- STOR 기반 층 선택 → RC 보/거더 필터링 (네이밍 규칙 기반, 정렬: 층→B→G→번호)
+- 배근 형식: ALL / BOTH / 3단 (연속단/중앙/불연속단)
 - 통합 테이블: 부재력 + 배근 입력 + DCR 실시간 표시
   - My(-) → 상부근(n-Dxx) → 상부DCR
   - My(+) → 하부근(n-Dxx) → 하부DCR
   - Fz → 스터럽(n-Dxx@s) → 전단DCR
 - KDS 41 30 00 기준: 휨강도, 전단강도, 철근비, 스터럽 간격 검토
 - 배근/재료 변경 시 자동 검토 (300ms 디바운스)
+- 대시보드 재료 강도 연동 (주근 지름별 fy 자동 매칭)
+- 배근 데이터 영구 저장 (JSON 파일 + localStorage 자동 임시 저장)
 
 ### 하중정보
 - Static Load Case / Floor Load / Seismic Load
