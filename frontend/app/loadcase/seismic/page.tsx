@@ -4,16 +4,22 @@ import React, { useEffect, useState } from "react";
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Legend,
+  ReferenceLine,
 } from "recharts";
 import { BACKEND_URL, EigenvalueRow, StoryShearRow, StoryWeightData } from "@/lib/types";
 import PageHeader from "@/components/ui/PageHeader";
 import SectionCard from "@/components/ui/SectionCard";
 import RefreshButton from "@/components/ui/RefreshButton";
+import Select from "@/components/ui/Select";
+import FormField from "@/components/ui/FormField";
 import { ErrorText } from "@/components/ui/StatusMessage";
 
 const SC_MAP: Record<number, string> = {
@@ -52,14 +58,13 @@ function interpolate(table: [number, number, number], s: number): number {
   return table[1] + t * (table[2] - table[1]);
 }
 
+interface VItem { expected: number | string; ok: boolean }
 interface ValidationResult {
-  Fa: { expected: number; ok: boolean };
-  Fv: { expected: number; ok: boolean };
-  Sds: { expected: number; ok: boolean };
-  Sd1: { expected: number; ok: boolean };
+  Fa: VItem; Fv: VItem; Sds: VItem; Sd1: VItem;
+  SC: VItem; IE: VItem; R: VItem;
 }
 
-function validate(spfc: SPFCData): ValidationResult | null {
+function validate(spfc: SPFCData, pc?: ProjectComment): ValidationResult | null {
   const siteClass = SC_MAP[spfc.SC];
   if (!siteClass || !FA_TABLE[siteClass]) return null;
 
@@ -70,11 +75,44 @@ function validate(spfc: SPFCData): ValidationResult | null {
   const expectedSd1 = s * expectedFv * (2 / 3);
 
   const tol = 0.01; // 1% 허용 오차
+  const numOk = (a: number, b: number) => Math.abs(a - b) / Math.max(b, 1e-9) < tol;
+
+  // SiteClass 검증: 프로젝트 정보의 전단파속도/기반암깊이로 판정한 지반분류와 비교
+  let scOk = true;
+  let expectedSC = siteClass;
+  if (pc) {
+    const vel = parseFloat(pc.SHEAR_WAVE_VELOCITY ?? "0");
+    const dep = parseFloat(pc.BEDROCK_DEPTH ?? "0");
+    if (vel > 0 && dep > 0) {
+      expectedSC = classifySoil(dep, vel);
+      scOk = siteClass === expectedSC;
+    }
+  }
+
+  // IE 검증: 프로젝트 정보의 중요도 계수와 비교
+  const importance = pc?.IMPORTANCE ?? "(1)";
+  const expectedIE = IE_MAP[importance] ?? 1.0;
+  const ieOk = numOk(spfc.IE, expectedIE);
+
+  // R 검증: 프로젝트 정보의 지진력저항시스템(X방향 기준)과 비교
+  let expectedR = spfc.R;
+  let rOk = true;
+  if (pc?.SFRS_X) {
+    const sfrs = SFRS_LIST.find((s) => s.id === pc.SFRS_X);
+    if (sfrs) {
+      expectedR = sfrs.R;
+      rOk = numOk(spfc.R, expectedR);
+    }
+  }
+
   return {
-    Fa: { expected: expectedFa, ok: Math.abs(spfc.Fa - expectedFa) / Math.max(expectedFa, 1e-9) < tol },
-    Fv: { expected: expectedFv, ok: Math.abs(spfc.Fv - expectedFv) / Math.max(expectedFv, 1e-9) < tol },
-    Sds: { expected: expectedSds, ok: Math.abs(spfc.Sds - expectedSds) / Math.max(expectedSds, 1e-9) < tol },
-    Sd1: { expected: expectedSd1, ok: Math.abs(spfc.Sd1 - expectedSd1) / Math.max(expectedSd1, 1e-9) < tol },
+    Fa: { expected: expectedFa, ok: numOk(spfc.Fa, expectedFa) },
+    Fv: { expected: expectedFv, ok: numOk(spfc.Fv, expectedFv) },
+    Sds: { expected: expectedSds, ok: numOk(spfc.Sds, expectedSds) },
+    Sd1: { expected: expectedSd1, ok: numOk(spfc.Sd1, expectedSd1) },
+    SC: { expected: expectedSC, ok: scOk },
+    IE: { expected: expectedIE, ok: ieOk },
+    R: { expected: expectedR, ok: rOk },
   };
 }
 
@@ -90,6 +128,143 @@ function StatusIcon({ ok }: { ok: boolean }) {
   return ok
     ? <span className="text-green-400 text-base ml-1">&#x2713;</span>
     : <span className="text-red-400 text-base ml-1">&#x2717;</span>;
+}
+
+/* ── 정적해석 결과 타입 ── */
+
+interface StoryDisplacement {
+  story: string;
+  level: number;
+  dx: number;
+  dy: number;
+}
+
+interface StoryDrift {
+  story: string;
+  level: number;
+  height: number;
+  drift_x: number;
+  drift_y: number;
+  ratio_x: number;
+  ratio_y: number;
+}
+
+interface ReactionSum {
+  lcName: string;
+  fx: number;
+  fy: number;
+  fz: number;
+  mx: number;
+  my: number;
+  mz: number;
+}
+
+const DRIFT_LIMIT = 1 / 200;
+
+function formatTime(d: Date | null): string {
+  if (!d) return "";
+  return d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+/* ── 등가정적 지진하중 검토 로직 ── */
+
+// 지반분류 자동 판정 (표 4.2-4)
+function classifySoil(bedrockDepth: number, shearVelocity: number): string {
+  if (bedrockDepth < 1) return "S1";
+  if (bedrockDepth <= 20) return shearVelocity >= 260 ? "S2" : "S3";
+  return shearVelocity >= 180 ? "S4" : "S5";
+}
+
+// 중요도 계수
+const IE_MAP: Record<string, number> = { "특": 1.5, "(1)": 1.2, "(2)": 1.0, "(3)": 1.0 };
+
+// 근사고유주기 구조형식
+const STRUCT_TYPES = [
+  { label: "철근콘크리트 전단벽구조, 기타골조", ct: 0.0488, x: 0.75 },
+  { label: "철근콘크리트 모멘트골조", ct: 0.0466, x: 0.9 },
+  { label: "철골모멘트 골조", ct: 0.0724, x: 0.8 },
+  { label: "철골 편심가새골조 및 좌굴방지가새골조", ct: 0.0731, x: 0.75 },
+] as const;
+
+// Cu 보간 (표 7.2-1)
+const CU_TABLE: [number, number][] = [[0.1, 1.7], [0.15, 1.6], [0.2, 1.5], [0.3, 1.4], [0.4, 1.4]];
+function interpolateCu(sd1: number): number {
+  if (sd1 <= CU_TABLE[0][0]) return CU_TABLE[0][1];
+  if (sd1 >= CU_TABLE[CU_TABLE.length - 1][0]) return CU_TABLE[CU_TABLE.length - 1][1];
+  for (let i = 0; i < CU_TABLE.length - 1; i++) {
+    const [x0, y0] = CU_TABLE[i];
+    const [x1, y1] = CU_TABLE[i + 1];
+    if (sd1 >= x0 && sd1 <= x1) return y0 + ((sd1 - x0) / (x1 - x0)) * (y1 - y0);
+  }
+  return 1.7;
+}
+
+// 내진설계범주 판정 (표 5.2-1, 5.2-2)
+function seismicCategory(sds: number, sd1: number, importance: string): string {
+  const grade = importance === "특" ? 0 : importance === "(1)" ? 1 : 2;
+  // Sds 기준
+  let catSds: string;
+  if (sds >= 0.50) catSds = "D";
+  else if (sds >= 0.33) catSds = grade === 0 ? "D" : "C";
+  else if (sds >= 0.17) catSds = grade === 0 ? "C" : "B";
+  else catSds = "A";
+  // Sd1 기준
+  let catSd1: string;
+  if (sd1 >= 0.20) catSd1 = "D";
+  else if (sd1 >= 0.14) catSd1 = grade === 0 ? "D" : "C";
+  else if (sd1 >= 0.07) catSd1 = grade === 0 ? "C" : "B";
+  else catSd1 = "A";
+  // 엄격한 쪽 적용
+  const order = ["A", "B", "C", "D"];
+  return order.indexOf(catSds) >= order.indexOf(catSd1) ? catSds : catSd1;
+}
+
+// 지진력저항시스템 목록 (표 6.2-1 주요 항목)
+const SFRS_LIST = [
+  { id: "1-a", name: "철근콘크리트 특수전단벽", R: 5, cat: "내력벽" },
+  { id: "1-b", name: "철근콘크리트 보통전단벽", R: 4, cat: "내력벽" },
+  { id: "2-a", name: "철골 편심가새골조 (모멘트저항접합)", R: 8, cat: "건물골조" },
+  { id: "2-c", name: "철골 특수중심가새골조", R: 6, cat: "건물골조" },
+  { id: "2-d", name: "철골 보통중심가새골조", R: 3.25, cat: "건물골조" },
+  { id: "2-l", name: "철골 좌굴방지가새골조 (모멘트저항접합)", R: 8, cat: "건물골조" },
+  { id: "2-n", name: "철근콘크리트 특수전단벽 (건물골조)", R: 6, cat: "건물골조" },
+  { id: "2-o", name: "철근콘크리트 보통전단벽 (건물골조)", R: 5, cat: "건물골조" },
+  { id: "3-a", name: "철골 특수모멘트골조", R: 8, cat: "모멘트저항골조" },
+  { id: "3-b", name: "철골 중간모멘트골조", R: 4.5, cat: "모멘트저항골조" },
+  { id: "3-c", name: "철골 보통모멘트골조", R: 3.5, cat: "모멘트저항골조" },
+  { id: "3-h", name: "철근콘크리트 특수모멘트골조", R: 8, cat: "모멘트저항골조" },
+  { id: "3-i", name: "철근콘크리트 중간모멘트골조", R: 5, cat: "모멘트저항골조" },
+  { id: "3-j", name: "철근콘크리트 보통모멘트골조", R: 3, cat: "모멘트저항골조" },
+  { id: "4-a", name: "이중: 철골 편심가새골조 (특수모멘트)", R: 8, cat: "이중골조(특수)" },
+  { id: "4-j", name: "이중: 철근콘크리트 특수전단벽 (특수모멘트)", R: 7, cat: "이중골조(특수)" },
+  { id: "4-k", name: "이중: 철근콘크리트 보통전단벽 (특수모멘트)", R: 6, cat: "이중골조(특수)" },
+  { id: "5-b", name: "이중: 철근콘크리트 특수전단벽 (중간모멘트)", R: 6.5, cat: "이중골조(중간)" },
+  { id: "5-c", name: "이중: 철근콘크리트 보통전단벽 (중간모멘트)", R: 5.5, cat: "이중골조(중간)" },
+  { id: "8", name: "강구조기준 일반규정 철골구조", R: 3, cat: "기타" },
+  { id: "9", name: "철근콘크리트구조기준 일반규정 RC구조", R: 3, cat: "기타" },
+] as const;
+
+interface ProjectComment {
+  IMPORTANCE?: string;
+  SHEAR_WAVE_VELOCITY?: string;
+  BEDROCK_DEPTH?: string;
+  STRUCT_TYPE_X?: string;
+  STRUCT_TYPE_Y?: string;
+  SFRS_X?: string;
+  SFRS_Y?: string;
+}
+
+function StatCard({ label, value, unit, status }: { label: string; value: string; unit?: string; status?: "ok" | "fail" | "info" }) {
+  const color = status === "ok" ? "text-green-400" : status === "fail" ? "text-red-400" : "text-blue-400";
+  return (
+    <div className="rounded-md bg-gray-800/60 px-3 py-2">
+      <span className="text-gray-500 text-[10px] uppercase tracking-wide">{label}</span>
+      <div className="flex items-baseline gap-1 mt-0.5">
+        <span className={`font-medium text-sm ${color}`}>{value}</span>
+        {unit && <span className="text-gray-500 text-xs">{unit}</span>}
+      </div>
+    </div>
+  );
 }
 
 function ParamCard({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
@@ -110,12 +285,24 @@ export default function SeismicLoadPage() {
   const [error, setError] = useState<string | null>(null);
   const [eigenRows, setEigenRows] = useState<EigenvalueRow[]>([]);
   const [eigenLoading, setEigenLoading] = useState(false);
-  const [eigenError, setEigenError] = useState<string | null>(null);
+  const [eigenTime, setEigenTime] = useState<Date | null>(null);
   const [shearRows, setShearRows] = useState<StoryShearRow[]>([]);
   const [shearLoading, setShearLoading] = useState(false);
-  const [shearError, setShearError] = useState<string | null>(null);
+  const [shearTime, setShearTime] = useState<Date | null>(null);
   const [eigenDisplayN, setEigenDisplayN] = useState(5);
   const [storyWeight, setStoryWeight] = useState<StoryWeightData | null>(null);
+
+  // 등가정적 지진하중 검토 상태
+  const [projectComment, setProjectComment] = useState<ProjectComment>({});
+  const [analysisHeight, setAnalysisHeight] = useState(0);
+
+  // 정적해석 결과 상태
+  const [displacements, setDisplacements] = useState<StoryDisplacement[]>([]);
+  const [drifts, setDrifts] = useState<StoryDrift[]>([]);
+  const [reactions, setReactions] = useState<ReactionSum[]>([]);
+  const [dispLoading, setDispLoading] = useState(false);
+  const [driftLoading, setDriftLoading] = useState(false);
+  const [rxnLoading, setRxnLoading] = useState(false);
 
   const fetchData = async () => {
     setLoading(true); setError(null);
@@ -128,22 +315,27 @@ export default function SeismicLoadPage() {
   };
 
   const fetchEigenvalue = async () => {
-    setEigenLoading(true); setEigenError(null);
+    setEigenLoading(true);
     try {
       const res = await fetch(`${BACKEND_URL}/api/eigenvalue`);
-      if (!res.ok) throw new Error(`서버 오류: ${res.status}`);
-      setEigenRows(await res.json());
-    } catch (e) { setEigenError(String(e)); }
+      if (!res.ok) return;
+      const rows = await res.json();
+      setEigenRows(rows);
+      if (rows.length > 0) setEigenTime(new Date());
+      fetchStoryWeight();
+    } catch { /* 해석 미완료 시 캐시 유지 */ }
     finally { setEigenLoading(false); }
   };
 
   const fetchStoryShear = async () => {
-    setShearLoading(true); setShearError(null);
+    setShearLoading(true);
     try {
       const res = await fetch(`${BACKEND_URL}/api/story-shear`);
-      if (!res.ok) throw new Error(`서버 오류: ${res.status}`);
-      setShearRows(await res.json());
-    } catch (e) { setShearError(String(e)); }
+      if (!res.ok) return;
+      const rows = await res.json();
+      setShearRows(rows);
+      if (rows.length > 0) setShearTime(new Date());
+    } catch { /* 해석 미완료 시 캐시 유지 */ }
     finally { setShearLoading(false); }
   };
 
@@ -154,7 +346,61 @@ export default function SeismicLoadPage() {
     } catch { /* ignore */ }
   };
 
-  useEffect(() => { fetchData(); fetchEigenvalue(); fetchStoryShear(); fetchStoryWeight(); }, []);
+  const fetchProjectInfo = async () => {
+    try {
+      // 프로젝트 정보 (중요도, 전단파속도, 기반암깊이)
+      const res = await fetch(`${BACKEND_URL}/api/project`);
+      if (res.ok) {
+        const d = await res.json();
+        try {
+          setProjectComment(JSON.parse(d.COMMENT ?? "{}"));
+        } catch { /* ignore */ }
+      }
+      // STOR에서 해석높이 (max STORY_LEVEL)
+      const storRes = await fetch(`${BACKEND_URL}/api/midas/db/STOR`);
+      if (storRes.ok) {
+        const raw = await storRes.json();
+        const stor = raw.STOR ?? {};
+        let maxLevel = 0;
+        for (const v of Object.values(stor)) {
+          if (typeof v === "object" && v !== null && "STORY_LEVEL" in v) {
+            const lvl = (v as { STORY_LEVEL: number }).STORY_LEVEL;
+            if (lvl > maxLevel) maxLevel = lvl;
+          }
+        }
+        setAnalysisHeight(maxLevel);
+      }
+    } catch { /* ignore */ }
+  };
+
+  const fetchDisplacements = async () => {
+    setDispLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/results/story-displacement`);
+      if (res.ok) setDisplacements(await res.json());
+    } catch { /* ignore */ }
+    finally { setDispLoading(false); }
+  };
+
+  const fetchDrifts = async () => {
+    setDriftLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/results/story-drift`);
+      if (res.ok) setDrifts(await res.json());
+    } catch { /* ignore */ }
+    finally { setDriftLoading(false); }
+  };
+
+  const fetchReactions = async () => {
+    setRxnLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/results/reactions`);
+      if (res.ok) setReactions(await res.json());
+    } catch { /* ignore */ }
+    finally { setRxnLoading(false); }
+  };
+
+  useEffect(() => { fetchData(); fetchEigenvalue(); fetchStoryShear(); fetchStoryWeight(); fetchProjectInfo(); fetchDisplacements(); fetchDrifts(); fetchReactions(); }, []);
 
   const headerAction = <RefreshButton onClick={fetchData} loading={loading} />;
 
@@ -162,6 +408,387 @@ export default function SeismicLoadPage() {
     <div className="p-6 space-y-6">
       <PageHeader title="Seismic Load" subtitle="지진하중" backHref="/loadcase" />
 
+      {/* ════════ 등가정적 지진하중 검토 ════════ */}
+      {data.length > 0 && (() => {
+        const spfc = data[0];
+        const importance = projectComment.IMPORTANCE ?? "(1)";
+        const Ie = IE_MAP[importance] ?? 1.0;
+        const shearVel = parseFloat(projectComment.SHEAR_WAVE_VELOCITY ?? "0");
+        const bedrockDep = parseFloat(projectComment.BEDROCK_DEPTH ?? "0");
+        const soilClass = (shearVel > 0 && bedrockDep > 0) ? classifySoil(bedrockDep, shearVel) : (SC_MAP[spfc.SC] ?? "-");
+
+        const hn = analysisHeight;
+        const Sds = spfc.Sds;
+        const Sd1 = spfc.Sd1;
+        const Cu = interpolateCu(Sd1);
+
+        // X/Y 구조물 형식
+        const stIdxX = parseInt(projectComment.STRUCT_TYPE_X ?? "0") || 0;
+        const stIdxY = parseInt(projectComment.STRUCT_TYPE_Y ?? "0") || 0;
+        const stX = STRUCT_TYPES[stIdxX] ?? STRUCT_TYPES[0];
+        const stY = STRUCT_TYPES[stIdxY] ?? STRUCT_TYPES[0];
+        const TaX = hn > 0 ? stX.ct * Math.pow(hn, stX.x) : 0;
+        const TaY = hn > 0 ? stY.ct * Math.pow(hn, stY.x) : 0;
+
+        // X/Y 지진력저항시스템
+        const sfrsIdX = projectComment.SFRS_X ?? "1-a";
+        const sfrsIdY = projectComment.SFRS_Y ?? "1-a";
+        const sfrsX = SFRS_LIST.find((s) => s.id === sfrsIdX) ?? SFRS_LIST[0];
+        const sfrsY = SFRS_LIST.find((s) => s.id === sfrsIdY) ?? SFRS_LIST[0];
+        const Rx = sfrsX.R;
+        const Ry = sfrsY.R;
+
+        // 고유치 해석 주기 (X, Y dominant mode)
+        let eigenPeriodX = 0;
+        let eigenPeriodY = 0;
+        if (eigenRows.length > 0) {
+          let maxMassX = -1;
+          let maxMassY = -1;
+          for (const r of eigenRows) {
+            if (r.mass_x > maxMassX) { maxMassX = r.mass_x; eigenPeriodX = r.period; }
+            if (r.mass_y > maxMassY) { maxMassY = r.mass_y; eigenPeriodY = r.period; }
+          }
+        }
+
+        // 적용주기
+        const upperLimitX = Cu * TaX;
+        const upperLimitY = Cu * TaY;
+        const Tx = Math.max(TaX, Math.min(eigenPeriodX, upperLimitX));
+        const Ty = Math.max(TaY, Math.min(eigenPeriodY, upperLimitY));
+
+        // 내진설계범주
+        const sdc = seismicCategory(Sds, Sd1, importance);
+
+        // Cs (X, Y 별도 R 적용)
+        const TL = 8;
+        const calcCs = (T: number, R: number) => {
+          let cs = Sds / (R / Ie);
+          const csUpper = T <= TL ? Sd1 / ((R / Ie) * T) : (Sd1 * TL) / ((R / Ie) * T * T);
+          cs = Math.min(cs, csUpper);
+          const csLower = Math.max(0.044 * Sds * Ie, 0.01);
+          return Math.max(cs, csLower);
+        };
+        const CsX = Tx > 0 ? calcCs(Tx, Rx) : 0;
+        const CsY = Ty > 0 ? calcCs(Ty, Ry) : 0;
+
+        const W = storyWeight?.total_weight ?? 0;
+        const VxCalc = CsX * W;
+        const VyCalc = CsY * W;
+
+        // 응답스펙트럼 밑면전단력 (GL층 = level이 0에 가장 가까운 층)
+        const glRow = shearRows.length > 0
+          ? shearRows.reduce((best, r) => Math.abs(r.level) < Math.abs(best.level) ? r : best)
+          : null;
+        const VxRS = glRow ? Math.sqrt(glRow.rx_shear_x ** 2 + glRow.rx_shear_y ** 2) : 0;
+        const VyRS = glRow ? Math.sqrt(glRow.ry_shear_x ** 2 + glRow.ry_shear_y ** 2) : 0;
+
+        // Scale-up factor Cm = 0.85 * V_equiv / V_rs >= 1.0
+        const CmX = (VxCalc > 0 && VxRS > 0) ? Math.max(0.85 * VxCalc / VxRS, 1.0) : 0;
+        const CmY = (VyCalc > 0 && VyRS > 0) ? Math.max(0.85 * VyCalc / VyRS, 1.0) : 0;
+
+        return (
+          <SectionCard
+            title="등가정적 지진하중 검토"
+            action={
+              <span className={`text-xs font-medium px-2 py-0.5 rounded ${sdc === "D" ? "bg-red-900/40 text-red-400" : sdc === "C" ? "bg-yellow-900/40 text-yellow-400" : "bg-green-900/40 text-green-400"}`}>
+                내진설계범주 {sdc}
+              </span>
+            }
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-700">
+                    <th className="px-3 py-2 text-left text-gray-400 font-medium">항목</th>
+                    <th className="px-3 py-2 text-right text-gray-400 font-medium">X 방향</th>
+                    <th className="px-3 py-2 text-right text-gray-400 font-medium">Y 방향</th>
+                    <th className="px-3 py-2 text-left text-gray-400 font-medium">비고</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-gray-700/30">
+                    <td className="px-3 py-1.5 text-white">건물높이 (hn)</td>
+                    <td colSpan={2} className="px-3 py-1.5 text-right text-gray-300 font-mono">{hn > 0 ? `${hn.toFixed(3)} m` : "-"}</td>
+                    <td className="px-3 py-1.5 text-gray-500">해석높이</td>
+                  </tr>
+                  <tr className="border-b border-gray-700/30">
+                    <td className="px-3 py-1.5 text-white">지반분류</td>
+                    <td colSpan={2} className="px-3 py-1.5 text-right text-gray-300 font-mono">{soilClass}</td>
+                    <td className="px-3 py-1.5 text-gray-500">Vs={shearVel > 0 ? `${shearVel}m/s` : "-"}, H={bedrockDep > 0 ? `${bedrockDep}m` : "-"}</td>
+                  </tr>
+                  <tr className="border-b border-gray-700/30">
+                    <td className="px-3 py-1.5 text-white">중요도 / Ie</td>
+                    <td colSpan={2} className="px-3 py-1.5 text-right text-gray-300 font-mono">{importance} / {Ie.toFixed(1)}</td>
+                    <td className="px-3 py-1.5 text-gray-500">프로젝트 정보</td>
+                  </tr>
+                  <tr className="border-b border-gray-700/30">
+                    <td className="px-3 py-1.5 text-white">Sds / Sd1</td>
+                    <td colSpan={2} className="px-3 py-1.5 text-right text-gray-300 font-mono">{Sds.toFixed(4)} / {Sd1.toFixed(4)}</td>
+                    <td className="px-3 py-1.5 text-gray-500">설계스펙트럼 가속도</td>
+                  </tr>
+                  <tr className="border-b border-gray-700/30">
+                    <td className="px-3 py-1.5 text-white">구조물 형식</td>
+                    <td className="px-3 py-1.5 text-right text-gray-300 text-[10px]">{stX.label}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-300 text-[10px]">{stY.label}</td>
+                    <td className="px-3 py-1.5 text-gray-500">프로젝트 정보에서 설정</td>
+                  </tr>
+                  <tr className="border-b border-gray-700/30">
+                    <td className="px-3 py-1.5 text-white">근사고유주기 (Ta)</td>
+                    <td className="px-3 py-1.5 text-right text-gray-300 font-mono">{TaX > 0 ? `${TaX.toFixed(4)} sec` : "-"}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-300 font-mono">{TaY > 0 ? `${TaY.toFixed(4)} sec` : "-"}</td>
+                    <td className="px-3 py-1.5 text-gray-500">Ct×hn^x</td>
+                  </tr>
+                  <tr className="border-b border-gray-700/30">
+                    <td className="px-3 py-1.5 text-white">주기상한 (Cu×Ta)</td>
+                    <td className="px-3 py-1.5 text-right text-gray-300 font-mono">{upperLimitX > 0 ? `${upperLimitX.toFixed(4)} sec` : "-"}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-300 font-mono">{upperLimitY > 0 ? `${upperLimitY.toFixed(4)} sec` : "-"}</td>
+                    <td className="px-3 py-1.5 text-gray-500">Cu={Cu.toFixed(2)}</td>
+                  </tr>
+                  <tr className="border-b border-gray-700/30">
+                    <td className="px-3 py-1.5 text-white">고유치해석 주기</td>
+                    <td className="px-3 py-1.5 text-right text-gray-300 font-mono">{eigenPeriodX > 0 ? `${eigenPeriodX.toFixed(4)} sec` : "-"}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-300 font-mono">{eigenPeriodY > 0 ? `${eigenPeriodY.toFixed(4)} sec` : "-"}</td>
+                    <td className="px-3 py-1.5 text-gray-500">dominant mode</td>
+                  </tr>
+                  <tr className="border-b border-gray-700/30 bg-gray-700/20">
+                    <td className="px-3 py-1.5 text-white font-semibold">적용주기 (T)</td>
+                    <td className="px-3 py-1.5 text-right text-blue-400 font-mono font-semibold">{Tx > 0 ? `${Tx.toFixed(4)} sec` : "-"}</td>
+                    <td className="px-3 py-1.5 text-right text-blue-400 font-mono font-semibold">{Ty > 0 ? `${Ty.toFixed(4)} sec` : "-"}</td>
+                    <td className="px-3 py-1.5 text-gray-500">max(Ta, min(T_eigen, Cu×Ta))</td>
+                  </tr>
+                  <tr className="border-b border-gray-700/30">
+                    <td className="px-3 py-1.5 text-white">지진력저항시스템</td>
+                    <td className="px-3 py-1.5 text-right text-gray-300 text-[10px]">{sfrsX.name}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-300 text-[10px]">{sfrsY.name}</td>
+                    <td className="px-3 py-1.5 text-gray-500">프로젝트 정보에서 설정</td>
+                  </tr>
+                  <tr className="border-b border-gray-700/30">
+                    <td className="px-3 py-1.5 text-white">반응수정계수 (R)</td>
+                    <td className="px-3 py-1.5 text-right text-gray-300 font-mono">{Rx}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-300 font-mono">{Ry}</td>
+                    <td className="px-3 py-1.5 text-gray-500"></td>
+                  </tr>
+                  <tr className="border-b border-gray-700/30 bg-gray-700/20">
+                    <td className="px-3 py-1.5 text-white font-semibold">지진응답계수 (Cs)</td>
+                    <td className="px-3 py-1.5 text-right text-blue-400 font-mono font-semibold">{CsX > 0 ? CsX.toFixed(5) : "-"}</td>
+                    <td className="px-3 py-1.5 text-right text-blue-400 font-mono font-semibold">{CsY > 0 ? CsY.toFixed(5) : "-"}</td>
+                    <td className="px-3 py-1.5 text-gray-500">Sds/(R/Ie), 상·하한 적용</td>
+                  </tr>
+                  <tr className="border-b border-gray-700/30">
+                    <td className="px-3 py-1.5 text-white">구조물 중량 (W)</td>
+                    <td colSpan={2} className="px-3 py-1.5 text-right text-gray-300 font-mono">{W > 0 ? `${W.toFixed(2)} kN` : "-"}</td>
+                    <td className="px-3 py-1.5 text-gray-500">{storyWeight ? `${storyWeight.gl_story} 기준` : ""}</td>
+                  </tr>
+                  <tr className="border-b border-gray-700/30 bg-gray-700/20">
+                    <td className="px-3 py-1.5 text-white font-bold">등가정적 밑면전단력</td>
+                    <td className="px-3 py-1.5 text-right text-green-400 font-mono font-bold">{VxCalc > 0 ? `${VxCalc.toFixed(2)} kN` : "-"}</td>
+                    <td className="px-3 py-1.5 text-right text-green-400 font-mono font-bold">{VyCalc > 0 ? `${VyCalc.toFixed(2)} kN` : "-"}</td>
+                    <td className="px-3 py-1.5 text-gray-500">V = Cs × W</td>
+                  </tr>
+                  <tr className="border-b border-gray-700/30 bg-gray-700/20">
+                    <td className="px-3 py-1.5 text-white font-bold">응답스펙트럼 밑면전단력</td>
+                    <td className="px-3 py-1.5 text-right text-yellow-400 font-mono font-bold">{VxRS > 0 ? `${VxRS.toFixed(2)} kN` : "-"}</td>
+                    <td className="px-3 py-1.5 text-right text-yellow-400 font-mono font-bold">{VyRS > 0 ? `${VyRS.toFixed(2)} kN` : "-"}</td>
+                    <td className="px-3 py-1.5 text-gray-500">{glRow ? `SRSS (${glRow.story})` : "해석 결과 없음"}</td>
+                  </tr>
+                  <tr className="bg-gray-700/30">
+                    <td className="px-3 py-1.5 text-white font-bold">Scale-up Factor (Cm)</td>
+                    <td className="px-3 py-1.5 text-right font-mono font-bold">
+                      {CmX > 0 ? (
+                        <span className={CmX > 1.0 ? "text-red-400" : "text-green-400"}>{CmX.toFixed(4)}</span>
+                      ) : "-"}
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono font-bold">
+                      {CmY > 0 ? (
+                        <span className={CmY > 1.0 ? "text-red-400" : "text-green-400"}>{CmY.toFixed(4)}</span>
+                      ) : "-"}
+                    </td>
+                    <td className="px-3 py-1.5 text-gray-500">0.85×V_등가/V_RS ≥ 1.0</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </SectionCard>
+        );
+      })()}
+
+      {/* ════════ 정적해석 결과 섹션 ════════ */}
+      {(() => {
+        const maxDriftX = drifts.length > 0 ? Math.max(...drifts.map((d) => d.ratio_x)) : 0;
+        const maxDriftY = drifts.length > 0 ? Math.max(...drifts.map((d) => d.ratio_y)) : 0;
+        const maxDriftStoryX = drifts.length > 0 ? drifts.reduce((a, b) => (b.ratio_x > a.ratio_x ? b : a)).story : "-";
+        const maxDriftStoryY = drifts.length > 0 ? drifts.reduce((a, b) => (b.ratio_y > a.ratio_y ? b : a)).story : "-";
+        const driftOkX = maxDriftX <= DRIFT_LIMIT;
+        const driftOkY = maxDriftY <= DRIFT_LIMIT;
+        const maxDispX = displacements.length > 0 ? Math.max(...displacements.map((d) => Math.abs(d.dx))) : 0;
+        const maxDispY = displacements.length > 0 ? Math.max(...displacements.map((d) => Math.abs(d.dy))) : 0;
+        const driftChartData = [...drifts].reverse();
+        const dispChartData = [...displacements].reverse();
+
+        return (
+          <>
+            {/* 요약 카드 */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatCard label="Max Drift X" value={maxDriftX > 0 ? `1/${Math.round(1 / maxDriftX)}` : "-"} unit={`(${maxDriftStoryX})`} status={maxDriftX > 0 ? (driftOkX ? "ok" : "fail") : "info"} />
+              <StatCard label="Max Drift Y" value={maxDriftY > 0 ? `1/${Math.round(1 / maxDriftY)}` : "-"} unit={`(${maxDriftStoryY})`} status={maxDriftY > 0 ? (driftOkY ? "ok" : "fail") : "info"} />
+              <StatCard label="Max Disp X" value={maxDispX > 0 ? maxDispX.toFixed(2) : "-"} unit="mm" status="info" />
+              <StatCard label="Max Disp Y" value={maxDispY > 0 ? maxDispY.toFixed(2) : "-"} unit="mm" status="info" />
+            </div>
+
+            {/* 층간변위비 차트 + 층변위 차트 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <SectionCard
+                title="Story Drift Ratio"
+                action={
+                  <div className="flex items-center gap-3">
+                    {drifts.length > 0 && (
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded ${driftOkX && driftOkY ? "bg-green-900/40 text-green-400" : "bg-red-900/40 text-red-400"}`}>
+                        {driftOkX && driftOkY ? "허용치 이내" : "허용치 초과"}
+                      </span>
+                    )}
+                    <RefreshButton onClick={fetchDrifts} loading={driftLoading} />
+                  </div>
+                }
+              >
+                {drifts.length === 0 && !driftLoading && (
+                  <p className="text-sm text-gray-500">데이터 없음</p>
+                )}
+                {drifts.length > 0 && (
+                  <ResponsiveContainer width="100%" height={Math.max(300, drifts.length * 28)}>
+                    <BarChart data={driftChartData} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis type="number" tick={{ fill: "#9ca3af", fontSize: 11 }} domain={[0, "auto"]} />
+                      <YAxis type="category" dataKey="story" tick={{ fill: "#9ca3af", fontSize: 11 }} width={50} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#1f2937", border: "1px solid #374151", borderRadius: "8px", color: "#f3f4f6" }}
+                        formatter={(value: number) => [`1/${Math.round(1 / value)}  (${value.toFixed(5)})`, ""]}
+                      />
+                      <Legend />
+                      <ReferenceLine x={DRIFT_LIMIT} stroke="#ef4444" strokeDasharray="5 5" label={{ value: "1/200", fill: "#ef4444", fontSize: 10 }} />
+                      <Bar dataKey="ratio_x" name="X Dir" fill="#60a5fa" barSize={10} />
+                      <Bar dataKey="ratio_y" name="Y Dir" fill="#34d399" barSize={10} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </SectionCard>
+
+              <SectionCard
+                title="Story Displacement"
+                action={<RefreshButton onClick={fetchDisplacements} loading={dispLoading} />}
+              >
+                {displacements.length === 0 && !dispLoading && (
+                  <p className="text-sm text-gray-500">데이터 없음</p>
+                )}
+                {displacements.length > 0 && (
+                  <ResponsiveContainer width="100%" height={Math.max(300, displacements.length * 28)}>
+                    <BarChart data={dispChartData} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis type="number" tick={{ fill: "#9ca3af", fontSize: 11 }} />
+                      <YAxis type="category" dataKey="story" tick={{ fill: "#9ca3af", fontSize: 11 }} width={50} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#1f2937", border: "1px solid #374151", borderRadius: "8px", color: "#f3f4f6" }}
+                        formatter={(value: number) => [value.toFixed(3), ""]}
+                      />
+                      <Legend />
+                      <Bar dataKey="dx" name="X Dir (mm)" fill="#60a5fa" barSize={10} />
+                      <Bar dataKey="dy" name="Y Dir (mm)" fill="#34d399" barSize={10} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </SectionCard>
+            </div>
+
+            {/* 층간변위비 상세 테이블 */}
+            <SectionCard title="Story Drift Detail">
+              {drifts.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-700">
+                        <th className="px-3 py-2 text-center text-gray-400 font-medium">Story</th>
+                        <th className="px-3 py-2 text-right text-gray-400 font-medium">Level (m)</th>
+                        <th className="px-3 py-2 text-right text-gray-400 font-medium">Height (m)</th>
+                        <th className="px-3 py-2 text-right text-gray-400 font-medium">Drift X</th>
+                        <th className="px-3 py-2 text-right text-gray-400 font-medium">Drift Y</th>
+                        <th className="px-3 py-2 text-right text-gray-400 font-medium">Ratio X</th>
+                        <th className="px-3 py-2 text-right text-gray-400 font-medium">Ratio Y</th>
+                        <th className="px-3 py-2 text-center text-gray-400 font-medium">Check</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {drifts.map((r) => {
+                        const okX = r.ratio_x <= DRIFT_LIMIT;
+                        const okY = r.ratio_y <= DRIFT_LIMIT;
+                        const ok = okX && okY;
+                        const td = "px-3 py-1 text-right text-gray-300 font-mono";
+                        return (
+                          <tr key={r.story} className="border-b border-gray-700/30 hover:bg-gray-700/20">
+                            <td className="px-3 py-1 text-center text-white font-medium">{r.story}</td>
+                            <td className={td}>{r.level.toFixed(2)}</td>
+                            <td className={td}>{r.height.toFixed(2)}</td>
+                            <td className={td}>{r.drift_x.toFixed(3)}</td>
+                            <td className={td}>{r.drift_y.toFixed(3)}</td>
+                            <td className={`${td} ${okX ? "" : "text-red-400 font-semibold"}`}>1/{r.ratio_x > 0 ? Math.round(1 / r.ratio_x) : "∞"}</td>
+                            <td className={`${td} ${okY ? "" : "text-red-400 font-semibold"}`}>1/{r.ratio_y > 0 ? Math.round(1 / r.ratio_y) : "∞"}</td>
+                            <td className="px-3 py-1 text-center">
+                              <span className={ok ? "text-green-400" : "text-red-400"}>{ok ? "OK" : "NG"}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </SectionCard>
+
+            {/* 반력 합계 테이블 */}
+            <SectionCard
+              title="Reaction Summary"
+              action={<RefreshButton onClick={fetchReactions} loading={rxnLoading} />}
+            >
+              {reactions.length === 0 && !rxnLoading && (
+                <p className="text-sm text-gray-500">데이터 없음</p>
+              )}
+              {reactions.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-700">
+                        <th className="px-3 py-2 text-left text-gray-400 font-medium">Load Case</th>
+                        <th className="px-3 py-2 text-right text-gray-400 font-medium">FX (kN)</th>
+                        <th className="px-3 py-2 text-right text-gray-400 font-medium">FY (kN)</th>
+                        <th className="px-3 py-2 text-right text-gray-400 font-medium">FZ (kN)</th>
+                        <th className="px-3 py-2 text-right text-gray-400 font-medium">MX (kN·m)</th>
+                        <th className="px-3 py-2 text-right text-gray-400 font-medium">MY (kN·m)</th>
+                        <th className="px-3 py-2 text-right text-gray-400 font-medium">MZ (kN·m)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reactions.map((r) => {
+                        const td = "px-3 py-1 text-right text-gray-300 font-mono";
+                        return (
+                          <tr key={r.lcName} className="border-b border-gray-700/30 hover:bg-gray-700/20">
+                            <td className="px-3 py-1 text-white font-medium">{r.lcName}</td>
+                            <td className={td}>{r.fx.toFixed(2)}</td>
+                            <td className={td}>{r.fy.toFixed(2)}</td>
+                            <td className={td}>{r.fz.toFixed(2)}</td>
+                            <td className={td}>{r.mx.toFixed(2)}</td>
+                            <td className={td}>{r.my.toFixed(2)}</td>
+                            <td className={td}>{r.mz.toFixed(2)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </SectionCard>
+          </>
+        );
+      })()}
+
+      {/* ════════ 지진하중 섹션 ════════ */}
       {error && <ErrorText message={error} />}
 
       {data.length === 0 && !loading && !error && (
@@ -169,8 +796,8 @@ export default function SeismicLoadPage() {
       )}
 
       {data.map((spfc) => {
-        const v = validate(spfc);
-        const allOk = v && v.Fa.ok && v.Fv.ok && v.Sds.ok && v.Sd1.ok;
+        const v = validate(spfc, projectComment);
+        const allOk = v && v.Fa.ok && v.Fv.ok && v.Sds.ok && v.Sd1.ok && v.SC.ok && v.IE.ok && v.R.ok;
 
         return (
           <div key={spfc.id} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -190,8 +817,8 @@ export default function SeismicLoadPage() {
               <div className="grid grid-cols-2 gap-3">
                 <ParamCard label="Design Spectrum" value={spfc.SPEC_CODE} />
                 <ParamCard label="유효지반가속도 (S)" value={spfc.ZONEFACTOR.toFixed(3)} />
-                <ParamCard label="Site Class" value={SC_MAP[spfc.SC] ?? String(spfc.SC)} />
-                <ParamCard label="중요도 계수 (Ie)" value={spfc.IE.toFixed(2)} />
+                <ParamCard label="Site Class" value={SC_MAP[spfc.SC] ?? String(spfc.SC)} ok={v?.SC.ok} />
+                <ParamCard label="중요도 계수 (Ie)" value={spfc.IE.toFixed(2)} ok={v?.IE.ok} />
               </div>
               <div className="grid grid-cols-2 gap-3 mt-3">
                 <ParamCard label="Fa (단주기)" value={spfc.Fa.toFixed(3)} ok={v?.Fa.ok} />
@@ -200,7 +827,7 @@ export default function SeismicLoadPage() {
                 <ParamCard label="Sd1 (1초주기)" value={spfc.Sd1.toFixed(4)} ok={v?.Sd1.ok} />
               </div>
               <div className="grid grid-cols-2 gap-3 mt-3">
-                <ParamCard label="반응수정 계수 (R)" value={spfc.R.toFixed(2)} />
+                <ParamCard label="반응수정 계수 (R)" value={spfc.R.toFixed(2)} ok={v?.R.ok} />
                 {storyWeight && (
                   <ParamCard label={`Building Weight (${storyWeight.gl_story}, GL=${storyWeight.gl_level})`} value={`${storyWeight.total_weight.toFixed(2)} kN`} />
                 )}
@@ -243,6 +870,9 @@ export default function SeismicLoadPage() {
         title="Eigenvalue Analysis"
         action={
           <div className="flex items-center gap-3">
+            {eigenTime && (
+              <span className="text-[10px] text-gray-500">{formatTime(eigenTime)}</span>
+            )}
             {eigenRows.length > 0 && (() => {
               const last = eigenRows[eigenRows.length - 1];
               const allOk = last.sum_x > 90 && last.sum_y > 90 && last.sum_rotn_z > 90;
@@ -270,9 +900,8 @@ export default function SeismicLoadPage() {
           </div>
         }
       >
-        {eigenError && <ErrorText message={eigenError} />}
-        {eigenRows.length === 0 && !eigenLoading && !eigenError && (
-          <p className="text-sm text-gray-500">데이터 없음</p>
+        {eigenRows.length === 0 && !eigenLoading && (
+          <p className="text-sm text-gray-500">해석 결과 대기 중</p>
         )}
         {eigenRows.length > 0 && (() => {
           // Mass 최대값 모드 탐색 (X, Y, ROTN-Z)
@@ -427,11 +1056,17 @@ export default function SeismicLoadPage() {
       {/* 밑면 전단력 테이블 */}
       <SectionCard
         title="Story Shear (Response Spectrum)"
-        action={<RefreshButton onClick={fetchStoryShear} loading={shearLoading} />}
+        action={
+          <div className="flex items-center gap-3">
+            {shearTime && (
+              <span className="text-[10px] text-gray-500">{formatTime(shearTime)}</span>
+            )}
+            <RefreshButton onClick={fetchStoryShear} loading={shearLoading} />
+          </div>
+        }
       >
-        {shearError && <ErrorText message={shearError} />}
-        {shearRows.length === 0 && !shearLoading && !shearError && (
-          <p className="text-sm text-gray-500">데이터 없음</p>
+        {shearRows.length === 0 && !shearLoading && (
+          <p className="text-sm text-gray-500">해석 결과 대기 중</p>
         )}
         {shearRows.length > 0 && (
           <div className="overflow-x-auto">
