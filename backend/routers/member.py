@@ -1,4 +1,6 @@
+import json
 import logging
+import os
 from collections import defaultdict
 
 from fastapi import APIRouter
@@ -224,3 +226,30 @@ def beam_design_check(req: BeamDesignCheckRequest) -> list[PositionCheckResult]:
             ))
 
     return results
+
+
+# ===== 배근 데이터 저장/로드 (JSON 파일) =====
+
+_REBARS_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
+_REBARS_FILE = os.path.join(_REBARS_DIR, "rc_beam_rebars.json")
+
+
+@router.get("/member/rebars")
+def get_rebars() -> dict:
+    """저장된 배근 데이터를 로드한다."""
+    if not os.path.isfile(_REBARS_FILE):
+        return {"version": 1, "savedAt": None, "sections": []}
+    try:
+        with open(_REBARS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"version": 1, "savedAt": None, "sections": []}
+
+
+@router.put("/member/rebars")
+def save_rebars(body: dict) -> dict:
+    """배근 데이터를 JSON 파일에 저장한다."""
+    os.makedirs(_REBARS_DIR, exist_ok=True)
+    with open(_REBARS_FILE, "w", encoding="utf-8") as f:
+        json.dump(body, f, ensure_ascii=False, indent=2)
+    return {"status": "ok"}

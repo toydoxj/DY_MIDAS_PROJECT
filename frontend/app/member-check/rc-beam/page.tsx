@@ -10,6 +10,7 @@ import SectionCard from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 import { ErrorText } from "@/components/ui/StatusMessage";
 import { initSectionRebars } from "./_components/RebarInputTable";
+import { saveDraftToLocal, loadDraftFromLocal, clearDraftLocal, loadRebarsFromServer, saveRebarsToServer } from "./_lib/storage";
 import { REBAR_OPTIONS, REBAR_TYPE_CONFIG } from "./_lib/constants";
 import type { SectionRebarInput, RebarInput, RebarType, PositionCheckResult } from "./_lib/types";
 
@@ -487,8 +488,11 @@ export default function RcBeamCheckPage() {
     return defaultFy;
   }, [rebarRules, defaultFy]);
   const [rebarSections, setRebarSections] = useState<SectionRebarInput[]>([]);
+  const [savedRebars, setSavedRebars] = useState<SectionRebarInput[]>([]);
   const [checkResults, setCheckResults] = useState<PositionCheckResult[]>([]);
   const [checkLoading, setCheckLoading] = useState(false);
+  const [rebarSaving, setRebarSaving] = useState(false);
+  const [rebarSaved, setRebarSaved] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -542,10 +546,11 @@ export default function RcBeamCheckPage() {
     setLoadingSections(true);
     setError("");
     try {
-      const [sectRes, storRes, projRes] = await Promise.all([
+      const [sectRes, storRes, projRes, rebarsData] = await Promise.all([
         fetch(`${BACKEND_URL}/api/member/sections`),
         fetch(`${BACKEND_URL}/api/midas/db/STOR`),
         fetch(`${BACKEND_URL}/api/project`),
+        loadRebarsFromServer(),
       ]);
       if (!sectRes.ok) throw new Error(`Section HTTP ${sectRes.status}`);
       const data: SectionInfo[] = await sectRes.json();
@@ -589,6 +594,9 @@ export default function RcBeamCheckPage() {
           }
         } catch { /* ignore */ }
       }
+
+      // 서버 저장 배근 데이터 로드
+      if (rebarsData.length > 0) setSavedRebars(rebarsData);
     } catch (e) {
       setError(`Section 조회 실패: ${e}`);
     } finally {
@@ -734,14 +742,36 @@ export default function RcBeamCheckPage() {
 
   const selectionKey = [...selectedIds].sort().join(",");
 
-  // maxResult 변경 시 배근 입력 폼 초기화
+  // maxResult 변경 시 저장 데이터와 병합
   useEffect(() => {
     if (!maxResult || maxResult.length === 0) { setRebarSections([]); return; }
+    const draft = loadDraftFromLocal();
+    const saved = draft ?? savedRebars;
+    const savedMap = new Map(saved.map((s) => [s.section_name, s]));
     setRebarSections(
-      maxResult.map((r) => initSectionRebars(r.SectName, r.B ?? 400, r.H ?? 700, defaultFck, getFyForDia(25), defaultFyt))
+      maxResult.map((r) => {
+        const existing = savedMap.get(r.SectName);
+        if (existing) return { ...existing, B: r.B ?? existing.B, H: r.H ?? existing.H };
+        return initSectionRebars(r.SectName, r.B ?? 400, r.H ?? 700, defaultFck, getFyForDia(25), defaultFyt);
+      })
     );
     setCheckResults([]);
   }, [maxResult]);
+
+  // localStorage 자동 저장 (1초 디바운스)
+  useEffect(() => {
+    if (rebarSections.length === 0) return;
+    const timer = setTimeout(() => saveDraftToLocal(rebarSections), 1000);
+    return () => clearTimeout(timer);
+  }, [rebarSections]);
+
+  // 서버에 배근 저장
+  const handleSaveRebars = async () => {
+    setRebarSaving(true); setRebarSaved(false);
+    const ok = await saveRebarsToServer(rebarSections);
+    if (ok) { setRebarSaved(true); clearDraftLocal(); }
+    setRebarSaving(false);
+  };
 
   // 검토 실행
   const checkAbortRef = useRef<AbortController | null>(null);
@@ -981,6 +1011,10 @@ export default function RcBeamCheckPage() {
                       {checkResults.every((r) => r.all_ok) ? "전체 적합" : "부적합 있음"}
                     </span>
                   )}
+                  {rebarSaved && <span className="text-xs text-green-400">저장됨</span>}
+                  <Button size="xs" variant="outline" onClick={handleSaveRebars} loading={rebarSaving}>
+                    {rebarSaving ? "저장 중..." : "배근 저장"}
+                  </Button>
                 </div>
               }
             >
