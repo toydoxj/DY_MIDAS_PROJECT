@@ -79,6 +79,12 @@ class BeamDesignCheckRequest(BaseModel):
     forces: list[BeamForceMaxRow]
 
 
+class SaveRebarsRequest(BaseModel):
+    version: int = 1
+    savedAt: Optional[str] = None
+    sections: list[SectionRebarInput] = []
+
+
 class PositionCheckResult(BaseModel):
     section_name: str
     position: str
@@ -86,29 +92,29 @@ class PositionCheckResult(BaseModel):
     neg_Mu_d: float = 0
     neg_phi_Mn: float = 0
     neg_flexure_dcr: float = 0
-    neg_flexure_ok: bool = True
+    neg_flexure_ok: bool = False
     # 휨 (하부 = 양의 모멘트)
     pos_Mu_d: float = 0
     pos_phi_Mn: float = 0
     pos_flexure_dcr: float = 0
-    pos_flexure_ok: bool = True
+    pos_flexure_ok: bool = False
     # 전단
     Vu_d: float = 0
     phi_Vn: float = 0
     shear_dcr: float = 0
-    shear_ok: bool = True
+    shear_ok: bool = False
     # 철근비
     rho: float = 0
     rho_min: float = 0
     rho_max: float = 0
-    rho_min_ok: bool = True
-    rho_max_ok: bool = True
+    rho_min_ok: bool = False
+    rho_max_ok: bool = False
     # 스터럽
     stirrup_spacing: float = 0
     stirrup_max_spacing: float = 0
-    stirrup_ok: bool = True
+    stirrup_ok: bool = False
     # 종합
-    all_ok: bool = True
+    all_ok: bool = False
 
 
 class BeamForceMemberRow(BaseModel):

@@ -282,14 +282,16 @@ function MaxTableIntegrated({
                   const v = Math.abs(Number(force[`${prefix}_${p}`]) || 0);
                   if (v > maxVal) { maxVal = v; maxPos = p; }
                 }
-                return { val: Number(force[`${prefix}_${maxPos}`]) || 0, lc: (force[`${prefix}_${maxPos}_LC`] as string) ?? "" };
+                return { val: Number(force[`${prefix}_${maxPos}`]) || 0, lc: (force[`${prefix}_${maxPos}_LC`] as string) ?? "", pos: maxPos };
               };
               const myNeg = getMax("My_neg");
               const myPos = getMax("My_pos");
               const fz = getMax("Fz");
 
-              // DCR: 첫 매핑 위치 기준
-              const cr = resultMap.get(`${r.SectName}-${mappedPositions[0]}`);
+              // DCR: 각 부재력의 지배적 위치에서 가져옴
+              const crNeg = resultMap.get(`${r.SectName}-${myNeg.pos}`);
+              const crPos = resultMap.get(`${r.SectName}-${myPos.pos}`);
+              const crShear = resultMap.get(`${r.SectName}-${fz.pos}`);
 
               return (
                 <tr key={`${gi}-${label}`} className={`${gi % 2 === 0 ? "bg-gray-800/80" : "bg-gray-900/60"} ${pi === 0 && gi > 0 ? "border-t-2 border-gray-500" : ""}`}>
@@ -350,7 +352,7 @@ function MaxTableIntegrated({
                       </div>
                     )}
                   </td>
-                  {hasResults && (cr ? dcrCell(cr.neg_flexure_dcr, cr.neg_flexure_ok) : <td className={tdCls}></td>)}
+                  {hasResults && (crNeg ? dcrCell(crNeg.neg_flexure_dcr, crNeg.neg_flexure_ok) : <td className={tdCls}></td>)}
                   {/* My(+) + 하부근 (n-Dxx) */}
                   <td className={`${tdCls} font-mono border-l border-gray-600`}>
                     <div className="text-white">{myPos.val.toFixed(1)}</div>
@@ -366,7 +368,7 @@ function MaxTableIntegrated({
                       </div>
                     )}
                   </td>
-                  {hasResults && (cr ? dcrCell(cr.pos_flexure_dcr, cr.pos_flexure_ok) : <td className={tdCls}></td>)}
+                  {hasResults && (crPos ? dcrCell(crPos.pos_flexure_dcr, crPos.pos_flexure_ok) : <td className={tdCls}></td>)}
                   {/* Fz + 스터럽 (Dxx@nnn) */}
                   <td className={`${tdCls} font-mono border-l border-gray-600`}>
                     <div className="text-white">{fz.val.toFixed(1)}</div>
@@ -396,7 +398,7 @@ function MaxTableIntegrated({
                       </div>
                     )}
                   </td>
-                  {hasResults && (cr ? dcrCell(cr.shear_dcr, cr.shear_ok) : <td className={tdCls}></td>)}
+                  {hasResults && (crShear ? dcrCell(crShear.shear_dcr, crShear.shear_ok) : <td className={tdCls}></td>)}
                 </tr>
               );
             });

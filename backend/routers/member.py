@@ -15,6 +15,7 @@ from models.member import (
     BeamForceMemberRow,
     BeamDesignCheckRequest,
     PositionCheckResult,
+    SaveRebarsRequest,
 )
 from typing import Union
 
@@ -247,9 +248,9 @@ def get_rebars() -> dict:
 
 
 @router.put("/member/rebars")
-def save_rebars(body: dict) -> dict:
+def save_rebars(body: SaveRebarsRequest) -> dict:
     """배근 데이터를 JSON 파일에 저장한다."""
     os.makedirs(_REBARS_DIR, exist_ok=True)
     with open(_REBARS_FILE, "w", encoding="utf-8") as f:
-        json.dump(body, f, ensure_ascii=False, indent=2)
+        json.dump(body.model_dump(), f, ensure_ascii=False, indent=2)
     return {"status": "ok"}
