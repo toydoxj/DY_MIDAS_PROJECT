@@ -238,9 +238,6 @@ function MaxTableIntegrated({
           <tr>
             <th className={thCls}>단면</th>
             <th className={thCls}>B×H</th>
-            <th className={thCls}>fck</th>
-            <th className={thCls}>fy</th>
-            <th className={thCls}>fyt</th>
             <th className={thCls}>Type</th>
             <th className={thCls}>위치</th>
             <th className={thCls}>표기</th>
@@ -299,24 +296,6 @@ function MaxTableIntegrated({
                     <>
                       <td className={tdMergedCls} rowSpan={rowCount}>{r.SectName}</td>
                       <td className={`${tdMergedCls} font-mono text-xs`} rowSpan={rowCount}>{r.B ?? "-"}×{r.H ?? "-"}</td>
-                      <td className={tdMergedCls} rowSpan={rowCount}>
-                        {si !== undefined && sec ? (
-                          <input className={inputCls} type="number" value={sec.fck}
-                            onChange={(e) => { const next = [...rebarSections]; next[si] = { ...sec, fck: Number(e.target.value) || 27 }; onRebarChange(next); }} />
-                        ) : "-"}
-                      </td>
-                      <td className={tdMergedCls} rowSpan={rowCount}>
-                        {si !== undefined && sec ? (
-                          <input className={inputCls} type="number" value={sec.fy}
-                            onChange={(e) => { const next = [...rebarSections]; next[si] = { ...sec, fy: Number(e.target.value) || 400 }; onRebarChange(next); }} />
-                        ) : "-"}
-                      </td>
-                      <td className={tdMergedCls} rowSpan={rowCount}>
-                        {si !== undefined && sec ? (
-                          <input className={inputCls} type="number" value={sec.fyt}
-                            onChange={(e) => { const next = [...rebarSections]; next[si] = { ...sec, fyt: Number(e.target.value) || 400 }; onRebarChange(next); }} />
-                        ) : "-"}
-                      </td>
                       <td className={tdMergedCls} rowSpan={rowCount}>
                         {si !== undefined && sec ? (
                           <select className={selectCls} value={sec.rebarType}
