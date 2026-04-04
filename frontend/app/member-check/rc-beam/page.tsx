@@ -220,7 +220,7 @@ function MaxTableIntegrated({
     onRebarChange(next);
   };
 
-  const inputCls = "w-10 rounded bg-gray-700 border border-gray-600 px-1 py-0.5 text-[11px] text-white text-center focus:outline-none focus:ring-1 focus:ring-blue-500";
+  const inputCls = "w-12 rounded bg-gray-700 border border-gray-600 px-1 py-0.5 text-[11px] text-white text-center focus:outline-none focus:ring-1 focus:ring-blue-500";
   const selectCls = "w-14 rounded bg-gray-700 border border-gray-600 px-0.5 py-0.5 text-[11px] text-white text-center focus:outline-none focus:ring-1 focus:ring-blue-500";
 
   const hasResults = checkResults.length > 0;
