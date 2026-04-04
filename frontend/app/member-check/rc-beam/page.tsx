@@ -185,7 +185,7 @@ function filterSectionsByStories(sects: SectionInfo[], stories: Set<string>): Se
   });
 }
 
-const thCls = "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-300";
+const thCls = "px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-300";
 const tdCls = "px-3 py-2 text-gray-300 whitespace-nowrap text-sm";
 const tdMergedCls = "px-3 py-2 text-gray-200 whitespace-nowrap text-sm font-medium align-middle";
 
