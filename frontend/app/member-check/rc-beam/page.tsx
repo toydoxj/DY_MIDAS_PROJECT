@@ -108,6 +108,7 @@ function MaxTableIntegrated({
           <tr>
             <th className={thCls}>단면</th>
             <th className={thCls}>B×H</th>
+            <th className={thCls}>주근</th>
             <th className={thCls}>위치</th>
             <th className={thCls}>My(-)</th>
             <th className={thCls}>상부근</th>
@@ -135,52 +136,39 @@ function MaxTableIntegrated({
                     <>
                       <td className={tdMergedCls} rowSpan={3}>{r.SectName}</td>
                       <td className={`${tdMergedCls} font-mono text-xs`} rowSpan={3}>{r.B ?? "-"}×{r.H ?? "-"}</td>
+                      {/* 주근 규격 — 단면 공통 (상부/하부 동일) */}
+                      <td className={tdMergedCls} rowSpan={3}>
+                        {si !== undefined && rb0 ? (
+                          <select className={selectCls} value={rb0.top_dia}
+                            onChange={(e) => { const d = Number(e.target.value); updateSectionRebar(si, { top_dia: d, bot_dia: d }); }}>
+                            {REBAR_OPTIONS.map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
+                          </select>
+                        ) : "-"}
+                      </td>
                     </>
                   )}
                   <td className={`${tdCls} text-blue-400 font-medium`}>{pos}</td>
-                  {/* My(-) + 상부근 */}
+                  {/* My(-) + 상부근 개수 */}
                   <td className={`${tdCls} font-mono`}>
                     <span className="text-gray-300">{String(force[`My_neg_${pos}`])}</span>
                     <span className="text-gray-600 text-[9px] ml-1">{force[`My_neg_${pos}_LC`] as string}</span>
                   </td>
                   <td className={tdCls}>
                     {rb && si !== undefined && (
-                      <div className="flex items-center gap-0.5 justify-center">
-                        <input className={inputCls} type="number" min={0} value={rb.top_count}
-                          onChange={(e) => updatePositionCount(si, pi, { top_count: Number(e.target.value) || 0 })} />
-                        <span className="text-gray-500">-</span>
-                        {pi === 0 ? (
-                          <select className={selectCls} value={rb.top_dia}
-                            onChange={(e) => updateSectionRebar(si, { top_dia: Number(e.target.value) })}>
-                            {REBAR_OPTIONS.map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
-                          </select>
-                        ) : (
-                          <span className="text-gray-300 text-[11px] w-14 text-center">D{rb0?.top_dia ?? rb.top_dia}</span>
-                        )}
-                      </div>
+                      <input className={inputCls} type="number" min={0} value={rb.top_count}
+                        onChange={(e) => updatePositionCount(si, pi, { top_count: Number(e.target.value) || 0 })} />
                     )}
                   </td>
                   {hasResults && (cr ? dcrCell(cr.flexure_dcr, cr.flexure_ok) : <td className={tdCls}></td>)}
-                  {/* My(+) + 하부근 */}
+                  {/* My(+) + 하부근 개수 */}
                   <td className={`${tdCls} font-mono`}>
                     <span className="text-gray-300">{String(force[`My_pos_${pos}`])}</span>
                     <span className="text-gray-600 text-[9px] ml-1">{force[`My_pos_${pos}_LC`] as string}</span>
                   </td>
                   <td className={tdCls}>
                     {rb && si !== undefined && (
-                      <div className="flex items-center gap-0.5 justify-center">
-                        <input className={inputCls} type="number" min={0} value={rb.bot_count}
-                          onChange={(e) => updatePositionCount(si, pi, { bot_count: Number(e.target.value) || 0 })} />
-                        <span className="text-gray-500">-</span>
-                        {pi === 0 ? (
-                          <select className={selectCls} value={rb.bot_dia}
-                            onChange={(e) => updateSectionRebar(si, { bot_dia: Number(e.target.value) })}>
-                            {REBAR_OPTIONS.map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
-                          </select>
-                        ) : (
-                          <span className="text-gray-300 text-[11px] w-14 text-center">D{rb0?.bot_dia ?? rb.bot_dia}</span>
-                        )}
-                      </div>
+                      <input className={inputCls} type="number" min={0} value={rb.bot_count}
+                        onChange={(e) => updatePositionCount(si, pi, { bot_count: Number(e.target.value) || 0 })} />
                     )}
                   </td>
                   {hasResults && (cr ? dcrCell(cr.flexure_dcr, cr.flexure_ok) : <td className={tdCls}></td>)}
