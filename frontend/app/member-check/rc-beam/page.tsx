@@ -72,7 +72,17 @@ function MaxTableIntegrated({
   const resultMap = new Map<string, PositionCheckResult>();
   for (const r of checkResults) resultMap.set(`${r.section_name}-${r.position}`, r);
 
-  const updateRebar = (si: number, ri: number, patch: Partial<RebarInput>) => {
+  // 단면 단위 배근 업데이트 (모든 위치에 동일 적용)
+  const updateSectionRebar = (si: number, patch: Partial<RebarInput>) => {
+    const next = rebarSections.map((s, i) => {
+      if (i !== si) return s;
+      return { ...s, rebars: s.rebars.map((r) => ({ ...r, ...patch })) };
+    });
+    onRebarChange(next);
+  };
+
+  // 위치별 배근 업데이트 (개수만)
+  const updatePositionCount = (si: number, ri: number, patch: Partial<RebarInput>) => {
     const next = rebarSections.map((s, i) => {
       if (i !== si) return s;
       return { ...s, rebars: s.rebars.map((r, j) => (j === ri ? { ...r, ...patch } : r)) };
@@ -80,50 +90,41 @@ function MaxTableIntegrated({
     onRebarChange(next);
   };
 
-  const inputCls = "w-14 rounded bg-gray-700 border border-gray-600 px-1 py-0.5 text-xs text-white text-center focus:outline-none focus:ring-1 focus:ring-blue-500";
-  const selectCls = "w-16 rounded bg-gray-700 border border-gray-600 px-0.5 py-0.5 text-xs text-white text-center focus:outline-none focus:ring-1 focus:ring-blue-500";
+  const inputCls = "w-10 rounded bg-gray-700 border border-gray-600 px-1 py-0.5 text-[11px] text-white text-center focus:outline-none focus:ring-1 focus:ring-blue-500";
+  const selectCls = "w-14 rounded bg-gray-700 border border-gray-600 px-0.5 py-0.5 text-[11px] text-white text-center focus:outline-none focus:ring-1 focus:ring-blue-500";
 
   const hasResults = checkResults.length > 0;
+
+  const dcrCell = (dcr: number, ok: boolean) => (
+    <td className={`${tdCls} font-mono font-semibold text-center ${ok ? "text-green-400" : "text-red-400"}`}>
+      {dcr < 900 ? dcr.toFixed(3) : "-"}
+    </td>
+  );
 
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-700">
       <table className="min-w-full text-xs">
         <thead className="bg-gray-700">
           <tr>
-            <th className={thCls} rowSpan={2}>단면</th>
-            <th className={thCls} rowSpan={2}>B×H</th>
-            <th className={thCls} rowSpan={2}>위치</th>
-            <th className={thCls} colSpan={2}>My(-)</th>
-            <th className={thCls} colSpan={2}>My(+)</th>
-            <th className={thCls} colSpan={2}>Fz</th>
-            <th className={thCls} colSpan={2}>상부근</th>
-            <th className={thCls} colSpan={2}>하부근</th>
-            <th className={thCls} colSpan={2}>스터럽</th>
-            {hasResults && (
-              <>
-                <th className={thCls}>휨DCR</th>
-                <th className={thCls}>전단DCR</th>
-                <th className={thCls}>철근비</th>
-                <th className={thCls}>스터럽</th>
-              </>
-            )}
-          </tr>
-          <tr>
-            <th className={thCls}>LC</th><th className={thCls}>kN·m</th>
-            <th className={thCls}>LC</th><th className={thCls}>kN·m</th>
-            <th className={thCls}>LC</th><th className={thCls}>kN</th>
-            <th className={thCls}>규격</th><th className={thCls}>개수</th>
-            <th className={thCls}>규격</th><th className={thCls}>개수</th>
-            <th className={thCls}>규격</th><th className={thCls}>간격</th>
-            {hasResults && (
-              <><th className={thCls}></th><th className={thCls}></th><th className={thCls}></th><th className={thCls}></th></>
-            )}
+            <th className={thCls}>단면</th>
+            <th className={thCls}>B×H</th>
+            <th className={thCls}>위치</th>
+            <th className={thCls}>My(-)</th>
+            <th className={thCls}>상부근</th>
+            {hasResults && <th className={thCls}>휨DCR</th>}
+            <th className={thCls}>My(+)</th>
+            <th className={thCls}>하부근</th>
+            {hasResults && <th className={thCls}>휨DCR</th>}
+            <th className={thCls}>Fz</th>
+            <th className={thCls}>스터럽</th>
+            {hasResults && <th className={thCls}>전단DCR</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-700">
           {data.map((r, gi) => {
             const si = rebarMap.get(r.SectName);
             const sec = si !== undefined ? rebarSections[si] : null;
+            const rb0 = sec?.rebars[0]; // 단면 공통 철근 규격 (첫 위치 기준)
             return POSITIONS.map((pos, pi) => {
               const rb = sec?.rebars[pi];
               const cr = resultMap.get(`${r.SectName}-${pos}`);
@@ -137,62 +138,73 @@ function MaxTableIntegrated({
                     </>
                   )}
                   <td className={`${tdCls} text-blue-400 font-medium`}>{pos}</td>
-                  <td className={`${tdCls} text-gray-500 text-[10px]`}>{force[`My_neg_${pos}_LC`] as string}</td>
-                  <td className={`${tdCls} font-mono`}>{String(force[`My_neg_${pos}`])}</td>
-                  <td className={`${tdCls} text-gray-500 text-[10px]`}>{force[`My_pos_${pos}_LC`] as string}</td>
-                  <td className={`${tdCls} font-mono`}>{String(force[`My_pos_${pos}`])}</td>
-                  <td className={`${tdCls} text-gray-500 text-[10px]`}>{force[`Fz_${pos}_LC`] as string}</td>
-                  <td className={`${tdCls} font-mono`}>{String(force[`Fz_${pos}`])}</td>
-                  {rb && si !== undefined ? (
-                    <>
-                      <td className={tdCls}>
-                        <select className={selectCls} value={rb.top_dia} onChange={(e) => updateRebar(si, pi, { top_dia: Number(e.target.value) })}>
-                          {REBAR_OPTIONS.map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
-                        </select>
-                      </td>
-                      <td className={tdCls}>
-                        <input className={inputCls} type="number" min={0} value={rb.top_count} onChange={(e) => updateRebar(si, pi, { top_count: Number(e.target.value) || 0 })} />
-                      </td>
-                      <td className={tdCls}>
-                        <select className={selectCls} value={rb.bot_dia} onChange={(e) => updateRebar(si, pi, { bot_dia: Number(e.target.value) })}>
-                          {REBAR_OPTIONS.map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
-                        </select>
-                      </td>
-                      <td className={tdCls}>
-                        <input className={inputCls} type="number" min={0} value={rb.bot_count} onChange={(e) => updateRebar(si, pi, { bot_count: Number(e.target.value) || 0 })} />
-                      </td>
-                      <td className={tdCls}>
-                        <select className={selectCls} value={rb.stirrup_dia} onChange={(e) => updateRebar(si, pi, { stirrup_dia: Number(e.target.value) })}>
+                  {/* My(-) + 상부근 */}
+                  <td className={`${tdCls} font-mono`}>
+                    <span className="text-gray-300">{String(force[`My_neg_${pos}`])}</span>
+                    <span className="text-gray-600 text-[9px] ml-1">{force[`My_neg_${pos}_LC`] as string}</span>
+                  </td>
+                  <td className={tdCls}>
+                    {rb && si !== undefined && (
+                      <div className="flex items-center gap-0.5 justify-center">
+                        <input className={inputCls} type="number" min={0} value={rb.top_count}
+                          onChange={(e) => updatePositionCount(si, pi, { top_count: Number(e.target.value) || 0 })} />
+                        <span className="text-gray-500">-</span>
+                        {pi === 0 ? (
+                          <select className={selectCls} value={rb.top_dia}
+                            onChange={(e) => updateSectionRebar(si, { top_dia: Number(e.target.value) })}>
+                            {REBAR_OPTIONS.map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
+                          </select>
+                        ) : (
+                          <span className="text-gray-300 text-[11px] w-14 text-center">D{rb0?.top_dia ?? rb.top_dia}</span>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  {hasResults && (cr ? dcrCell(cr.flexure_dcr, cr.flexure_ok) : <td className={tdCls}></td>)}
+                  {/* My(+) + 하부근 */}
+                  <td className={`${tdCls} font-mono`}>
+                    <span className="text-gray-300">{String(force[`My_pos_${pos}`])}</span>
+                    <span className="text-gray-600 text-[9px] ml-1">{force[`My_pos_${pos}_LC`] as string}</span>
+                  </td>
+                  <td className={tdCls}>
+                    {rb && si !== undefined && (
+                      <div className="flex items-center gap-0.5 justify-center">
+                        <input className={inputCls} type="number" min={0} value={rb.bot_count}
+                          onChange={(e) => updatePositionCount(si, pi, { bot_count: Number(e.target.value) || 0 })} />
+                        <span className="text-gray-500">-</span>
+                        {pi === 0 ? (
+                          <select className={selectCls} value={rb.bot_dia}
+                            onChange={(e) => updateSectionRebar(si, { bot_dia: Number(e.target.value) })}>
+                            {REBAR_OPTIONS.map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
+                          </select>
+                        ) : (
+                          <span className="text-gray-300 text-[11px] w-14 text-center">D{rb0?.bot_dia ?? rb.bot_dia}</span>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  {hasResults && (cr ? dcrCell(cr.flexure_dcr, cr.flexure_ok) : <td className={tdCls}></td>)}
+                  {/* Fz + 스터럽 */}
+                  <td className={`${tdCls} font-mono`}>
+                    <span className="text-gray-300">{String(force[`Fz_${pos}`])}</span>
+                    <span className="text-gray-600 text-[9px] ml-1">{force[`Fz_${pos}_LC`] as string}</span>
+                  </td>
+                  {pi === 0 && si !== undefined && rb0 ? (
+                    <td className={tdCls} rowSpan={3}>
+                      <div className="flex items-center gap-0.5 justify-center">
+                        <select className={selectCls} value={rb0.stirrup_dia}
+                          onChange={(e) => updateSectionRebar(si, { stirrup_dia: Number(e.target.value) })}>
                           {REBAR_OPTIONS.filter((o) => o.dia <= 16).map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
                         </select>
-                      </td>
-                      <td className={tdCls}>
-                        <input className={inputCls} type="number" min={50} step={25} value={rb.stirrup_spacing} onChange={(e) => updateRebar(si, pi, { stirrup_spacing: Number(e.target.value) || 200 })} />
-                      </td>
-                    </>
-                  ) : (
-                    <td colSpan={6} className={tdCls}></td>
-                  )}
-                  {hasResults && (
-                    cr ? (
-                      <>
-                        <td className={`${tdCls} font-mono font-semibold ${cr.flexure_ok ? "text-green-400" : "text-red-400"}`}>
-                          {cr.flexure_dcr < 900 ? cr.flexure_dcr.toFixed(3) : "-"}
-                        </td>
-                        <td className={`${tdCls} font-mono font-semibold ${cr.shear_ok ? "text-green-400" : "text-red-400"}`}>
-                          {cr.shear_dcr < 900 ? cr.shear_dcr.toFixed(3) : "-"}
-                        </td>
-                        <td className={`${tdCls} text-center ${cr.rho_min_ok && cr.rho_max_ok ? "text-green-400" : "text-red-400"}`}>
-                          {cr.rho_min_ok && cr.rho_max_ok ? "✓" : "✗"}
-                        </td>
-                        <td className={`${tdCls} text-center ${cr.stirrup_ok ? "text-green-400" : "text-red-400"}`}>
-                          {cr.stirrup_ok ? "✓" : "✗"}
-                        </td>
-                      </>
-                    ) : (
-                      <td colSpan={4} className={tdCls}></td>
-                    )
-                  )}
+                        <span className="text-gray-500">@</span>
+                        <input className={inputCls} type="number" min={50} step={25} value={rb0.stirrup_spacing}
+                          onChange={(e) => updateSectionRebar(si, { stirrup_spacing: Number(e.target.value) || 200 })} />
+                      </div>
+                    </td>
+                  ) : pi === 0 ? (
+                    <td className={tdCls} rowSpan={3}></td>
+                  ) : null}
+                  {hasResults && (cr ? dcrCell(cr.shear_dcr, cr.shear_ok) : <td className={tdCls}></td>)}
                 </tr>
               );
             });
