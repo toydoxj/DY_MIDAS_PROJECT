@@ -177,21 +177,23 @@ function MaxTableIntegrated({
                     <span className="text-gray-300">{String(force[`Fz_${pos}`])}</span>
                     <span className="text-gray-600 text-[9px] ml-1">{force[`Fz_${pos}_LC`] as string}</span>
                   </td>
-                  {pi === 0 && si !== undefined && rb0 ? (
-                    <td className={tdCls} rowSpan={3}>
+                  <td className={tdCls}>
+                    {rb && si !== undefined && (
                       <div className="flex items-center gap-0.5 justify-center">
-                        <select className={selectCls} value={rb0.stirrup_dia}
-                          onChange={(e) => updateSectionRebar(si, { stirrup_dia: Number(e.target.value) })}>
-                          {REBAR_OPTIONS.filter((o) => o.dia <= 16).map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
-                        </select>
+                        {pi === 0 ? (
+                          <select className={selectCls} value={rb.stirrup_dia}
+                            onChange={(e) => updateSectionRebar(si, { stirrup_dia: Number(e.target.value) })}>
+                            {REBAR_OPTIONS.filter((o) => o.dia <= 16).map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
+                          </select>
+                        ) : (
+                          <span className="text-gray-300 text-[11px] w-14 text-center">D{rb0?.stirrup_dia ?? rb.stirrup_dia}</span>
+                        )}
                         <span className="text-gray-500">@</span>
-                        <input className={inputCls} type="number" min={50} step={25} value={rb0.stirrup_spacing}
-                          onChange={(e) => updateSectionRebar(si, { stirrup_spacing: Number(e.target.value) || 200 })} />
+                        <input className={inputCls} type="number" min={50} step={25} value={rb.stirrup_spacing}
+                          onChange={(e) => updatePositionCount(si, pi, { stirrup_spacing: Number(e.target.value) || 200 })} />
                       </div>
-                    </td>
-                  ) : pi === 0 ? (
-                    <td className={tdCls} rowSpan={3}></td>
-                  ) : null}
+                    )}
+                  </td>
                   {hasResults && (cr ? dcrCell(cr.shear_dcr, cr.shear_ok) : <td className={tdCls}></td>)}
                 </tr>
               );
