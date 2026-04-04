@@ -193,7 +193,7 @@ def beam_design_check(req: BeamDesignCheckRequest) -> list[PositionCheckResult]:
                 fck=req.fck, fy=req.fy, fyt=req.fyt,
                 top_dia=rb.top_dia, top_count=rb.top_count,
                 bot_dia=rb.bot_dia, bot_count=rb.bot_count,
-                stirrup_dia=rb.stirrup_dia, stirrup_spacing=rb.stirrup_spacing,
+                stirrup_dia=rb.stirrup_dia, stirrup_legs=rb.stirrup_legs, stirrup_spacing=rb.stirrup_spacing,
                 Mu_neg_kNm=Mu_neg, Mu_pos_kNm=Mu_pos, Vu_kN=Vu,
             )
 

@@ -6,6 +6,7 @@ export interface RebarInput {
   bot_dia: number;
   bot_count: number;
   stirrup_dia: number;
+  stirrup_legs: number;
   stirrup_spacing: number;
   cover: number;
 }

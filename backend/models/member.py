@@ -59,6 +59,7 @@ class RebarInput(BaseModel):
     bot_dia: int = 25
     bot_count: int = 3
     stirrup_dia: int = 10
+    stirrup_legs: int = 2
     stirrup_spacing: float = 200  # mm
     cover: float = 40.0  # mm
 

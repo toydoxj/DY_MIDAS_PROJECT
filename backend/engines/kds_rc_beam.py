@@ -223,16 +223,17 @@ def check_position(
     bot_dia: int,
     bot_count: int,
     stirrup_dia: int,
-    stirrup_spacing: float,  # mm
-    Mu_neg_kNm: float,  # 음의 모멘트 (상부근 인장)
-    Mu_pos_kNm: float,  # 양의 모멘트 (하부근 인장)
-    Vu_kN: float,       # 전단력
+    stirrup_legs: int = 2,
+    stirrup_spacing: float = 200,  # mm
+    Mu_neg_kNm: float = 0,  # 음의 모멘트 (상부근 인장)
+    Mu_pos_kNm: float = 0,  # 양의 모멘트 (하부근 인장)
+    Vu_kN: float = 0,       # 전단력
 ) -> PositionCheck:
     """단일 위치(I/C/J)에 대한 통합 검토"""
 
     As_top = rebar_area(top_dia, top_count)
     As_bot = rebar_area(bot_dia, bot_count)
-    Av = stirrup_area(stirrup_dia)
+    Av = stirrup_area(stirrup_dia, stirrup_legs)
 
     # 유효깊이 (음의 모멘트: 상부근 인장 → d from 하단, 양의 모멘트: 하부근 인장 → d from 상단)
     d_neg = effective_depth(H, cover, stirrup_dia, top_dia) if top_count > 0 else H * 0.9
