@@ -645,16 +645,8 @@ export default function RcBeamCheckPage() {
     setCheckResults([]);
   }, [maxResult]);
 
-  // 배근/재료 변경 시 자동 검토 (300ms 디바운스)
-  useEffect(() => {
-    if (!maxResult || rebarSections.length === 0) return;
-    const timer = setTimeout(() => { runDesignCheck(); }, 300);
-    return () => clearTimeout(timer);
-  }, [rebarSections, fck, fy, fyt, maxResult, runDesignCheck]);
-
-  // 검토 실행 (배근/재료 변경 시 자동, 300ms 디바운스)
+  // 검토 실행
   const checkAbortRef = useRef<AbortController | null>(null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const runDesignCheck = useCallback(async () => {
     if (!maxResult || rebarSections.length === 0) return;
     if (checkAbortRef.current) checkAbortRef.current.abort();
@@ -678,7 +670,15 @@ export default function RcBeamCheckPage() {
     } finally {
       if (!controller.signal.aborted) setCheckLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maxResult, rebarSections, fck, fy, fyt]);
+
+  // 배근/재료 변경 시 자동 검토 (300ms 디바운스)
+  useEffect(() => {
+    if (!maxResult || rebarSections.length === 0) return;
+    const timer = setTimeout(() => { runDesignCheck(); }, 300);
+    return () => clearTimeout(timer);
+  }, [runDesignCheck, maxResult, rebarSections]);
 
   return (
     <div className="p-6 space-y-6">
