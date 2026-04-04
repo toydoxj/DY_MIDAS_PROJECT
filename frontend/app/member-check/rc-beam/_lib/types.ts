@@ -11,6 +11,9 @@ export interface RebarInput {
   cover: number;
 }
 
+/** 배근 형식 */
+export type RebarType = "type3" | "type2" | "type1";
+
 /** 단면별 배근 입력 */
 export interface SectionRebarInput {
   section_name: string;
@@ -19,6 +22,7 @@ export interface SectionRebarInput {
   fck: number;
   fy: number;
   fyt: number;
+  rebarType: RebarType;
   rebars: RebarInput[];
 }
 

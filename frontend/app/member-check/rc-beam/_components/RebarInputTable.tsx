@@ -17,7 +17,7 @@ function defaultRebar(pos: RebarInput["position"]): RebarInput {
 }
 
 export function initSectionRebars(sectName: string, B: number, H: number, fck = 27, fy = 400, fyt = 400): SectionRebarInput {
-  return { section_name: sectName, B, H, fck, fy, fyt, rebars: POSITIONS.map(defaultRebar) };
+  return { section_name: sectName, B, H, fck, fy, fyt, rebarType: "type3", rebars: POSITIONS.map(defaultRebar) };
 }
 
 export default function RebarInputTable({ sections, onChange }: Props) {

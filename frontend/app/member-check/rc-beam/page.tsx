@@ -10,8 +10,8 @@ import SectionCard from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 import { ErrorText } from "@/components/ui/StatusMessage";
 import { initSectionRebars } from "./_components/RebarInputTable";
-import { REBAR_OPTIONS } from "./_lib/constants";
-import type { SectionRebarInput, RebarInput, PositionCheckResult } from "./_lib/types";
+import { REBAR_OPTIONS, REBAR_TYPE_CONFIG } from "./_lib/constants";
+import type { SectionRebarInput, RebarInput, RebarType, PositionCheckResult } from "./_lib/types";
 
 interface SectionInfo {
   id: number;
@@ -241,6 +241,7 @@ function MaxTableIntegrated({
             <th className={thCls}>fck</th>
             <th className={thCls}>fy</th>
             <th className={thCls}>fyt</th>
+            <th className={thCls}>Type</th>
             <th className={thCls}>위치</th>
             <th className={thCls}>My(-)</th>
             <th className={thCls}>상부근</th>
@@ -257,42 +258,81 @@ function MaxTableIntegrated({
           {data.map((r, gi) => {
             const si = rebarMap.get(r.SectName);
             const sec = si !== undefined ? rebarSections[si] : null;
-            const rb0 = sec?.rebars[0]; // 단면 공통 철근 규격 (첫 위치 기준)
-            return POSITIONS.map((pos, pi) => {
+            const rb0 = sec?.rebars[0];
+            const rType = sec?.rebarType ?? "type3";
+            const typeConfig = REBAR_TYPE_CONFIG[rType];
+            const posLabels = typeConfig.positions;
+            const rowCount = posLabels.length;
+
+            // type에 따른 I/C/J 매핑
+            const posMap: ("I" | "C" | "J")[][] = rType === "type1"
+              ? [["I", "C", "J"]]  // ALL: 3개 중 최대
+              : rType === "type2"
+              ? [["I", "J"], ["C"]]  // 양단(I+J 최대), 중앙
+              : [["I"], ["C"], ["J"]];  // 연속단, 중앙, 불연속단
+
+            return posLabels.map((label, pi) => {
               const rb = sec?.rebars[pi];
-              const cr = resultMap.get(`${r.SectName}-${pos}`);
+              const mappedPositions = posMap[pi];
+              // 해당 위치들 중 최대 부재력
               const force = r as unknown as Record<string, unknown>;
+              const getMax = (prefix: string) => {
+                let maxVal = 0;
+                let maxPos = mappedPositions[0];
+                for (const p of mappedPositions) {
+                  const v = Math.abs(Number(force[`${prefix}_${p}`]) || 0);
+                  if (v > maxVal) { maxVal = v; maxPos = p; }
+                }
+                return { val: Number(force[`${prefix}_${maxPos}`]) || 0, lc: (force[`${prefix}_${maxPos}_LC`] as string) ?? "" };
+              };
+              const myNeg = getMax("My_neg");
+              const myPos = getMax("My_pos");
+              const fz = getMax("Fz");
+
+              // DCR: 첫 매핑 위치 기준
+              const cr = resultMap.get(`${r.SectName}-${mappedPositions[0]}`);
+
               return (
-                <tr key={`${gi}-${pos}`} className={gi % 2 === 0 ? "bg-gray-800" : "bg-gray-800/50"}>
+                <tr key={`${gi}-${label}`} className={gi % 2 === 0 ? "bg-gray-800" : "bg-gray-800/50"}>
                   {pi === 0 && (
                     <>
-                      <td className={tdMergedCls} rowSpan={3}>{r.SectName}</td>
-                      <td className={`${tdMergedCls} font-mono text-xs`} rowSpan={3}>{r.B ?? "-"}×{r.H ?? "-"}</td>
-                      <td className={tdMergedCls} rowSpan={3}>
+                      <td className={tdMergedCls} rowSpan={rowCount}>{r.SectName}</td>
+                      <td className={`${tdMergedCls} font-mono text-xs`} rowSpan={rowCount}>{r.B ?? "-"}×{r.H ?? "-"}</td>
+                      <td className={tdMergedCls} rowSpan={rowCount}>
                         {si !== undefined && sec ? (
                           <input className={inputCls} type="number" value={sec.fck}
                             onChange={(e) => { const next = [...rebarSections]; next[si] = { ...sec, fck: Number(e.target.value) || 27 }; onRebarChange(next); }} />
                         ) : "-"}
                       </td>
-                      <td className={tdMergedCls} rowSpan={3}>
+                      <td className={tdMergedCls} rowSpan={rowCount}>
                         {si !== undefined && sec ? (
                           <input className={inputCls} type="number" value={sec.fy}
                             onChange={(e) => { const next = [...rebarSections]; next[si] = { ...sec, fy: Number(e.target.value) || 400 }; onRebarChange(next); }} />
                         ) : "-"}
                       </td>
-                      <td className={tdMergedCls} rowSpan={3}>
+                      <td className={tdMergedCls} rowSpan={rowCount}>
                         {si !== undefined && sec ? (
                           <input className={inputCls} type="number" value={sec.fyt}
                             onChange={(e) => { const next = [...rebarSections]; next[si] = { ...sec, fyt: Number(e.target.value) || 400 }; onRebarChange(next); }} />
                         ) : "-"}
                       </td>
+                      <td className={tdMergedCls} rowSpan={rowCount}>
+                        {si !== undefined && sec ? (
+                          <select className={selectCls} value={sec.rebarType}
+                            onChange={(e) => { const next = [...rebarSections]; next[si] = { ...sec, rebarType: e.target.value as RebarType }; onRebarChange(next); }}>
+                            <option value="type3">연속/중앙/불연속</option>
+                            <option value="type2">양단/중앙</option>
+                            <option value="type1">ALL</option>
+                          </select>
+                        ) : "-"}
+                      </td>
                     </>
                   )}
-                  <td className={`${tdCls} text-blue-400 font-medium`}>{pos}</td>
+                  <td className={`${tdCls} text-blue-400 font-medium`}>{label}</td>
                   {/* My(-) + 상부근 (n-Dxx) */}
                   <td className={`${tdCls} font-mono`}>
-                    <div className="text-white">{Number(force[`My_neg_${pos}`]).toFixed(1)}</div>
-                    <div className="text-gray-400 text-[10px] truncate max-w-[80px]" title={force[`My_neg_${pos}_LC`] as string}>{force[`My_neg_${pos}_LC`] as string}</div>
+                    <div className="text-white">{myNeg.val.toFixed(1)}</div>
+                    <div className="text-gray-400 text-[10px] truncate max-w-[80px]" title={myNeg.lc}>{myNeg.lc}</div>
                   </td>
                   <td className={tdCls}>
                     {rb && si !== undefined && (
@@ -326,8 +366,8 @@ function MaxTableIntegrated({
                   {hasResults && (cr ? dcrCell(cr.neg_flexure_dcr, cr.neg_flexure_ok) : <td className={tdCls}></td>)}
                   {/* My(+) + 하부근 (n-Dxx) */}
                   <td className={`${tdCls} font-mono`}>
-                    <div className="text-white">{Number(force[`My_pos_${pos}`]).toFixed(1)}</div>
-                    <div className="text-gray-400 text-[10px] truncate max-w-[80px]" title={force[`My_pos_${pos}_LC`] as string}>{force[`My_pos_${pos}_LC`] as string}</div>
+                    <div className="text-white">{myPos.val.toFixed(1)}</div>
+                    <div className="text-gray-400 text-[10px] truncate max-w-[80px]" title={myPos.lc}>{myPos.lc}</div>
                   </td>
                   <td className={tdCls}>
                     {rb && si !== undefined && (
@@ -342,8 +382,8 @@ function MaxTableIntegrated({
                   {hasResults && (cr ? dcrCell(cr.pos_flexure_dcr, cr.pos_flexure_ok) : <td className={tdCls}></td>)}
                   {/* Fz + 스터럽 (Dxx@nnn) */}
                   <td className={`${tdCls} font-mono`}>
-                    <div className="text-white">{Number(force[`Fz_${pos}`]).toFixed(1)}</div>
-                    <div className="text-gray-400 text-[10px] truncate max-w-[80px]" title={force[`Fz_${pos}_LC`] as string}>{force[`Fz_${pos}_LC`] as string}</div>
+                    <div className="text-white">{fz.val.toFixed(1)}</div>
+                    <div className="text-gray-400 text-[10px] truncate max-w-[80px]" title={fz.lc}>{fz.lc}</div>
                   </td>
                   <td className={tdCls}>
                     {rb && si !== undefined && (
