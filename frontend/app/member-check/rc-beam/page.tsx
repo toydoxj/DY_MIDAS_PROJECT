@@ -488,7 +488,7 @@ export default function RcBeamCheckPage() {
     return defaultFy;
   }, [rebarRules, defaultFy]);
   const [rebarSections, setRebarSections] = useState<SectionRebarInput[]>([]);
-  const [savedRebars, setSavedRebars] = useState<SectionRebarInput[]>([]);
+  const savedRebarsRef = useRef<SectionRebarInput[]>([]);
   const [checkResults, setCheckResults] = useState<PositionCheckResult[]>([]);
   const [checkLoading, setCheckLoading] = useState(false);
   const [rebarSaving, setRebarSaving] = useState(false);
@@ -596,7 +596,7 @@ export default function RcBeamCheckPage() {
       }
 
       // 서버 저장 배근 데이터 로드
-      if (rebarsData.length > 0) setSavedRebars(rebarsData);
+      savedRebarsRef.current = rebarsData;
     } catch (e) {
       setError(`Section 조회 실패: ${e}`);
     } finally {
@@ -746,7 +746,7 @@ export default function RcBeamCheckPage() {
   useEffect(() => {
     if (!maxResult || maxResult.length === 0) { setRebarSections([]); return; }
     const draft = loadDraftFromLocal();
-    const saved = draft ?? savedRebars;
+    const saved = draft ?? savedRebarsRef.current;
     const savedMap = new Map(saved.map((s) => [s.section_name, s]));
     setRebarSections(
       maxResult.map((r) => {
@@ -765,11 +765,14 @@ export default function RcBeamCheckPage() {
     return () => clearTimeout(timer);
   }, [rebarSections]);
 
-  // 서버에 배근 저장
+  // 서버에 배근 저장 (기존 저장 데이터와 병합)
   const handleSaveRebars = async () => {
     setRebarSaving(true); setRebarSaved(false);
-    const ok = await saveRebarsToServer(rebarSections);
-    if (ok) { setRebarSaved(true); clearDraftLocal(); }
+    // 기존 저장 데이터에서 현재 선택되지 않은 단면 유지 + 현재 단면 덮어쓰기
+    const currentMap = new Map(rebarSections.map((s) => [s.section_name, s]));
+    const merged = [...savedRebarsRef.current.filter((s) => !currentMap.has(s.section_name)), ...rebarSections];
+    const ok = await saveRebarsToServer(merged);
+    if (ok) { setRebarSaved(true); clearDraftLocal(); savedRebarsRef.current = merged; }
     setRebarSaving(false);
   };
 
