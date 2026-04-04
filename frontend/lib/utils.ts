@@ -1,3 +1,10 @@
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
 /**
  * HEAD+DATA 형식을 Record 배열로 변환한다.
  */
@@ -53,7 +60,7 @@ export function extractSubTables(data: unknown): SubTableData[] {
   if (!data || typeof data !== "object") return [];
   const obj = data as Record<string, unknown>;
 
-  // 최상위 키 내부에서 SUB_TABLES 탐색 (예: data.EigenvalueMode.SUB_TABLES)
+  // 최상위 키 내부에서 SUB_TABLES 탐색
   const inner = Object.values(obj).find(
     (v) => v && typeof v === "object" && !Array.isArray(v) && (v as Record<string, unknown>).SUB_TABLES
   ) as Record<string, unknown> | undefined;

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import SectionCard from "@/components/ui/SectionCard";
-import Button from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import FormField from "@/components/ui/FormField";
 import { SavedBadge, AlertBanner } from "@/components/ui/StatusMessage";
@@ -112,8 +112,7 @@ export default function SettingsPage() {
             type="button"
             variant="secondary"
             onClick={handleTest}
-            disabled={testState === "loading"}
-            icon={testState === "loading" ? <Loader2 size={14} className="animate-spin" /> : undefined}
+            loading={testState === "loading"}
           >
             연결 테스트
           </Button>

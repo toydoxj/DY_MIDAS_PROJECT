@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { BACKEND_URL, TestResult } from "@/lib/types";
 import SectionCard from "@/components/ui/SectionCard";
-import Button from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import FormField from "@/components/ui/FormField";
 import { SavedBadge, AlertBanner } from "@/components/ui/StatusMessage";

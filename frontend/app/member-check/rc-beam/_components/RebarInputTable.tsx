@@ -1,7 +1,7 @@
 "use client";
 
 import SectionCard from "@/components/ui/SectionCard";
-import Button from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import { REBAR_OPTIONS, DEFAULT_COVER } from "../_lib/constants";
 import type { SectionRebarInput, RebarInput } from "../_lib/types";
 

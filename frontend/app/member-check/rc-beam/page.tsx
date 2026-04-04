@@ -7,7 +7,7 @@ import { BACKEND_URL } from "@/lib/types";
 import { flattenResponse } from "@/lib/utils";
 import PageHeader from "@/components/ui/PageHeader";
 import SectionCard from "@/components/ui/SectionCard";
-import Button from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import { ErrorText } from "@/components/ui/StatusMessage";
 import MaterialInput from "./_components/MaterialInput";
 import { initSectionRebars } from "./_components/RebarInputTable";

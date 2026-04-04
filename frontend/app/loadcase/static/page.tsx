@@ -5,7 +5,7 @@ import { Save, Plus, Trash2 } from "lucide-react";
 import { BACKEND_URL } from "@/lib/types";
 import PageHeader from "@/components/ui/PageHeader";
 import SectionCard from "@/components/ui/SectionCard";
-import Button from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import RefreshButton from "@/components/ui/RefreshButton";
 import { SavedBadge, ErrorText } from "@/components/ui/StatusMessage";
 
@@ -97,8 +97,8 @@ export default function LoadCasePage() {
         onClick={handleSave}
         disabled={rows.length === 0}
         loading={saving}
-        icon={<Save size={13} />}
       >
+        <Save size={13} />
         {saving ? "업데이트 중..." : "MIDAS에 업데이트"}
       </Button>
     </>
