@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LayoutDashboard, Search, Weight, ClipboardCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import ConnectionStatus from "./ConnectionStatus";
 
@@ -18,13 +18,10 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
-  // main content의 margin 동기화
-  if (typeof window !== "undefined") {
-    requestAnimationFrame(() => {
-      const main = document.getElementById("main-content");
-      if (main) main.style.marginLeft = collapsed ? "4rem" : "16rem";
-    });
-  }
+  useEffect(() => {
+    const main = document.getElementById("main-content");
+    if (main) main.style.marginLeft = collapsed ? "4rem" : "16rem";
+  }, [collapsed]);
 
   return (
     <>
@@ -34,7 +31,7 @@ export default function Sidebar() {
         {/* 로고 */}
         <div className="p-4 border-b border-gray-700 flex items-center justify-between">
           <div className={`flex items-center gap-3 ${collapsed ? "justify-center w-full" : ""}`}>
-            <Image src="/dongyang_logo.svg" alt="동양구조" width={28} height={28} className="flex-shrink-0" />
+            <Image src="/dongyang_logo.svg" alt="동양구조" width={28} height={28} className="flex-shrink-0 brightness-[2] saturate-0 opacity-70" />
             {!collapsed && (
               <div>
                 <h1 className="text-sm font-bold text-white tracking-tight">MIDAS GEN NX</h1>
