@@ -294,7 +294,7 @@ function MaxTableIntegrated({
               const cr = resultMap.get(`${r.SectName}-${mappedPositions[0]}`);
 
               return (
-                <tr key={`${gi}-${label}`} className={`${gi % 2 === 0 ? "bg-gray-800" : "bg-gray-800/50"} ${pi === 0 && gi > 0 ? "border-t-2 border-gray-500" : ""}`}>
+                <tr key={`${gi}-${label}`} className={`${gi % 2 === 0 ? "bg-gray-800/80" : "bg-gray-900/60"} ${pi === 0 && gi > 0 ? "border-t-2 border-gray-500" : ""}`}>
                   {pi === 0 && (
                     <>
                       <td className={tdMergedCls} rowSpan={rowCount}>{r.SectName}</td>
@@ -447,7 +447,7 @@ function MemberTable({ data }: { data: MemberForceMaxRow[] }) {
         <tbody className="divide-y divide-gray-700">
           {data.map((r, gi) =>
             POSITIONS.map((pos, pi) => (
-              <tr key={`${gi}-${pos}`} className={`${gi % 2 === 0 ? "bg-gray-800" : "bg-gray-800/50"} ${pi === 0 && gi > 0 ? "border-t-2 border-gray-500" : ""}`}>
+              <tr key={`${gi}-${pos}`} className={`${gi % 2 === 0 ? "bg-gray-800/80" : "bg-gray-900/60"} ${pi === 0 && gi > 0 ? "border-t-2 border-gray-500" : ""}`}>
                 {pi === 0 && (
                   <td className={tdMergedCls} rowSpan={3}>{r.Memb}</td>
                 )}
