@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Search, Weight, ClipboardCheck, Moon, Sun } from "lucide-react";
-import { useEffect, useState } from "react";
+import { LayoutDashboard, Search, Weight, ClipboardCheck } from "lucide-react";
 import ConnectionStatus from "./ConnectionStatus";
 
 const navItems = [
@@ -15,55 +14,33 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [dark, setDark] = useState(true);
-
-  useEffect(() => {
-    setDark(document.documentElement.classList.contains("dark"));
-  }, []);
-
-  const toggleTheme = () => {
-    const next = !dark;
-    setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    localStorage.setItem("theme", next ? "dark" : "light");
-  };
-
-  // 초기 로드 시 저장된 테마 적용
-  useEffect(() => {
-    const saved = localStorage.getItem("theme");
-    if (saved === "light") {
-      setDark(false);
-      document.documentElement.classList.remove("dark");
-    }
-  }, []);
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
-      <div className="p-5 border-b border-sidebar-border flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-sidebar-foreground">MIDAS GEN NX</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">API Dashboard</p>
+    <aside className="fixed left-0 top-0 h-full w-64 flex flex-col"
+      style={{ background: "linear-gradient(180deg, #1a1a2e 0%, #16213e 100%)" }}>
+      {/* 로고 */}
+      <div className="p-5 border-b border-white/10">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white font-bold text-sm">D</div>
+          <div>
+            <h1 className="text-base font-bold text-white tracking-tight">MIDAS GEN NX</h1>
+            <p className="text-[10px] text-gray-400 -mt-0.5">API Dashboard</p>
+          </div>
         </div>
-        <button
-          onClick={toggleTheme}
-          className="rounded-lg p-1.5 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-          title={dark ? "라이트 모드" : "다크 모드"}
-        >
-          {dark ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
+      {/* 네비게이션 */}
+      <nav className="flex-1 p-3 space-y-1">
         {navItems.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link
               key={href}
               href={href}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
                 active
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200 border border-transparent"
               }`}
             >
               <Icon size={18} />
@@ -73,9 +50,10 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="p-3 border-t border-sidebar-border space-y-2">
+      {/* 하단 */}
+      <div className="p-3 border-t border-white/10 space-y-2">
         <ConnectionStatus />
-        <p className="text-xs text-muted-foreground px-3">(주)동양구조</p>
+        <p className="text-[10px] text-gray-500 px-3">(주)동양구조</p>
       </div>
     </aside>
   );
