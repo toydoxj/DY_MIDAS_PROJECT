@@ -190,7 +190,7 @@ def beam_design_check(req: BeamDesignCheckRequest) -> list[PositionCheckResult]:
                 section_name=sec.section_name,
                 position=pos,
                 B=sec.B, H=sec.H, cover=rb.cover,
-                fck=req.fck, fy=req.fy, fyt=req.fyt,
+                fck=sec.fck, fy=sec.fy, fyt=sec.fyt,
                 top_dia=rb.top_dia, top_count=rb.top_count,
                 bot_dia=rb.bot_dia, bot_count=rb.bot_count,
                 stirrup_dia=rb.stirrup_dia, stirrup_legs=rb.stirrup_legs, stirrup_spacing=rb.stirrup_spacing,

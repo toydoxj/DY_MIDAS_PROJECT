@@ -68,13 +68,13 @@ class SectionRebarInput(BaseModel):
     section_name: str
     B: float  # mm
     H: float  # mm
+    fck: float = 27.0
+    fy: float = 400.0
+    fyt: float = 400.0
     rebars: list[RebarInput]  # I, C, J
 
 
 class BeamDesignCheckRequest(BaseModel):
-    fck: float = 27.0
-    fy: float = 400.0
-    fyt: float = 400.0
     sections: list[SectionRebarInput]
     forces: list[BeamForceMaxRow]
 

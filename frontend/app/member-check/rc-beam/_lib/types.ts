@@ -16,14 +16,14 @@ export interface SectionRebarInput {
   section_name: string;
   B: number;
   H: number;
+  fck: number;
+  fy: number;
+  fyt: number;
   rebars: RebarInput[];
 }
 
 /** 검토 요청 */
 export interface BeamDesignCheckRequest {
-  fck: number;
-  fy: number;
-  fyt: number;
   sections: SectionRebarInput[];
   forces: BeamForceMaxRowForCheck[];
 }

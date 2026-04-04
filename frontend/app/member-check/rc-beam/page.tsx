@@ -9,9 +9,8 @@ import PageHeader from "@/components/ui/PageHeader";
 import SectionCard from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 import { ErrorText } from "@/components/ui/StatusMessage";
-import MaterialInput from "./_components/MaterialInput";
 import { initSectionRebars } from "./_components/RebarInputTable";
-import { DEFAULT_FCK, DEFAULT_FY, DEFAULT_FYT, REBAR_OPTIONS } from "./_lib/constants";
+import { REBAR_OPTIONS } from "./_lib/constants";
 import type { SectionRebarInput, RebarInput, PositionCheckResult } from "./_lib/types";
 
 interface SectionInfo {
@@ -238,6 +237,9 @@ function MaxTableIntegrated({
           <tr>
             <th className={thCls}>단면</th>
             <th className={thCls}>B×H</th>
+            <th className={thCls}>fck</th>
+            <th className={thCls}>fy</th>
+            <th className={thCls}>fyt</th>
             <th className={thCls}>위치</th>
             <th className={thCls}>My(-)</th>
             <th className={thCls}>상부근</th>
@@ -265,6 +267,24 @@ function MaxTableIntegrated({
                     <>
                       <td className={tdMergedCls} rowSpan={3}>{r.SectName}</td>
                       <td className={`${tdMergedCls} font-mono text-xs`} rowSpan={3}>{r.B ?? "-"}×{r.H ?? "-"}</td>
+                      <td className={tdMergedCls} rowSpan={3}>
+                        {si !== undefined && sec ? (
+                          <input className={inputCls} type="number" value={sec.fck}
+                            onChange={(e) => { const next = [...rebarSections]; next[si] = { ...sec, fck: Number(e.target.value) || 27 }; onRebarChange(next); }} />
+                        ) : "-"}
+                      </td>
+                      <td className={tdMergedCls} rowSpan={3}>
+                        {si !== undefined && sec ? (
+                          <input className={inputCls} type="number" value={sec.fy}
+                            onChange={(e) => { const next = [...rebarSections]; next[si] = { ...sec, fy: Number(e.target.value) || 400 }; onRebarChange(next); }} />
+                        ) : "-"}
+                      </td>
+                      <td className={tdMergedCls} rowSpan={3}>
+                        {si !== undefined && sec ? (
+                          <input className={inputCls} type="number" value={sec.fyt}
+                            onChange={(e) => { const next = [...rebarSections]; next[si] = { ...sec, fyt: Number(e.target.value) || 400 }; onRebarChange(next); }} />
+                        ) : "-"}
+                      </td>
                     </>
                   )}
                   <td className={`${tdCls} text-blue-400 font-medium`}>{pos}</td>
@@ -409,9 +429,9 @@ export default function RcBeamCheckPage() {
   const [lastFetchedAt, setLastFetchedAt] = useState<string | null>(null);
 
   // 설계 검토 상태
-  const [fck, setFck] = useState(DEFAULT_FCK);
-  const [fy, setFy] = useState(DEFAULT_FY);
-  const [fyt, setFyt] = useState(DEFAULT_FYT);
+  const [defaultFck, setDefaultFck] = useState(27);
+  const [defaultFy, setDefaultFy] = useState(400);
+  const [defaultFyt, setDefaultFyt] = useState(400);
   const [rebarSections, setRebarSections] = useState<SectionRebarInput[]>([]);
   const [checkResults, setCheckResults] = useState<PositionCheckResult[]>([]);
   const [checkLoading, setCheckLoading] = useState(false);
@@ -468,9 +488,10 @@ export default function RcBeamCheckPage() {
     setLoadingSections(true);
     setError("");
     try {
-      const [sectRes, storRes] = await Promise.all([
+      const [sectRes, storRes, projRes] = await Promise.all([
         fetch(`${BACKEND_URL}/api/member/sections`),
         fetch(`${BACKEND_URL}/api/midas/db/STOR`),
+        fetch(`${BACKEND_URL}/api/project`),
       ]);
       if (!sectRes.ok) throw new Error(`Section HTTP ${sectRes.status}`);
       const data: SectionInfo[] = await sectRes.json();
@@ -490,6 +511,20 @@ export default function RcBeamCheckPage() {
           .map((v) => ({ name: v.STORY_NAME, level: v.STORY_LEVEL }))
           .sort((a, b) => a.level - b.level);
         setStories(items);
+      }
+
+      // 대시보드 재료 강도 기본값
+      if (projRes.ok) {
+        try {
+          const proj = await projRes.json();
+          const c = JSON.parse(proj.COMMENT ?? "{}");
+          const mat = c.MATERIALS_V2;
+          if (mat?.concrete?.[0]?.strength) setDefaultFck(Number(mat.concrete[0].strength));
+          if (mat?.rebar?.[0]?.strength) {
+            setDefaultFy(Number(mat.rebar[0].strength));
+            setDefaultFyt(Number(mat.rebar[0].strength));
+          }
+        } catch { /* ignore */ }
       }
     } catch (e) {
       setError(`Section 조회 실패: ${e}`);
@@ -640,7 +675,7 @@ export default function RcBeamCheckPage() {
   useEffect(() => {
     if (!maxResult || maxResult.length === 0) { setRebarSections([]); return; }
     setRebarSections(
-      maxResult.map((r) => initSectionRebars(r.SectName, r.B ?? 400, r.H ?? 700))
+      maxResult.map((r) => initSectionRebars(r.SectName, r.B ?? 400, r.H ?? 700, defaultFck, defaultFy, defaultFyt))
     );
     setCheckResults([]);
   }, [maxResult]);
@@ -654,7 +689,7 @@ export default function RcBeamCheckPage() {
     checkAbortRef.current = controller;
     setCheckLoading(true);
     try {
-      const body = { fck, fy, fyt, sections: rebarSections, forces: maxResult };
+      const body = { sections: rebarSections, forces: maxResult };
       const res = await fetch(`${BACKEND_URL}/api/member/beam-design-check`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -671,7 +706,7 @@ export default function RcBeamCheckPage() {
       if (!controller.signal.aborted) setCheckLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maxResult, rebarSections, fck, fy, fyt]);
+  }, [maxResult, rebarSections]);
 
   // 배근/재료 변경 시 자동 검토 (300ms 디바운스)
   useEffect(() => {
@@ -886,10 +921,6 @@ export default function RcBeamCheckPage() {
                 </div>
               }
             >
-              <MaterialInput
-                fck={fck} fy={fy} fyt={fyt}
-                onChange={(v) => { if (v.fck !== undefined) setFck(v.fck); if (v.fy !== undefined) setFy(v.fy); if (v.fyt !== undefined) setFyt(v.fyt); }}
-              />
               <MaxTableIntegrated
                 data={maxResult}
                 rebarSections={rebarSections}
