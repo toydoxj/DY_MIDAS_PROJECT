@@ -28,7 +28,7 @@ export default function RootLayout({
       <body className="min-h-full bg-white text-gray-900 antialiased" suppressHydrationWarning>
         <div className="flex min-h-screen">
           <Sidebar />
-          <main className="flex-1 ml-64 p-6">{children}</main>
+          <main className="flex-1 p-6 transition-all duration-200" id="main-content">{children}</main>
         </div>
       </body>
     </html>

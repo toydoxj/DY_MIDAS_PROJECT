@@ -63,7 +63,7 @@ export default function SettingsSection() {
         <Button type="button" variant="outline" size="xs" onClick={handleTest} disabled={testState === "loading"} loading={testState === "loading"}>
           연결 테스트
         </Button>
-        <Button type="submit" size="xs" loading={saving} className="ml-auto bg-emerald-600 hover:bg-emerald-500 text-white">
+        <Button type="submit" size="xs" loading={saving} className="ml-auto">
           {saving ? "저장 중..." : "저장"}
         </Button>
       </div>
