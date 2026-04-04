@@ -55,62 +55,85 @@ type ViewMode = "max" | "member" | "raw";
 
 const POSITIONS = ["I", "C", "J"] as const;
 
-/** 보 구분자 패턴 (긴 것 먼저 매칭) */
-const BEAM_SEPARATORS = ["SRG", "SRB", "SG", "SB", "TG", "TB", "WG", "FG", "LB", "G", "B"] as const;
-const BEAM_SEP_REGEX = new RegExp(`^(.*?)(${BEAM_SEPARATORS.join("|")})(\\d+.*)?$`);
+/** RC 보 구분자만 (강구조 SG, SB, SRG, SRB 제외) */
+const RC_BEAM_SEPARATORS = ["TG", "TB", "WG", "FG", "LB", "G", "B"] as const;
+const RC_BEAM_SEP_REGEX = new RegExp(`^(.*?)(${RC_BEAM_SEPARATORS.join("|")})(\\d+.*)?$`);
 
-/** 단면명에서 층 정보를 파싱 */
-function parseFloorFromName(name: string): { floor: string; sep: string; num: string } | null {
-  const m = name.match(BEAM_SEP_REGEX);
+/** 강구조 구분자 (제외용) */
+const STEEL_PREFIX_REGEX = /^(.*?)(SRG|SRB|SG|SB)/;
+
+/** 단면명에서 층 정보를 파싱 (RC만) */
+function parseBeamName(name: string): { floor: string; sep: string; num: string } | null {
+  // 강구조 제외
+  if (STEEL_PREFIX_REGEX.test(name)) return null;
+  const m = name.match(RC_BEAM_SEP_REGEX);
   if (!m) return null;
   return { floor: m[1] || "", sep: m[2], num: m[3] || "" };
 }
 
-/** 층 표기를 정렬 가능한 키로 변환 */
-function floorSortKey(floor: string): number {
-  if (!floor) return 9999; // 층 없음 → 맨 뒤
-  if (floor === "R") return 8000;
-  if (floor === "PH") return 8100;
-  if (floor === "PHR") return 8200;
-  if (floor === "P") return -100;
-  if (floor === "M") return 5000;
-  // 음수층: -4, B4 등
-  const negMatch = floor.match(/^-(\d+)/);
-  if (negMatch) return -parseInt(negMatch[1]);
-  const bMatch = floor.match(/^B(\d+)/i);
-  if (bMatch) return -parseInt(bMatch[1]);
-  // 범위: 2~4 → 첫 숫자
-  const rangeMatch = floor.match(/^(\d+)/);
-  if (rangeMatch) return parseInt(rangeMatch[1]);
-  return 9000;
+/** RC 보 단면만 필터 */
+function filterRcBeamSections(sects: SectionInfo[]): SectionInfo[] {
+  return sects.filter((s) => parseBeamName(s.name) !== null);
 }
 
-/** sections에서 층 목록 추출 */
-function extractFloors(sects: SectionInfo[]): { floor: string; label: string; count: number }[] {
-  const floorMap = new Map<string, number>();
-  for (const s of sects) {
-    const parsed = parseFloorFromName(s.name);
-    if (!parsed) continue;
-    const f = parsed.floor || "(공통)";
-    floorMap.set(f, (floorMap.get(f) ?? 0) + 1);
+interface StoryItem {
+  name: string;   // STOR의 STORY_NAME (B5, 1F, Roof 등)
+  level: number;
+}
+
+/** 단면명의 층 표기가 STOR 층에 포함되는지 판정 */
+function sectionMatchesStory(sectName: string, storyName: string): boolean {
+  const parsed = parseBeamName(sectName);
+  if (!parsed) return false;
+  const floor = parsed.floor;
+
+  // 층 표기 없음 → 공통 (모든 층에 매칭)
+  if (!floor) return true;
+
+  // STOR 이름 정규화: B5→-5, 1F→1, Roof→R 등
+  const normalize = (s: string): string => {
+    const bm = s.match(/^B(\d+)F?$/i);
+    if (bm) return `-${bm[1]}`;
+    const fm = s.match(/^(\d+)F$/i);
+    if (fm) return fm[1];
+    if (s.toUpperCase() === "ROOF" || s.toUpperCase() === "RF") return "R";
+    if (s.toUpperCase() === "PHR") return "PHR";
+    if (s.toUpperCase() === "PH") return "PH";
+    return s;
+  };
+
+  const normalized = normalize(storyName);
+
+  // 단일 층 매칭
+  if (floor === normalized) return true;
+
+  // 범위 매칭: 2~4 → 2,3,4
+  const rangeMatch = floor.match(/^(-?\d+)~(-?\d+)$/);
+  if (rangeMatch) {
+    const lo = parseInt(rangeMatch[1]);
+    const hi = parseInt(rangeMatch[2]);
+    const nVal = parseInt(normalized);
+    if (!isNaN(nVal) && nVal >= lo && nVal <= hi) return true;
   }
-  return [...floorMap.entries()]
-    .map(([floor, count]) => ({
-      floor,
-      label: floor === "(공통)" ? "공통 (전층)" : `${floor}층`,
-      count,
-    }))
-    .sort((a, b) => floorSortKey(a.floor) - floorSortKey(b.floor));
+
+  // 불연속 매칭: 2,8
+  if (floor.includes(",")) {
+    const parts = floor.split(",").map((p) => p.trim());
+    if (parts.includes(normalized)) return true;
+  }
+
+  return false;
 }
 
-/** 선택된 층에 해당하는 sections 필터 */
-function filterSectionsByFloors(sects: SectionInfo[], floors: Set<string>): SectionInfo[] {
-  if (floors.size === 0) return [];
-  return sects.filter((s) => {
-    const parsed = parseFloorFromName(s.name);
-    if (!parsed) return false;
-    const f = parsed.floor || "(공통)";
-    return floors.has(f);
+/** 선택된 층에 해당하는 RC 보 sections 필터 */
+function filterSectionsByStories(sects: SectionInfo[], stories: Set<string>): SectionInfo[] {
+  if (stories.size === 0) return [];
+  const rcSects = filterRcBeamSections(sects);
+  return rcSects.filter((s) => {
+    for (const st of stories) {
+      if (sectionMatchesStory(s.name, st)) return true;
+    }
+    return false;
   });
 }
 
@@ -324,7 +347,8 @@ const TAB_ITEMS: { key: ViewMode; label: string }[] = [
 
 export default function RcBeamCheckPage() {
   const [sections, setSections] = useState<SectionInfo[]>([]);
-  const [selectedFloors, setSelectedFloors] = useState<Set<string>>(new Set());
+  const [stories, setStories] = useState<StoryItem[]>([]);
+  const [selectedStories, setSelectedStories] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [loadingSections, setLoadingSections] = useState(false);
@@ -361,13 +385,10 @@ export default function RcBeamCheckPage() {
     [sections, selectedIds],
   );
 
-  // 층 목록 (보 구분자가 있는 섹션만)
-  const floors = useMemo(() => extractFloors(sections), [sections]);
-
-  // 선택된 층에 해당하는 섹션 목록
+  // 선택된 층에 해당하는 RC 보 섹션 목록
   const filteredSections = useMemo(
-    () => filterSectionsByFloors(sections, selectedFloors),
-    [sections, selectedFloors],
+    () => filterSectionsByStories(sections, selectedStories),
+    [sections, selectedStories],
   );
 
   const totalElements = useMemo(
@@ -390,14 +411,29 @@ export default function RcBeamCheckPage() {
     setLoadingSections(true);
     setError("");
     try {
-      const res = await fetch(`${BACKEND_URL}/api/member/sections`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: SectionInfo[] = await res.json();
+      const [sectRes, storRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/member/sections`),
+        fetch(`${BACKEND_URL}/api/midas/db/STOR`),
+      ]);
+      if (!sectRes.ok) throw new Error(`Section HTTP ${sectRes.status}`);
+      const data: SectionInfo[] = await sectRes.json();
       setSections(data);
       setSelectedIds(new Set());
       setResult(null);
       setMaxResult(null);
       setMemberResult(null);
+
+      // STOR 층 정보
+      if (storRes.ok) {
+        const storRaw = await storRes.json();
+        const stor = storRaw.STOR ?? {};
+        const items: StoryItem[] = Object.values(stor)
+          .filter((v): v is { STORY_NAME: string; STORY_LEVEL: number } =>
+            typeof v === "object" && v !== null && "STORY_NAME" in v)
+          .map((v) => ({ name: v.STORY_NAME, level: v.STORY_LEVEL }))
+          .sort((a, b) => a.level - b.level);
+        setStories(items);
+      }
     } catch (e) {
       setError(`Section 조회 실패: ${e}`);
     } finally {
@@ -617,40 +653,58 @@ export default function RcBeamCheckPage() {
 
         {sections.length > 0 ? (
           <div className="grid grid-cols-[200px_1fr] gap-3">
-            {/* 좌: 층 선택 */}
+            {/* 좌: 층 선택 (STOR 기반) */}
             <div className="rounded-lg bg-gray-800 border border-gray-700 overflow-hidden">
-              <div className="px-3 py-2 border-b border-gray-700 bg-gray-700/50">
+              <div className="px-3 py-2 border-b border-gray-700 bg-gray-700/50 flex items-center justify-between">
                 <span className="text-xs font-medium text-gray-400">층 선택</span>
+                {stories.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSelectedStories(new Set(stories.map((s) => s.name)))}
+                      className="text-[10px] text-blue-400 hover:text-blue-300"
+                    >전체</button>
+                    <span className="text-gray-600">|</span>
+                    <button
+                      onClick={() => setSelectedStories(new Set())}
+                      className="text-[10px] text-gray-400 hover:text-gray-300"
+                    >해제</button>
+                  </div>
+                )}
               </div>
               <div className="max-h-60 overflow-y-auto">
-                {floors.map(({ floor, label, count }) => (
-                  <label
-                    key={floor}
-                    className={`flex items-center justify-between gap-2 px-3 py-1.5 cursor-pointer text-sm transition-colors ${
-                      selectedFloors.has(floor) ? "bg-blue-600/20 text-blue-300" : "hover:bg-gray-700 text-gray-300"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedFloors.has(floor)}
-                        onChange={() => {
-                          setSelectedFloors((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(floor)) next.delete(floor);
-                            else next.add(floor);
-                            return next;
-                          });
-                        }}
-                        className="rounded border-gray-500 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
-                      />
-                      <span>{label}</span>
-                    </div>
-                    <span className="text-gray-500 text-xs">{count}</span>
-                  </label>
-                ))}
-                {floors.length === 0 && (
-                  <p className="px-3 py-2 text-xs text-gray-500">보 단면 없음</p>
+                {stories.map((st) => {
+                  // 해당 층의 RC 보 개수
+                  const cnt = filterRcBeamSections(sections).filter((s) => sectionMatchesStory(s.name, st.name)).length;
+                  return (
+                    <label
+                      key={st.name}
+                      className={`flex items-center justify-between gap-2 px-3 py-1.5 cursor-pointer text-sm transition-colors ${
+                        selectedStories.has(st.name) ? "bg-blue-600/20 text-blue-300" : "hover:bg-gray-700 text-gray-300"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedStories.has(st.name)}
+                          onChange={() => {
+                            setSelectedStories((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(st.name)) next.delete(st.name);
+                              else next.add(st.name);
+                              return next;
+                            });
+                          }}
+                          className="rounded border-gray-500 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                        />
+                        <span>{st.name}</span>
+                        <span className="text-gray-600 text-[10px]">{st.level.toFixed(1)}m</span>
+                      </div>
+                      {cnt > 0 && <span className="text-gray-500 text-xs">{cnt}</span>}
+                    </label>
+                  );
+                })}
+                {stories.length === 0 && (
+                  <p className="px-3 py-2 text-xs text-gray-500">층 데이터 없음</p>
                 )}
               </div>
             </div>
@@ -676,7 +730,7 @@ export default function RcBeamCheckPage() {
                 )}
               </div>
               <div className="max-h-60 overflow-y-auto">
-                {selectedFloors.size === 0 ? (
+                {selectedStories.size === 0 ? (
                   <p className="px-3 py-3 text-xs text-gray-500 text-center">좌측에서 층을 선택하세요</p>
                 ) : filteredSections.length === 0 ? (
                   <p className="px-3 py-3 text-xs text-gray-500 text-center">해당 층에 보 단면이 없습니다</p>
