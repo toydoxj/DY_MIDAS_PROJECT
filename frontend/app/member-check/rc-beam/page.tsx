@@ -148,27 +148,33 @@ function MaxTableIntegrated({
                     </>
                   )}
                   <td className={`${tdCls} text-blue-400 font-medium`}>{pos}</td>
-                  {/* My(-) + 상부근 개수 */}
+                  {/* My(-) + 상부근 (n-Dxx) */}
                   <td className={`${tdCls} font-mono`}>
                     <span className="text-gray-300">{String(force[`My_neg_${pos}`])}</span>
                     <span className="text-gray-600 text-[9px] ml-1">{force[`My_neg_${pos}_LC`] as string}</span>
                   </td>
                   <td className={tdCls}>
                     {rb && si !== undefined && (
-                      <input className={inputCls} type="number" min={0} value={rb.top_count}
-                        onChange={(e) => updatePositionCount(si, pi, { top_count: Number(e.target.value) || 0 })} />
+                      <div className="flex items-center gap-0.5 justify-center">
+                        <input className={inputCls} type="number" min={0} value={rb.top_count}
+                          onChange={(e) => updatePositionCount(si, pi, { top_count: Number(e.target.value) || 0 })} />
+                        <span className="text-gray-400 text-[10px]">-D{rb0?.top_dia ?? rb.top_dia}</span>
+                      </div>
                     )}
                   </td>
                   {hasResults && (cr ? dcrCell(cr.flexure_dcr, cr.flexure_ok) : <td className={tdCls}></td>)}
-                  {/* My(+) + 하부근 개수 */}
+                  {/* My(+) + 하부근 (n-Dxx) */}
                   <td className={`${tdCls} font-mono`}>
                     <span className="text-gray-300">{String(force[`My_pos_${pos}`])}</span>
                     <span className="text-gray-600 text-[9px] ml-1">{force[`My_pos_${pos}_LC`] as string}</span>
                   </td>
                   <td className={tdCls}>
                     {rb && si !== undefined && (
-                      <input className={inputCls} type="number" min={0} value={rb.bot_count}
-                        onChange={(e) => updatePositionCount(si, pi, { bot_count: Number(e.target.value) || 0 })} />
+                      <div className="flex items-center gap-0.5 justify-center">
+                        <input className={inputCls} type="number" min={0} value={rb.bot_count}
+                          onChange={(e) => updatePositionCount(si, pi, { bot_count: Number(e.target.value) || 0 })} />
+                        <span className="text-gray-400 text-[10px]">-D{rb0?.bot_dia ?? rb.bot_dia}</span>
+                      </div>
                     )}
                   </td>
                   {hasResults && (cr ? dcrCell(cr.flexure_dcr, cr.flexure_ok) : <td className={tdCls}></td>)}
