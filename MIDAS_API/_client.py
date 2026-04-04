@@ -1,8 +1,11 @@
 from __future__ import annotations
 from contextvars import ContextVar
 from typing import Optional
+import logging
 import requests
 import time
+
+logger = logging.getLogger("midas_api")
 
 # 현재 컨텍스트의 MidasClient를 저장하는 ContextVar
 _current_client: ContextVar[Optional["MidasClient"]] = ContextVar(
@@ -72,21 +75,23 @@ class MidasClient:
 
         start_time = time.perf_counter()
 
-        if method == "POST":
-            response = requests.post(url, headers=headers, json=body)
-        elif method == "GET":
-            response = requests.get(url, headers=headers)
-        elif method == "PUT":
-            response = requests.put(url, headers=headers, json=body)
-        elif method == "DELETE":
-            response = requests.delete(url, headers=headers)
-        else:
-            raise ValueError(f"Invalid method: {method}")
+        try:
+            response = requests.request(method, url, headers=headers, json=body, timeout=60)
+            response.raise_for_status()
+        except requests.ConnectionError:
+            raise ConnectionError(f"MIDAS 서버에 연결할 수 없습니다: {url}")
+        except requests.Timeout:
+            raise TimeoutError(f"MIDAS API 요청 시간 초과 (60초): {method} {command}")
+        except requests.HTTPError as e:
+            raise RuntimeError(f"MIDAS API 응답 오류 ({response.status_code}): {e}")
 
         elapsed = time.perf_counter() - start_time
-        print(f"Time taken: {elapsed:.2f} seconds")
+        logger.debug("API %s %s — %.2f초", method, command, elapsed)
 
-        return response.json()
+        try:
+            return response.json()
+        except ValueError:
+            raise RuntimeError(f"MIDAS API JSON 파싱 실패: {response.text[:200]}")
 
     # ------------------------------------------------------------------ #
     # ContextVar 헬퍼 (클래스 메서드)
