@@ -76,13 +76,15 @@ def calc_flexural_strength(
     # 인장철근 변형률
     epsilon_t = 0.003 * (d - c) / c if c > 0 else 999
 
-    # 강도감소계수 (변형률 기반)
+    # 강도감소계수 (변형률 기반, KDS 41 30 00)
+    # phi = 0.65 + (epsilon_t - 0.002) × (0.85 - 0.65) / (0.005 - 0.002)
+    _PHI_SLOPE = (0.85 - 0.65) / (0.005 - 0.002)  # = 200/3 ≈ 66.67
     if epsilon_t >= 0.005:
         phi = 0.85
     elif epsilon_t <= 0.002:
         phi = 0.65
     else:
-        phi = 0.65 + (epsilon_t - 0.002) * (250 / 3)
+        phi = 0.65 + (epsilon_t - 0.002) * _PHI_SLOPE
         phi = min(max(phi, 0.65), 0.85)
 
     # 설계휨강도 (N·mm → kN·m)
