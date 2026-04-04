@@ -243,6 +243,7 @@ function MaxTableIntegrated({
             <th className={thCls}>fyt</th>
             <th className={thCls}>Type</th>
             <th className={thCls}>위치</th>
+            <th className={thCls}>표기</th>
             <th className={thCls}>My(-)</th>
             <th className={thCls}>상부근</th>
             {hasResults && <th className={thCls}>휨DCR</th>}
@@ -320,8 +321,8 @@ function MaxTableIntegrated({
                         {si !== undefined && sec ? (
                           <select className={selectCls} value={sec.rebarType}
                             onChange={(e) => { const next = [...rebarSections]; next[si] = { ...sec, rebarType: e.target.value as RebarType }; onRebarChange(next); }}>
-                            <option value="type3">연속/중앙/불연속</option>
-                            <option value="type2">양단/중앙</option>
+                            <option value="type3">3단</option>
+                            <option value="type2">BOTH</option>
                             <option value="type1">ALL</option>
                           </select>
                         ) : "-"}
@@ -329,6 +330,12 @@ function MaxTableIntegrated({
                     </>
                   )}
                   <td className={`${tdCls} text-blue-400 font-medium`}>{label}</td>
+                  <td className={tdCls}>
+                    {rb && si !== undefined && (
+                      <input className={inputCls} value={rb.note ?? ""} placeholder=""
+                        onChange={(e) => updatePositionCount(si, pi, { note: e.target.value })} />
+                    )}
+                  </td>
                   {/* My(-) + 상부근 (n-Dxx) */}
                   <td className={`${tdCls} font-mono`}>
                     <div className="text-white">{myNeg.val.toFixed(1)}</div>

@@ -1,6 +1,7 @@
 /** 배근 입력 (위치별) */
 export interface RebarInput {
   position: "I" | "C" | "J";
+  note: string;
   top_dia: number;
   top_count: number;
   bot_dia: number;

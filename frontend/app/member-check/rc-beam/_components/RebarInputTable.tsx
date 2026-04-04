@@ -13,7 +13,7 @@ interface Props {
 const POSITIONS: RebarInput["position"][] = ["I", "C", "J"];
 
 function defaultRebar(pos: RebarInput["position"]): RebarInput {
-  return { position: pos, top_dia: 25, top_count: 3, bot_dia: 25, bot_count: 3, stirrup_dia: 10, stirrup_legs: 2, stirrup_spacing: 200, cover: DEFAULT_COVER };
+  return { position: pos, note: "", top_dia: 25, top_count: 3, bot_dia: 25, bot_count: 3, stirrup_dia: 10, stirrup_legs: 2, stirrup_spacing: 200, cover: DEFAULT_COVER };
 }
 
 export function initSectionRebars(sectName: string, B: number, H: number, fck = 27, fy = 400, fyt = 400): SectionRebarInput {

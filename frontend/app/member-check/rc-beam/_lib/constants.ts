@@ -14,8 +14,8 @@ export const REBAR_OPTIONS = [
 /** 배근 형식별 위치 라벨 */
 export const REBAR_TYPE_CONFIG = {
   type1: { label: "ALL", positions: ["ALL"] as const },
-  type2: { label: "양단/중앙", positions: ["양단", "중앙"] as const },
-  type3: { label: "연속단/중앙/불연속단", positions: ["연속단", "중앙", "불연속단"] as const },
+  type2: { label: "BOTH", positions: ["양단", "중앙"] as const },
+  type3: { label: "3단", positions: ["연속단", "중앙", "불연속단"] as const },
 } as const;
 
 /** 기본 재료 강도 */
