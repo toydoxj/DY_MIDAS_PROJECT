@@ -678,7 +678,7 @@ export default function RcBeamCheckPage() {
     } finally {
       if (!controller.signal.aborted) setCheckLoading(false);
     }
-  };
+  }, [maxResult, rebarSections, fck, fy, fyt]);
 
   return (
     <div className="p-6 space-y-6">
