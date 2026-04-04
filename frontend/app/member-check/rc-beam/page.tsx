@@ -10,10 +10,9 @@ import SectionCard from "@/components/ui/SectionCard";
 import Button from "@/components/ui/Button";
 import { ErrorText } from "@/components/ui/StatusMessage";
 import MaterialInput from "./_components/MaterialInput";
-import RebarInputTable, { initSectionRebars } from "./_components/RebarInputTable";
-import DesignResult from "./_components/DesignResult";
-import { DEFAULT_FCK, DEFAULT_FY, DEFAULT_FYT } from "./_lib/constants";
-import type { SectionRebarInput, PositionCheckResult } from "./_lib/types";
+import { initSectionRebars } from "./_components/RebarInputTable";
+import { DEFAULT_FCK, DEFAULT_FY, DEFAULT_FYT, REBAR_OPTIONS } from "./_lib/constants";
+import type { SectionRebarInput, RebarInput, PositionCheckResult } from "./_lib/types";
 
 interface SectionInfo {
   id: number;
@@ -60,46 +59,144 @@ const thCls = "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide
 const tdCls = "px-3 py-2 text-gray-300 whitespace-nowrap text-sm";
 const tdMergedCls = "px-3 py-2 text-gray-200 whitespace-nowrap text-sm font-medium align-middle";
 
-/** rowSpan 병합 테이블 — 단면별 최대값 */
-function MaxTable({ data }: { data: BeamForceMaxRow[] }) {
+/** 통합 테이블 — 부재력 + 배근 입력 + DCR */
+function MaxTableIntegrated({
+  data, rebarSections, onRebarChange, checkResults,
+}: {
+  data: BeamForceMaxRow[];
+  rebarSections: SectionRebarInput[];
+  onRebarChange: (sections: SectionRebarInput[]) => void;
+  checkResults: PositionCheckResult[];
+}) {
+  const rebarMap = new Map(rebarSections.map((s, i) => [s.section_name, i]));
+  const resultMap = new Map<string, PositionCheckResult>();
+  for (const r of checkResults) resultMap.set(`${r.section_name}-${r.position}`, r);
+
+  const updateRebar = (si: number, ri: number, patch: Partial<RebarInput>) => {
+    const next = rebarSections.map((s, i) => {
+      if (i !== si) return s;
+      return { ...s, rebars: s.rebars.map((r, j) => (j === ri ? { ...r, ...patch } : r)) };
+    });
+    onRebarChange(next);
+  };
+
+  const inputCls = "w-14 rounded bg-gray-700 border border-gray-600 px-1 py-0.5 text-xs text-white text-center focus:outline-none focus:ring-1 focus:ring-blue-500";
+  const selectCls = "w-16 rounded bg-gray-700 border border-gray-600 px-0.5 py-0.5 text-xs text-white text-center focus:outline-none focus:ring-1 focus:ring-blue-500";
+
+  const hasResults = checkResults.length > 0;
+
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-700">
-      <table className="min-w-full text-sm">
+      <table className="min-w-full text-xs">
         <thead className="bg-gray-700">
           <tr>
-            <th className={thCls}>단면명</th>
-            <th className={thCls}>B(mm)</th>
-            <th className={thCls}>H(mm)</th>
-            <th className={thCls}>위치</th>
-            <th className={thCls}>LC</th>
-            <th className={thCls}>My(-)</th>
-            <th className={thCls}>LC</th>
-            <th className={thCls}>My(+)</th>
-            <th className={thCls}>LC</th>
-            <th className={thCls}>Fz</th>
+            <th className={thCls} rowSpan={2}>단면</th>
+            <th className={thCls} rowSpan={2}>B×H</th>
+            <th className={thCls} rowSpan={2}>위치</th>
+            <th className={thCls} colSpan={2}>My(-)</th>
+            <th className={thCls} colSpan={2}>My(+)</th>
+            <th className={thCls} colSpan={2}>Fz</th>
+            <th className={thCls} colSpan={2}>상부근</th>
+            <th className={thCls} colSpan={2}>하부근</th>
+            <th className={thCls} colSpan={2}>스터럽</th>
+            {hasResults && (
+              <>
+                <th className={thCls}>휨DCR</th>
+                <th className={thCls}>전단DCR</th>
+                <th className={thCls}>철근비</th>
+                <th className={thCls}>스터럽</th>
+              </>
+            )}
+          </tr>
+          <tr>
+            <th className={thCls}>LC</th><th className={thCls}>kN·m</th>
+            <th className={thCls}>LC</th><th className={thCls}>kN·m</th>
+            <th className={thCls}>LC</th><th className={thCls}>kN</th>
+            <th className={thCls}>규격</th><th className={thCls}>개수</th>
+            <th className={thCls}>규격</th><th className={thCls}>개수</th>
+            <th className={thCls}>규격</th><th className={thCls}>간격</th>
+            {hasResults && (
+              <><th className={thCls}></th><th className={thCls}></th><th className={thCls}></th><th className={thCls}></th></>
+            )}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-700">
-          {data.map((r, gi) =>
-            POSITIONS.map((pos, pi) => (
-              <tr key={`${gi}-${pos}`} className={gi % 2 === 0 ? "bg-gray-800" : "bg-gray-800/50"}>
-                {pi === 0 && (
-                  <>
-                    <td className={tdMergedCls} rowSpan={3}>{r.SectName}</td>
-                    <td className={tdMergedCls} rowSpan={3}>{r.B ?? "-"}</td>
-                    <td className={tdMergedCls} rowSpan={3}>{r.H ?? "-"}</td>
-                  </>
-                )}
-                <td className={tdCls}>{pos}</td>
-                <td className={`${tdCls} text-gray-500`}>{(r as Record<string, unknown>)[`My_neg_${pos}_LC`] as string}</td>
-                <td className={tdCls}>{String((r as Record<string, unknown>)[`My_neg_${pos}`])}</td>
-                <td className={`${tdCls} text-gray-500`}>{(r as Record<string, unknown>)[`My_pos_${pos}_LC`] as string}</td>
-                <td className={tdCls}>{String((r as Record<string, unknown>)[`My_pos_${pos}`])}</td>
-                <td className={`${tdCls} text-gray-500`}>{(r as Record<string, unknown>)[`Fz_${pos}_LC`] as string}</td>
-                <td className={tdCls}>{String((r as Record<string, unknown>)[`Fz_${pos}`])}</td>
-              </tr>
-            ))
-          )}
+          {data.map((r, gi) => {
+            const si = rebarMap.get(r.SectName);
+            const sec = si !== undefined ? rebarSections[si] : null;
+            return POSITIONS.map((pos, pi) => {
+              const rb = sec?.rebars[pi];
+              const cr = resultMap.get(`${r.SectName}-${pos}`);
+              const force = r as unknown as Record<string, unknown>;
+              return (
+                <tr key={`${gi}-${pos}`} className={gi % 2 === 0 ? "bg-gray-800" : "bg-gray-800/50"}>
+                  {pi === 0 && (
+                    <>
+                      <td className={tdMergedCls} rowSpan={3}>{r.SectName}</td>
+                      <td className={`${tdMergedCls} font-mono text-xs`} rowSpan={3}>{r.B ?? "-"}×{r.H ?? "-"}</td>
+                    </>
+                  )}
+                  <td className={`${tdCls} text-blue-400 font-medium`}>{pos}</td>
+                  <td className={`${tdCls} text-gray-500 text-[10px]`}>{force[`My_neg_${pos}_LC`] as string}</td>
+                  <td className={`${tdCls} font-mono`}>{String(force[`My_neg_${pos}`])}</td>
+                  <td className={`${tdCls} text-gray-500 text-[10px]`}>{force[`My_pos_${pos}_LC`] as string}</td>
+                  <td className={`${tdCls} font-mono`}>{String(force[`My_pos_${pos}`])}</td>
+                  <td className={`${tdCls} text-gray-500 text-[10px]`}>{force[`Fz_${pos}_LC`] as string}</td>
+                  <td className={`${tdCls} font-mono`}>{String(force[`Fz_${pos}`])}</td>
+                  {rb && si !== undefined ? (
+                    <>
+                      <td className={tdCls}>
+                        <select className={selectCls} value={rb.top_dia} onChange={(e) => updateRebar(si, pi, { top_dia: Number(e.target.value) })}>
+                          {REBAR_OPTIONS.map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
+                        </select>
+                      </td>
+                      <td className={tdCls}>
+                        <input className={inputCls} type="number" min={0} value={rb.top_count} onChange={(e) => updateRebar(si, pi, { top_count: Number(e.target.value) || 0 })} />
+                      </td>
+                      <td className={tdCls}>
+                        <select className={selectCls} value={rb.bot_dia} onChange={(e) => updateRebar(si, pi, { bot_dia: Number(e.target.value) })}>
+                          {REBAR_OPTIONS.map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
+                        </select>
+                      </td>
+                      <td className={tdCls}>
+                        <input className={inputCls} type="number" min={0} value={rb.bot_count} onChange={(e) => updateRebar(si, pi, { bot_count: Number(e.target.value) || 0 })} />
+                      </td>
+                      <td className={tdCls}>
+                        <select className={selectCls} value={rb.stirrup_dia} onChange={(e) => updateRebar(si, pi, { stirrup_dia: Number(e.target.value) })}>
+                          {REBAR_OPTIONS.filter((o) => o.dia <= 16).map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
+                        </select>
+                      </td>
+                      <td className={tdCls}>
+                        <input className={inputCls} type="number" min={50} step={25} value={rb.stirrup_spacing} onChange={(e) => updateRebar(si, pi, { stirrup_spacing: Number(e.target.value) || 200 })} />
+                      </td>
+                    </>
+                  ) : (
+                    <td colSpan={6} className={tdCls}></td>
+                  )}
+                  {hasResults && (
+                    cr ? (
+                      <>
+                        <td className={`${tdCls} font-mono font-semibold ${cr.flexure_ok ? "text-green-400" : "text-red-400"}`}>
+                          {cr.flexure_dcr < 900 ? cr.flexure_dcr.toFixed(3) : "-"}
+                        </td>
+                        <td className={`${tdCls} font-mono font-semibold ${cr.shear_ok ? "text-green-400" : "text-red-400"}`}>
+                          {cr.shear_dcr < 900 ? cr.shear_dcr.toFixed(3) : "-"}
+                        </td>
+                        <td className={`${tdCls} text-center ${cr.rho_min_ok && cr.rho_max_ok ? "text-green-400" : "text-red-400"}`}>
+                          {cr.rho_min_ok && cr.rho_max_ok ? "✓" : "✗"}
+                        </td>
+                        <td className={`${tdCls} text-center ${cr.stirrup_ok ? "text-green-400" : "text-red-400"}`}>
+                          {cr.stirrup_ok ? "✓" : "✗"}
+                        </td>
+                      </>
+                    ) : (
+                      <td colSpan={4} className={tdCls}></td>
+                    )
+                  )}
+                </tr>
+              );
+            });
+          })}
         </tbody>
       </table>
     </div>
@@ -530,8 +627,31 @@ export default function RcBeamCheckPage() {
           </div>
 
           {viewMode === "max" && maxResult && maxResult.length > 0 && (
-            <SectionCard title={`단면별 최대 부재력 (${maxResult.length}개 단면)`}>
-              <MaxTable data={maxResult} />
+            <SectionCard
+              title={`단면별 설계 검토 (${maxResult.length}개 단면)`}
+              action={
+                <div className="flex items-center gap-3">
+                  {checkResults.length > 0 && (
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${checkResults.every((r) => r.all_ok) ? "bg-green-900/40 text-green-400" : "bg-red-900/40 text-red-400"}`}>
+                      {checkResults.every((r) => r.all_ok) ? "전체 적합" : "부적합 있음"}
+                    </span>
+                  )}
+                  <Button size="xs" onClick={runDesignCheck} loading={checkLoading}>
+                    {checkLoading ? "검토 중..." : "설계 검토"}
+                  </Button>
+                </div>
+              }
+            >
+              <MaterialInput
+                fck={fck} fy={fy} fyt={fyt}
+                onChange={(v) => { if (v.fck !== undefined) setFck(v.fck); if (v.fy !== undefined) setFy(v.fy); if (v.fyt !== undefined) setFyt(v.fyt); }}
+              />
+              <MaxTableIntegrated
+                data={maxResult}
+                rebarSections={rebarSections}
+                onRebarChange={setRebarSections}
+                checkResults={checkResults}
+              />
             </SectionCard>
           )}
 
@@ -552,26 +672,6 @@ export default function RcBeamCheckPage() {
               조회된 설계결과가 없습니다.
             </div>
           )}
-        </>
-      )}
-
-      {/* ═══ 설계 검토 섹션 ═══ */}
-      {maxResult && maxResult.length > 0 && (
-        <>
-          <MaterialInput
-            fck={fck} fy={fy} fyt={fyt}
-            onChange={(v) => { if (v.fck !== undefined) setFck(v.fck); if (v.fy !== undefined) setFy(v.fy); if (v.fyt !== undefined) setFyt(v.fyt); }}
-          />
-
-          <RebarInputTable sections={rebarSections} onChange={setRebarSections} />
-
-          <div className="flex justify-end">
-            <Button onClick={runDesignCheck} loading={checkLoading}>
-              {checkLoading ? "검토 중..." : "설계 검토 실행"}
-            </Button>
-          </div>
-
-          <DesignResult results={checkResults} />
         </>
       )}
     </div>
