@@ -742,15 +742,21 @@ export default function RcBeamCheckPage() {
 
   const selectionKey = [...selectedIds].sort().join(",");
 
-  // maxResult 변경 시 저장 데이터와 병합
+  // maxResult 변경 시 저장 데이터와 병합 (서버 우선, localStorage 보조)
   useEffect(() => {
     if (!maxResult || maxResult.length === 0) { setRebarSections([]); return; }
+
+    // 서버 저장 데이터와 localStorage draft 병합 (서버 우선)
+    const serverMap = new Map(savedRebarsRef.current.map((s) => [s.section_name, s]));
     const draft = loadDraftFromLocal();
-    const saved = draft ?? savedRebarsRef.current;
-    const savedMap = new Map(saved.map((s) => [s.section_name, s]));
+    const draftMap = draft ? new Map(draft.map((s) => [s.section_name, s])) : null;
+
     setRebarSections(
       maxResult.map((r) => {
-        const existing = savedMap.get(r.SectName);
+        // 서버 저장값 우선, 없으면 draft, 없으면 기본값
+        const fromServer = serverMap.get(r.SectName);
+        const fromDraft = draftMap?.get(r.SectName);
+        const existing = fromServer ?? fromDraft;
         if (existing) return { ...existing, B: r.B ?? existing.B, H: r.H ?? existing.H };
         return initSectionRebars(r.SectName, r.B ?? 400, r.H ?? 700, defaultFck, getFyForDia(25), defaultFyt);
       })
