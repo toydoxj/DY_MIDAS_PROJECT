@@ -190,12 +190,13 @@ const tdMergedCls = "px-3 py-2 text-gray-200 whitespace-nowrap text-sm font-medi
 
 /** 통합 테이블 — 부재력 + 배근 입력 + DCR */
 function MaxTableIntegrated({
-  data, rebarSections, onRebarChange, checkResults,
+  data, rebarSections, onRebarChange, checkResults, getFyForDia,
 }: {
   data: BeamForceMaxRow[];
   rebarSections: SectionRebarInput[];
   onRebarChange: (sections: SectionRebarInput[]) => void;
   checkResults: PositionCheckResult[];
+  getFyForDia: (dia: number) => number;
 }) {
   const rebarMap = new Map(rebarSections.map((s, i) => [s.section_name, i]));
   const resultMap = new Map<string, PositionCheckResult>();
@@ -301,7 +302,14 @@ function MaxTableIntegrated({
                         <span className="text-gray-500">-</span>
                         {pi === 0 ? (
                           <select className={selectCls} value={rb.top_dia}
-                            onChange={(e) => { const d = Number(e.target.value); updateSectionRebar(si, { top_dia: d, bot_dia: d }); }}>
+                            onChange={(e) => {
+                              const d = Number(e.target.value);
+                              const newFy = getFyForDia(d);
+                              updateSectionRebar(si, { top_dia: d, bot_dia: d });
+                              const next = [...rebarSections];
+                              next[si] = { ...next[si], fy: newFy };
+                              onRebarChange(next);
+                            }}>
                             {REBAR_OPTIONS.map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
                           </select>
                         ) : (
@@ -428,10 +436,25 @@ export default function RcBeamCheckPage() {
   const [error, setError] = useState("");
   const [lastFetchedAt, setLastFetchedAt] = useState<string | null>(null);
 
-  // 설계 검토 상태
+  // 대시보드 재료 규칙
+  interface RebarRule { strength: number; dia_threshold: number; dia_dir: string }
   const [defaultFck, setDefaultFck] = useState(27);
   const [defaultFy, setDefaultFy] = useState(400);
   const [defaultFyt, setDefaultFyt] = useState(400);
+  const [rebarRules, setRebarRules] = useState<RebarRule[]>([]);
+
+  /** 철근 지름에 맞는 강도 찾기 */
+  const getFyForDia = useCallback((dia: number): number => {
+    // 규칙 중 매칭되는 것 찾기 (구체적 규칙 우선)
+    for (const rule of rebarRules) {
+      if (rule.dia_dir === "이하" && dia <= rule.dia_threshold) return rule.strength;
+      if (rule.dia_dir === "이상" && dia >= rule.dia_threshold) return rule.strength;
+    }
+    // 전부재 규칙
+    const allRule = rebarRules.find((r) => r.dia_dir === "전부재");
+    if (allRule) return allRule.strength;
+    return defaultFy;
+  }, [rebarRules, defaultFy]);
   const [rebarSections, setRebarSections] = useState<SectionRebarInput[]>([]);
   const [checkResults, setCheckResults] = useState<PositionCheckResult[]>([]);
   const [checkLoading, setCheckLoading] = useState(false);
@@ -520,9 +543,18 @@ export default function RcBeamCheckPage() {
           const c = JSON.parse(proj.COMMENT ?? "{}");
           const mat = c.MATERIALS_V2;
           if (mat?.concrete?.[0]?.strength) setDefaultFck(Number(mat.concrete[0].strength));
-          if (mat?.rebar?.[0]?.strength) {
-            setDefaultFy(Number(mat.rebar[0].strength));
-            setDefaultFyt(Number(mat.rebar[0].strength));
+          if (mat?.rebar && Array.isArray(mat.rebar)) {
+            const rules: RebarRule[] = mat.rebar.map((r: { strength?: number; dia_threshold?: number; dia_dir?: string }) => ({
+              strength: Number(r.strength ?? 400),
+              dia_threshold: Number(r.dia_threshold ?? 0),
+              dia_dir: r.dia_dir ?? "전부재",
+            }));
+            setRebarRules(rules);
+            // 기본값: 전부재 규칙 또는 첫 번째
+            const allRule = rules.find((r) => r.dia_dir === "전부재");
+            const baseStrength = allRule?.strength ?? rules[0]?.strength ?? 400;
+            setDefaultFy(baseStrength);
+            setDefaultFyt(baseStrength);
           }
         } catch { /* ignore */ }
       }
@@ -675,7 +707,7 @@ export default function RcBeamCheckPage() {
   useEffect(() => {
     if (!maxResult || maxResult.length === 0) { setRebarSections([]); return; }
     setRebarSections(
-      maxResult.map((r) => initSectionRebars(r.SectName, r.B ?? 400, r.H ?? 700, defaultFck, defaultFy, defaultFyt))
+      maxResult.map((r) => initSectionRebars(r.SectName, r.B ?? 400, r.H ?? 700, defaultFck, getFyForDia(25), defaultFyt))
     );
     setCheckResults([]);
   }, [maxResult]);
@@ -926,6 +958,7 @@ export default function RcBeamCheckPage() {
                 rebarSections={rebarSections}
                 onRebarChange={setRebarSections}
                 checkResults={checkResults}
+                getFyForDia={getFyForDia}
               />
             </SectionCard>
           )}
