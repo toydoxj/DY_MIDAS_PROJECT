@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Search, Weight, ClipboardCheck } from "lucide-react";
+import { LayoutDashboard, Search, Weight, ClipboardCheck, Moon, Sun } from "lucide-react";
+import { useEffect, useState } from "react";
 import ConnectionStatus from "./ConnectionStatus";
 
 const navItems = [
@@ -14,12 +15,42 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [dark, setDark] = useState(true);
+
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  const toggleTheme = () => {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  };
+
+  // 초기 로드 시 저장된 테마 적용
+  useEffect(() => {
+    const saved = localStorage.getItem("theme");
+    if (saved === "light") {
+      setDark(false);
+      document.documentElement.classList.remove("dark");
+    }
+  }, []);
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-gray-900 border-r border-gray-800 flex flex-col">
-      <div className="p-5 border-b border-gray-800">
-        <h1 className="text-lg font-bold text-white">MIDAS GEN NX</h1>
-        <p className="text-xs text-gray-500 mt-0.5">API Dashboard</p>
+    <aside className="fixed left-0 top-0 h-full w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
+      <div className="p-5 border-b border-sidebar-border flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-sidebar-foreground">MIDAS GEN NX</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">API Dashboard</p>
+        </div>
+        <button
+          onClick={toggleTheme}
+          className="rounded-lg p-1.5 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+          title={dark ? "라이트 모드" : "다크 모드"}
+        >
+          {dark ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
@@ -31,8 +62,8 @@ export default function Sidebar() {
               href={href}
               className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                 active
-                  ? "bg-blue-600 text-white"
-                  : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               }`}
             >
               <Icon size={18} />
@@ -42,9 +73,9 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="p-3 border-t border-gray-800 space-y-2">
+      <div className="p-3 border-t border-sidebar-border space-y-2">
         <ConnectionStatus />
-        <p className="text-xs text-gray-600 px-3">(주)동양구조</p>
+        <p className="text-xs text-muted-foreground px-3">(주)동양구조</p>
       </div>
     </aside>
   );
