@@ -55,6 +55,65 @@ type ViewMode = "max" | "member" | "raw";
 
 const POSITIONS = ["I", "C", "J"] as const;
 
+/** 보 구분자 패턴 (긴 것 먼저 매칭) */
+const BEAM_SEPARATORS = ["SRG", "SRB", "SG", "SB", "TG", "TB", "WG", "FG", "LB", "G", "B"] as const;
+const BEAM_SEP_REGEX = new RegExp(`^(.*?)(${BEAM_SEPARATORS.join("|")})(\\d+.*)?$`);
+
+/** 단면명에서 층 정보를 파싱 */
+function parseFloorFromName(name: string): { floor: string; sep: string; num: string } | null {
+  const m = name.match(BEAM_SEP_REGEX);
+  if (!m) return null;
+  return { floor: m[1] || "", sep: m[2], num: m[3] || "" };
+}
+
+/** 층 표기를 정렬 가능한 키로 변환 */
+function floorSortKey(floor: string): number {
+  if (!floor) return 9999; // 층 없음 → 맨 뒤
+  if (floor === "R") return 8000;
+  if (floor === "PH") return 8100;
+  if (floor === "PHR") return 8200;
+  if (floor === "P") return -100;
+  if (floor === "M") return 5000;
+  // 음수층: -4, B4 등
+  const negMatch = floor.match(/^-(\d+)/);
+  if (negMatch) return -parseInt(negMatch[1]);
+  const bMatch = floor.match(/^B(\d+)/i);
+  if (bMatch) return -parseInt(bMatch[1]);
+  // 범위: 2~4 → 첫 숫자
+  const rangeMatch = floor.match(/^(\d+)/);
+  if (rangeMatch) return parseInt(rangeMatch[1]);
+  return 9000;
+}
+
+/** sections에서 층 목록 추출 */
+function extractFloors(sects: SectionInfo[]): { floor: string; label: string; count: number }[] {
+  const floorMap = new Map<string, number>();
+  for (const s of sects) {
+    const parsed = parseFloorFromName(s.name);
+    if (!parsed) continue;
+    const f = parsed.floor || "(공통)";
+    floorMap.set(f, (floorMap.get(f) ?? 0) + 1);
+  }
+  return [...floorMap.entries()]
+    .map(([floor, count]) => ({
+      floor,
+      label: floor === "(공통)" ? "공통 (전층)" : `${floor}층`,
+      count,
+    }))
+    .sort((a, b) => floorSortKey(a.floor) - floorSortKey(b.floor));
+}
+
+/** 선택된 층에 해당하는 sections 필터 */
+function filterSectionsByFloors(sects: SectionInfo[], floors: Set<string>): SectionInfo[] {
+  if (floors.size === 0) return [];
+  return sects.filter((s) => {
+    const parsed = parseFloorFromName(s.name);
+    if (!parsed) return false;
+    const f = parsed.floor || "(공통)";
+    return floors.has(f);
+  });
+}
+
 const thCls = "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-300";
 const tdCls = "px-3 py-2 text-gray-300 whitespace-nowrap text-sm";
 const tdMergedCls = "px-3 py-2 text-gray-200 whitespace-nowrap text-sm font-medium align-middle";
@@ -265,6 +324,7 @@ const TAB_ITEMS: { key: ViewMode; label: string }[] = [
 
 export default function RcBeamCheckPage() {
   const [sections, setSections] = useState<SectionInfo[]>([]);
+  const [selectedFloors, setSelectedFloors] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [loadingSections, setLoadingSections] = useState(false);
@@ -299,6 +359,15 @@ export default function RcBeamCheckPage() {
   const selectedSections = useMemo(
     () => sections.filter((s) => selectedIds.has(s.id)),
     [sections, selectedIds],
+  );
+
+  // 층 목록 (보 구분자가 있는 섹션만)
+  const floors = useMemo(() => extractFloors(sections), [sections]);
+
+  // 선택된 층에 해당하는 섹션 목록
+  const filteredSections = useMemo(
+    () => filterSectionsByFloors(sections, selectedFloors),
+    [sections, selectedFloors],
   );
 
   const totalElements = useMemo(
@@ -512,73 +581,21 @@ export default function RcBeamCheckPage() {
       <PageHeader title="RC보 검토" subtitle="Beam Design Forces" backHref="/member-check" />
 
       <SectionCard>
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-gray-300">Section 선택</label>
-          <button
-            onClick={fetchSections}
-            disabled={loadingSections}
-            className="rounded-lg bg-gray-700 p-1.5 hover:bg-gray-600 transition-colors disabled:opacity-50"
-            title="Section 새로고침"
-          >
-            <RefreshCw size={14} className={loadingSections ? "animate-spin" : ""} />
-          </button>
-        </div>
-
-        {sections.length > 0 ? (
-          <div ref={dropdownRef} className="relative">
-            {/* 드롭다운 트리거 */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-gray-300">Section 선택</label>
             <button
-              onClick={() => setDropdownOpen((v) => !v)}
-              className="w-full flex items-center justify-between rounded-lg bg-gray-700 border border-gray-600 px-3 py-2 text-sm text-left text-gray-200 hover:bg-gray-600 transition-colors"
+              onClick={fetchSections}
+              disabled={loadingSections}
+              className="rounded-lg bg-gray-700 p-1.5 hover:bg-gray-600 transition-colors disabled:opacity-50"
+              title="Section 새로고침"
             >
-              <span className={selectedIds.size === 0 ? "text-gray-400" : ""}>
-                {selectedIds.size === 0
-                  ? "Section을 선택하세요"
-                  : `${selectedIds.size}개 Section 선택됨 (${totalElements}개 부재)`}
-              </span>
-              <ChevronDown size={16} className={`transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+              <RefreshCw size={14} className={loadingSections ? "animate-spin" : ""} />
             </button>
-
-            {/* 체크박스 리스트 */}
-            {dropdownOpen && (
-              <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded-lg bg-gray-800 border border-gray-600 shadow-xl">
-                {/* 전체 선택/해제 */}
-                <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-700">
-                  <button onClick={selectAll} className="text-xs text-blue-400 hover:text-blue-300">전체 선택</button>
-                  <span className="text-gray-600">|</span>
-                  <button onClick={clearAll} className="text-xs text-gray-400 hover:text-gray-300">전체 해제</button>
-                </div>
-                {sections.map((s) => (
-                  <label
-                    key={s.id}
-                    className="flex items-center gap-3 px-3 py-2 hover:bg-gray-700 cursor-pointer text-sm"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(s.id)}
-                      onChange={() => toggleSection(s.id)}
-                      className="rounded border-gray-500 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
-                    />
-                    <span className="text-gray-300">
-                      {s.id} — {s.name}
-                      <span className="text-gray-500 ml-1">({s.element_count}개)</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
           </div>
-        ) : (
-          !loadingSections && <p className="text-sm text-gray-500">Section 데이터가 없습니다.</p>
-        )}
-
-        {/* 선택 요약 + 조회 버튼 */}
-        {selectedIds.size > 0 && (
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-500">
-              선택: {selectedSections.map((s) => s.name).join(", ")} · 총 {totalElements}개 부재
-            </p>
+          {selectedIds.size > 0 && (
             <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">{selectedIds.size}개 선택 · {totalElements}개 부재</span>
               <button
                 onClick={() => handleFetch(false)}
                 disabled={loadingResult}
@@ -595,7 +612,100 @@ export default function RcBeamCheckPage() {
                 <RefreshCw size={14} />
               </button>
             </div>
+          )}
+        </div>
+
+        {sections.length > 0 ? (
+          <div className="grid grid-cols-[200px_1fr] gap-3">
+            {/* 좌: 층 선택 */}
+            <div className="rounded-lg bg-gray-800 border border-gray-700 overflow-hidden">
+              <div className="px-3 py-2 border-b border-gray-700 bg-gray-700/50">
+                <span className="text-xs font-medium text-gray-400">층 선택</span>
+              </div>
+              <div className="max-h-60 overflow-y-auto">
+                {floors.map(({ floor, label, count }) => (
+                  <label
+                    key={floor}
+                    className={`flex items-center justify-between gap-2 px-3 py-1.5 cursor-pointer text-sm transition-colors ${
+                      selectedFloors.has(floor) ? "bg-blue-600/20 text-blue-300" : "hover:bg-gray-700 text-gray-300"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedFloors.has(floor)}
+                        onChange={() => {
+                          setSelectedFloors((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(floor)) next.delete(floor);
+                            else next.add(floor);
+                            return next;
+                          });
+                        }}
+                        className="rounded border-gray-500 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                      />
+                      <span>{label}</span>
+                    </div>
+                    <span className="text-gray-500 text-xs">{count}</span>
+                  </label>
+                ))}
+                {floors.length === 0 && (
+                  <p className="px-3 py-2 text-xs text-gray-500">보 단면 없음</p>
+                )}
+              </div>
+            </div>
+
+            {/* 우: 보/거더 선택 */}
+            <div className="rounded-lg bg-gray-800 border border-gray-700 overflow-hidden">
+              <div className="px-3 py-2 border-b border-gray-700 bg-gray-700/50 flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-400">
+                  보/거더 {filteredSections.length > 0 ? `(${filteredSections.length}개)` : ""}
+                </span>
+                {filteredSections.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSelectedIds(new Set(filteredSections.map((s) => s.id)))}
+                      className="text-[10px] text-blue-400 hover:text-blue-300"
+                    >전체 선택</button>
+                    <span className="text-gray-600">|</span>
+                    <button
+                      onClick={clearAll}
+                      className="text-[10px] text-gray-400 hover:text-gray-300"
+                    >해제</button>
+                  </div>
+                )}
+              </div>
+              <div className="max-h-60 overflow-y-auto">
+                {selectedFloors.size === 0 ? (
+                  <p className="px-3 py-3 text-xs text-gray-500 text-center">좌측에서 층을 선택하세요</p>
+                ) : filteredSections.length === 0 ? (
+                  <p className="px-3 py-3 text-xs text-gray-500 text-center">해당 층에 보 단면이 없습니다</p>
+                ) : (
+                  filteredSections.map((s) => (
+                    <label
+                      key={s.id}
+                      className={`flex items-center justify-between gap-2 px-3 py-1.5 cursor-pointer text-sm transition-colors ${
+                        selectedIds.has(s.id) ? "bg-blue-600/20 text-blue-300" : "hover:bg-gray-700 text-gray-300"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(s.id)}
+                          onChange={() => toggleSection(s.id)}
+                          className="rounded border-gray-500 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                        />
+                        <span>{s.name}</span>
+                      </div>
+                      <span className="text-gray-500 text-xs">{s.element_count}개</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
+        ) : (
+          !loadingSections && <p className="text-sm text-gray-500">Section 데이터가 없습니다.</p>
         )}
       </SectionCard>
 
