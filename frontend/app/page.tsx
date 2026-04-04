@@ -4,6 +4,7 @@ import { useState } from "react";
 import { StoryRow } from "@/lib/types";
 import ProjectSection from "@/components/dashboard/ProjectSection";
 import SettingsSection from "@/components/dashboard/SettingsSection";
+import MaterialSection from "@/components/dashboard/MaterialSection";
 import MapSection from "@/components/dashboard/MapSection";
 import SettingSection from "@/components/dashboard/SettingSection";
 import StorySection from "@/components/dashboard/StorySection";
@@ -21,7 +22,10 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <ProjectSection onAddressChange={setAddress} storyRows={storyRows} />
-        <SettingsSection />
+        <div className="space-y-6">
+          <SettingsSection />
+          <MaterialSection />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
