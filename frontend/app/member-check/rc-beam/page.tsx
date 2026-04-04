@@ -404,7 +404,7 @@ export default function RcBeamCheckPage() {
           Argument: {
             TABLE_TYPE: "BEAMDESIGNFORCES",
             UNIT: { FORCE: "KN", DIST: "M" },
-            STYLES: { FORMAT: "Fixed", PLACE: 3 },
+            STYLES: { FORMAT: "Fixed", PLACE: 1 },
             NODE_ELEMS: { KEYS: keys },
             PARTS: ["PartI", "Part2/4", "PartJ"],
             COMPONENTS: ["Memb", "Part", "LComName", "Type", "Fz", "My(-)", "My(+)"],

@@ -45,7 +45,7 @@ class beamForceDB:
         force_unit: str = "KN",
         dist_unit: str = "M",
         fmt: str = "Fixed",
-        place: int = 3,
+        place: int = 1,
     ) -> dict:
         """설계 부재력을 일괄 조회한다.
 
