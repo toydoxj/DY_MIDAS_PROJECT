@@ -222,7 +222,7 @@ function MaxTableIntegrated({
                   <td className={`${tdCls} text-blue-400 font-medium`}>{pos}</td>
                   {/* My(-) + 상부근 (n-Dxx) */}
                   <td className={`${tdCls} font-mono`}>
-                    <div className="text-white">{String(force[`My_neg_${pos}`])}</div>
+                    <div className="text-white">{Number(force[`My_neg_${pos}`]).toFixed(1)}</div>
                     <div className="text-gray-400 text-[10px] truncate max-w-[80px]" title={force[`My_neg_${pos}_LC`] as string}>{force[`My_neg_${pos}_LC`] as string}</div>
                   </td>
                   <td className={tdCls}>
@@ -245,7 +245,7 @@ function MaxTableIntegrated({
                   {hasResults && (cr ? dcrCell(cr.neg_flexure_dcr, cr.neg_flexure_ok) : <td className={tdCls}></td>)}
                   {/* My(+) + 하부근 (n-Dxx) */}
                   <td className={`${tdCls} font-mono`}>
-                    <div className="text-white">{String(force[`My_pos_${pos}`])}</div>
+                    <div className="text-white">{Number(force[`My_pos_${pos}`]).toFixed(1)}</div>
                     <div className="text-gray-400 text-[10px] truncate max-w-[80px]" title={force[`My_pos_${pos}_LC`] as string}>{force[`My_pos_${pos}_LC`] as string}</div>
                   </td>
                   <td className={tdCls}>
@@ -261,7 +261,7 @@ function MaxTableIntegrated({
                   {hasResults && (cr ? dcrCell(cr.pos_flexure_dcr, cr.pos_flexure_ok) : <td className={tdCls}></td>)}
                   {/* Fz + 스터럽 (Dxx@nnn) */}
                   <td className={`${tdCls} font-mono`}>
-                    <div className="text-white">{String(force[`Fz_${pos}`])}</div>
+                    <div className="text-white">{Number(force[`Fz_${pos}`]).toFixed(1)}</div>
                     <div className="text-gray-400 text-[10px] truncate max-w-[80px]" title={force[`Fz_${pos}_LC`] as string}>{force[`Fz_${pos}_LC`] as string}</div>
                   </td>
                   <td className={tdCls}>
