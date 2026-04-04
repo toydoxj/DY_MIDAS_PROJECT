@@ -24,8 +24,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
-      <body className="min-h-full bg-gray-950 text-gray-100 antialiased" suppressHydrationWarning>
+    <html lang="ko" className={`${geistSans.variable} ${geistMono.variable} dark h-full`}>
+      <body className="min-h-full bg-background text-foreground antialiased" suppressHydrationWarning>
         <div className="flex min-h-screen">
           <Sidebar />
           <main className="flex-1 ml-64 p-6">{children}</main>
