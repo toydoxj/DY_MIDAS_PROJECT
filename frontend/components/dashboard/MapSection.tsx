@@ -79,26 +79,26 @@ export default function MapSection({ address }: { address: string }) {
   }, [address, ready, searchAddress]);
 
   return (
-    <div className="rounded-xl bg-gray-800 border border-gray-700 p-5 space-y-3">
+    <div className="rounded-xl bg-gray-50 border border-gray-700 p-5 space-y-3">
       <div className="flex items-center justify-between mb-1">
         <div>
           <h2 className="text-base font-semibold text-white flex items-center gap-2"><MapPin size={16} /> MAPS</h2>
           <p className="text-[10px] text-gray-500 mt-0.5 ml-6">해당 지도는 실제 지도와 정확히 일치하지 않으므로 정밀한 확인 필요</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-xs text-gray-400">
+          <div className="flex items-center gap-2 text-xs text-gray-500">
             <span>등치선</span>
             <input type="range" min="0" max="1" step="0.05" value={opacity} onChange={(e) => setOpacity(parseFloat(e.target.value))} className="w-16 accent-blue-500 cursor-pointer" />
             <span className="font-mono text-blue-400 w-8">{Math.round(opacity * 100)}%</span>
           </div>
-          <button onClick={() => searchAddress(address)} disabled={searching || !ready || !address.trim()} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white disabled:opacity-50 transition-colors">
+          <button onClick={() => searchAddress(address)} disabled={searching || !ready || !address.trim()} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-white disabled:opacity-50 transition-colors">
             <Search size={13} className={searching ? "animate-spin" : ""} /> 위치 검색
           </button>
         </div>
       </div>
       {error && <p className="text-xs text-red-400">{error}</p>}
       {result && (
-        <div className="rounded-lg bg-gray-700/50 border border-gray-600 px-3 py-2 text-xs text-gray-300 flex items-center gap-4">
+        <div className="rounded-lg bg-gray-100/50 border border-gray-600 px-3 py-2 text-xs text-gray-700 flex items-center gap-4">
           <span className="text-white">{result.addr}</span><span className="text-gray-500">|</span>
           <span>위도 {result.lat.toFixed(5)}</span><span>경도 {result.lng.toFixed(5)}</span>
         </div>

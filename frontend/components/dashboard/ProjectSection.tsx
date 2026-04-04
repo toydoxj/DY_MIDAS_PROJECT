@@ -197,7 +197,7 @@ export default function ProjectSection({ onAddressChange, storyRows }: { onAddre
       </div>
 
       {/* 지진 설계 (X/Y 방향) */}
-      <div className="border-t border-gray-700 pt-3 mt-1">
+      <div className="border-t border-gray-200 pt-3 mt-1">
         <p className="text-xs text-gray-400 mb-2 font-medium">지진 설계 (X / Y 방향)</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField label="구조물 형식 (X)">
@@ -233,17 +233,17 @@ export default function ProjectSection({ onAddressChange, storyRows }: { onAddre
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <FormField label="지상층수">
-          <div className="rounded-lg bg-gray-700/50 border border-gray-600 px-3 py-1.5 text-sm text-gray-300">
+          <div className="rounded-lg bg-gray-100 border border-gray-200 px-3 py-1.5 text-sm text-gray-700">
             {aboveFloors > 0 ? `${aboveFloors}F` : "-"}
           </div>
         </FormField>
         <FormField label="지하층수">
-          <div className="rounded-lg bg-gray-700/50 border border-gray-600 px-3 py-1.5 text-sm text-gray-300">
+          <div className="rounded-lg bg-gray-100 border border-gray-200 px-3 py-1.5 text-sm text-gray-700">
             {belowFloors > 0 ? `B${belowFloors}` : "-"}
           </div>
         </FormField>
         <FormField label="해석높이 (m)">
-          <div className="rounded-lg bg-gray-700/50 border border-gray-600 px-3 py-1.5 text-sm text-gray-300">
+          <div className="rounded-lg bg-gray-100 border border-gray-200 px-3 py-1.5 text-sm text-gray-700">
             {analysisHeight > 0 ? analysisHeight.toFixed(3) : "-"}
           </div>
         </FormField>

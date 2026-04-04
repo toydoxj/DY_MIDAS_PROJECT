@@ -39,7 +39,7 @@ export default function StorySection({ onRowsChange }: { onRowsChange: (rows: St
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead>
-              <tr className="border-b border-gray-700">
+              <tr className="border-b border-gray-200">
                 <th className="pb-2 pr-4 font-medium text-gray-400">StoryName</th>
                 <th className="pb-2 pr-4 font-medium text-gray-400 text-right">StoryLevel</th>
                 <th className="pb-2 pr-4 font-medium text-gray-400 text-right">StoryHeight</th>
@@ -48,12 +48,12 @@ export default function StorySection({ onRowsChange }: { onRowsChange: (rows: St
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-b border-gray-700/50 hover:bg-gray-700/30">
+                <tr key={r.id} className="border-b border-gray-200/50 hover:bg-gray-50">
                   <td className="py-1.5 pr-4 text-white">{r.STORY_NAME}</td>
-                  <td className="py-1.5 pr-4 text-gray-300 text-right">{r.STORY_LEVEL.toFixed(3)}</td>
-                  <td className="py-1.5 pr-4 text-gray-300 text-right">{r.HEIGHT.toFixed(3)}</td>
+                  <td className="py-1.5 pr-4 text-gray-700 text-right">{r.STORY_LEVEL.toFixed(3)}</td>
+                  <td className="py-1.5 pr-4 text-gray-700 text-right">{r.HEIGHT.toFixed(3)}</td>
                   <td className="py-1.5 text-center">
-                    {r.bFLOOR_DIAPHRAGM ? <span className="text-green-400">●</span> : <span className="text-gray-600">○</span>}
+                    {r.bFLOOR_DIAPHRAGM ? <span className="text-emerald-600">●</span> : <span className="text-gray-400">○</span>}
                   </td>
                 </tr>
               ))}

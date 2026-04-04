@@ -96,9 +96,9 @@ export default function MaterialSection({ storyRows }: { storyRows: StoryRow[] }
     } finally { setSaving(false); }
   };
 
-  const thCls = "px-2 py-1.5 text-center text-xs font-semibold text-muted-foreground";
+  const thCls = "px-2 py-1.5 text-center text-xs font-semibold text-gray-500";
   const tdCls = "px-1.5 py-1 text-center text-sm";
-  const selectCls = "w-full rounded bg-muted border border-border px-1.5 py-1 text-sm text-foreground text-center focus:outline-none focus:ring-1 focus:ring-ring";
+  const selectCls = "w-full rounded bg-gray-50 border border-gray-300 px-1.5 py-1 text-sm text-gray-900 text-center focus:outline-none focus:ring-1 focus:ring-emerald-500";
   const inputCls = selectCls;
 
   /** 층 Select */
@@ -114,22 +114,22 @@ export default function MaterialSection({ storyRows }: { storyRows: StoryRow[] }
       {/* ── 콘크리트 ── */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-medium text-muted-foreground">콘크리트</span>
+          <span className="text-xs font-medium text-gray-500">콘크리트</span>
           <Button type="button" variant="ghost" size="xs"
             onClick={() => setData((p) => ({ ...p, concrete: [...p.concrete, { strength: 27, h_from: "", h_to: "", v_from: "", v_to: "" }] }))}>
             <Plus size={12} /> 추가
           </Button>
         </div>
-        <div className="overflow-x-auto rounded-lg border border-border">
+        <div className="overflow-x-auto rounded-lg border border-gray-200">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-border bg-muted/50">
+              <tr className="border-b border-gray-200 bg-gray-50">
                 <th className={thCls} rowSpan={2}>강도</th>
                 <th className={thCls} colSpan={2}>수평재 (층)</th>
                 <th className={thCls} colSpan={2}>수직재 (층)</th>
                 <th className={`${thCls} w-8`} rowSpan={2}></th>
               </tr>
-              <tr className="border-b border-border bg-muted/50">
+              <tr className="border-b border-gray-200 bg-gray-50">
                 <th className={thCls}>부터</th>
                 <th className={thCls}>까지</th>
                 <th className={thCls}>부터</th>
@@ -138,7 +138,7 @@ export default function MaterialSection({ storyRows }: { storyRows: StoryRow[] }
             </thead>
             <tbody>
               {data.concrete.map((row, i) => (
-                <tr key={i} className="border-b border-border/50">
+                <tr key={i} className="border-b border-gray-200/50">
                   <td className={tdCls}>
                     <select className={selectCls} value={row.strength}
                       onChange={(e) => {
@@ -167,7 +167,7 @@ export default function MaterialSection({ storyRows }: { storyRows: StoryRow[] }
                   </td>
                   <td className={tdCls}>
                     <button type="button" onClick={() => setData((p) => ({ ...p, concrete: p.concrete.filter((_, j) => j !== i) }))}
-                      className="text-muted-foreground hover:text-destructive transition-colors p-0.5">
+                      className="text-gray-500 hover:text-red-500 transition-colors p-0.5">
                       <Trash2 size={13} />
                     </button>
                   </td>
@@ -181,16 +181,16 @@ export default function MaterialSection({ storyRows }: { storyRows: StoryRow[] }
       {/* ── 철근 ── */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-medium text-muted-foreground">철근</span>
+          <span className="text-xs font-medium text-gray-500">철근</span>
           <Button type="button" variant="ghost" size="xs"
             onClick={() => setData((p) => ({ ...p, rebar: [...p.rebar, { grade: "SD400", strength: 400, dia_threshold: 0, dia_dir: "전부재", member: "" }] }))}>
             <Plus size={12} /> 추가
           </Button>
         </div>
-        <div className="overflow-x-auto rounded-lg border border-border">
+        <div className="overflow-x-auto rounded-lg border border-gray-200">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-border bg-muted/50">
+              <tr className="border-b border-gray-200 bg-gray-50">
                 <th className={thCls}>규격</th>
                 <th className={thCls}>강도</th>
                 <th className={thCls} colSpan={2}>적용</th>
@@ -200,7 +200,7 @@ export default function MaterialSection({ storyRows }: { storyRows: StoryRow[] }
             </thead>
             <tbody>
               {data.rebar.map((row, i) => (
-                <tr key={i} className="border-b border-border/50">
+                <tr key={i} className="border-b border-gray-200/50">
                   <td className={tdCls}>
                     <select className={selectCls} value={row.grade}
                       onChange={(e) => {
@@ -212,7 +212,7 @@ export default function MaterialSection({ storyRows }: { storyRows: StoryRow[] }
                       {REBAR_GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
                     </select>
                   </td>
-                  <td className={`${tdCls} text-muted-foreground`}>{row.strength}</td>
+                  <td className={`${tdCls} text-gray-500`}>{row.strength}</td>
                   <td className={tdCls}>
                     {row.dia_dir === "전부재" ? (
                       <select className={selectCls} value="전부재"
@@ -258,7 +258,7 @@ export default function MaterialSection({ storyRows }: { storyRows: StoryRow[] }
                   </td>
                   <td className={tdCls}>
                     <button type="button" onClick={() => setData((p) => ({ ...p, rebar: p.rebar.filter((_, j) => j !== i) }))}
-                      className="text-muted-foreground hover:text-destructive transition-colors p-0.5">
+                      className="text-gray-500 hover:text-red-500 transition-colors p-0.5">
                       <Trash2 size={13} />
                     </button>
                   </td>
@@ -272,17 +272,17 @@ export default function MaterialSection({ storyRows }: { storyRows: StoryRow[] }
       {/* ── 강재 ── */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-medium text-muted-foreground">강재</span>
+          <span className="text-xs font-medium text-gray-500">강재</span>
           <Button type="button" variant="ghost" size="xs"
             onClick={() => setData((p) => ({ ...p, steel: [...p.steel, { grade: "SS275", strength: 275, member: "" }] }))}>
             <Plus size={12} /> 추가
           </Button>
         </div>
         {data.steel.length > 0 ? (
-          <div className="overflow-x-auto rounded-lg border border-border">
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-border bg-muted/50">
+                <tr className="border-b border-gray-200 bg-gray-50">
                   <th className={thCls}>규격</th>
                   <th className={thCls}>강도</th>
                   <th className={thCls}>적용 부재</th>
@@ -291,7 +291,7 @@ export default function MaterialSection({ storyRows }: { storyRows: StoryRow[] }
               </thead>
               <tbody>
                 {data.steel.map((row, i) => (
-                  <tr key={i} className="border-b border-border/50">
+                  <tr key={i} className="border-b border-gray-200/50">
                     <td className={tdCls}>
                       <select className={selectCls} value={row.grade}
                         onChange={(e) => {
@@ -303,7 +303,7 @@ export default function MaterialSection({ storyRows }: { storyRows: StoryRow[] }
                         {STEEL_GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
                       </select>
                     </td>
-                    <td className={`${tdCls} text-muted-foreground`}>{row.strength}</td>
+                    <td className={`${tdCls} text-gray-500`}>{row.strength}</td>
                     <td className={tdCls}>
                       <input className={inputCls} value={row.member} placeholder="기둥, 보 등"
                         onChange={(e) => {
@@ -314,7 +314,7 @@ export default function MaterialSection({ storyRows }: { storyRows: StoryRow[] }
                     </td>
                     <td className={tdCls}>
                       <button type="button" onClick={() => setData((p) => ({ ...p, steel: p.steel.filter((_, j) => j !== i) }))}
-                        className="text-muted-foreground hover:text-destructive transition-colors p-0.5">
+                        className="text-gray-500 hover:text-red-500 transition-colors p-0.5">
                         <Trash2 size={13} />
                       </button>
                     </td>
@@ -324,7 +324,7 @@ export default function MaterialSection({ storyRows }: { storyRows: StoryRow[] }
             </table>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground px-2">강재 없음 — 위 버튼으로 추가</p>
+          <p className="text-xs text-gray-500 px-2">강재 없음 — 위 버튼으로 추가</p>
         )}
       </div>
 
