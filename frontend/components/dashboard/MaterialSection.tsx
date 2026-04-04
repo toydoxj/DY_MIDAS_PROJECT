@@ -53,7 +53,18 @@ export default function MaterialSection() {
       "철근": { category: "철근", name: "", strength: "400", usage: "" },
       "강재": { category: "강재", name: "", strength: "235", usage: "" },
     };
-    setRows((prev) => [...prev, defaults[category]]);
+    setRows((prev) => {
+      // 해당 카테고리의 마지막 행 뒤에 삽입
+      let lastIdx = -1;
+      for (let i = 0; i < prev.length; i++) {
+        if (prev[i].category === category) lastIdx = i;
+      }
+      const newRow = defaults[category];
+      if (lastIdx === -1) return [...prev, newRow];
+      const next = [...prev];
+      next.splice(lastIdx + 1, 0, newRow);
+      return next;
+    });
   };
 
   const removeRow = (idx: number) => {
