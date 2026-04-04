@@ -140,8 +140,8 @@ function MaxTableIntegrated({
                   <td className={`${tdCls} text-blue-400 font-medium`}>{pos}</td>
                   {/* My(-) + 상부근 (n-Dxx) */}
                   <td className={`${tdCls} font-mono`}>
-                    <span className="text-gray-300">{String(force[`My_neg_${pos}`])}</span>
-                    <span className="text-gray-600 text-[9px] ml-1">{force[`My_neg_${pos}_LC`] as string}</span>
+                    <div className="text-gray-300">{String(force[`My_neg_${pos}`])}</div>
+                    <div className="text-gray-500 text-[10px] truncate max-w-[80px]" title={force[`My_neg_${pos}_LC`] as string}>{force[`My_neg_${pos}_LC`] as string}</div>
                   </td>
                   <td className={tdCls}>
                     {rb && si !== undefined && (
@@ -163,8 +163,8 @@ function MaxTableIntegrated({
                   {hasResults && (cr ? dcrCell(cr.neg_flexure_dcr, cr.neg_flexure_ok) : <td className={tdCls}></td>)}
                   {/* My(+) + 하부근 (n-Dxx) */}
                   <td className={`${tdCls} font-mono`}>
-                    <span className="text-gray-300">{String(force[`My_pos_${pos}`])}</span>
-                    <span className="text-gray-600 text-[9px] ml-1">{force[`My_pos_${pos}_LC`] as string}</span>
+                    <div className="text-gray-300">{String(force[`My_pos_${pos}`])}</div>
+                    <div className="text-gray-500 text-[10px] truncate max-w-[80px]" title={force[`My_pos_${pos}_LC`] as string}>{force[`My_pos_${pos}_LC`] as string}</div>
                   </td>
                   <td className={tdCls}>
                     {rb && si !== undefined && (
@@ -179,8 +179,8 @@ function MaxTableIntegrated({
                   {hasResults && (cr ? dcrCell(cr.pos_flexure_dcr, cr.pos_flexure_ok) : <td className={tdCls}></td>)}
                   {/* Fz + 스터럽 (Dxx@nnn) */}
                   <td className={`${tdCls} font-mono`}>
-                    <span className="text-gray-300">{String(force[`Fz_${pos}`])}</span>
-                    <span className="text-gray-600 text-[9px] ml-1">{force[`Fz_${pos}_LC`] as string}</span>
+                    <div className="text-gray-300">{String(force[`Fz_${pos}`])}</div>
+                    <div className="text-gray-500 text-[10px] truncate max-w-[80px]" title={force[`Fz_${pos}_LC`] as string}>{force[`Fz_${pos}_LC`] as string}</div>
                   </td>
                   <td className={tdCls}>
                     {rb && si !== undefined && (
