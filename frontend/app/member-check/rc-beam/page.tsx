@@ -645,27 +645,38 @@ export default function RcBeamCheckPage() {
     setCheckResults([]);
   }, [maxResult]);
 
-  // 검토 실행
-  const runDesignCheck = async () => {
+  // 배근/재료 변경 시 자동 검토 (300ms 디바운스)
+  useEffect(() => {
     if (!maxResult || rebarSections.length === 0) return;
+    const timer = setTimeout(() => { runDesignCheck(); }, 300);
+    return () => clearTimeout(timer);
+  }, [rebarSections, fck, fy, fyt, maxResult, runDesignCheck]);
+
+  // 검토 실행 (배근/재료 변경 시 자동, 300ms 디바운스)
+  const checkAbortRef = useRef<AbortController | null>(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const runDesignCheck = useCallback(async () => {
+    if (!maxResult || rebarSections.length === 0) return;
+    if (checkAbortRef.current) checkAbortRef.current.abort();
+    const controller = new AbortController();
+    checkAbortRef.current = controller;
     setCheckLoading(true);
     try {
-      const body = {
-        fck, fy, fyt,
-        sections: rebarSections,
-        forces: maxResult,
-      };
+      const body = { fck, fy, fyt, sections: rebarSections, forces: maxResult };
       const res = await fetch(`${BACKEND_URL}/api/member/beam-design-check`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
+      if (controller.signal.aborted) return;
       if (!res.ok) throw new Error(`서버 오류: ${res.status}`);
       setCheckResults(await res.json());
     } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setError(String(e));
     } finally {
-      setCheckLoading(false);
+      if (!controller.signal.aborted) setCheckLoading(false);
     }
   };
 
@@ -866,14 +877,12 @@ export default function RcBeamCheckPage() {
               title={`단면별 설계 검토 (${maxResult.length}개 단면)`}
               action={
                 <div className="flex items-center gap-3">
-                  {checkResults.length > 0 && (
+                  {checkLoading && <Loader2 size={14} className="animate-spin text-gray-400" />}
+                  {checkResults.length > 0 && !checkLoading && (
                     <span className={`text-xs font-medium px-2 py-0.5 rounded ${checkResults.every((r) => r.all_ok) ? "bg-green-900/40 text-green-400" : "bg-red-900/40 text-red-400"}`}>
                       {checkResults.every((r) => r.all_ok) ? "전체 적합" : "부적합 있음"}
                     </span>
                   )}
-                  <Button size="xs" onClick={runDesignCheck} loading={checkLoading}>
-                    {checkLoading ? "검토 중..." : "설계 검토"}
-                  </Button>
                 </div>
               }
             >
