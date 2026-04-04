@@ -82,6 +82,18 @@ interface StoryItem {
 }
 
 /** 단면명의 층 표기가 STOR 층에 포함되는지 판정 */
+/** 층 이름 정규화: B5→-5, 1F→1, Roof→R 등 */
+function normalizeFloor(s: string): string {
+  const bm = s.match(/^B(\d+)F?$/i);
+  if (bm) return `-${bm[1]}`;
+  const fm = s.match(/^(\d+)F$/i);
+  if (fm) return fm[1];
+  if (s.toUpperCase() === "ROOF" || s.toUpperCase() === "RF") return "R";
+  if (s.toUpperCase() === "PHR") return "PHR";
+  if (s.toUpperCase() === "PH") return "PH";
+  return s;
+}
+
 function sectionMatchesStory(sectName: string, storyName: string): boolean {
   const parsed = parseBeamName(sectName);
   if (!parsed) return false;
@@ -90,36 +102,25 @@ function sectionMatchesStory(sectName: string, storyName: string): boolean {
   // 층 표기 없음 → 공통 (모든 층에 매칭)
   if (!floor) return true;
 
-  // STOR 이름 정규화: B5→-5, 1F→1, Roof→R 등
-  const normalize = (s: string): string => {
-    const bm = s.match(/^B(\d+)F?$/i);
-    if (bm) return `-${bm[1]}`;
-    const fm = s.match(/^(\d+)F$/i);
-    if (fm) return fm[1];
-    if (s.toUpperCase() === "ROOF" || s.toUpperCase() === "RF") return "R";
-    if (s.toUpperCase() === "PHR") return "PHR";
-    if (s.toUpperCase() === "PH") return "PH";
-    return s;
-  };
-
-  const normalized = normalize(storyName);
+  const normalizedStory = normalizeFloor(storyName);
+  const normalizedFloor = normalizeFloor(floor);
 
   // 단일 층 매칭
-  if (floor === normalized) return true;
+  if (normalizedFloor === normalizedStory) return true;
 
-  // 범위 매칭: 2~4 → 2,3,4
+  // 범위 매칭: 2~4 → 2,3,4 (범위 내 각 토큰 정규화)
   const rangeMatch = floor.match(/^(-?\d+)~(-?\d+)$/);
   if (rangeMatch) {
     const lo = parseInt(rangeMatch[1]);
     const hi = parseInt(rangeMatch[2]);
-    const nVal = parseInt(normalized);
+    const nVal = parseInt(normalizedStory);
     if (!isNaN(nVal) && nVal >= lo && nVal <= hi) return true;
   }
 
   // 불연속 매칭: 2,8
   if (floor.includes(",")) {
-    const parts = floor.split(",").map((p) => p.trim());
-    if (parts.includes(normalized)) return true;
+    const parts = floor.split(",").map((p) => normalizeFloor(p.trim()));
+    if (parts.includes(normalizedStory)) return true;
   }
 
   return false;
@@ -390,6 +391,15 @@ export default function RcBeamCheckPage() {
     () => filterSectionsByStories(sections, selectedStories),
     [sections, selectedStories],
   );
+
+  // 층 필터 변경 시 보이지 않는 선택 제거
+  useEffect(() => {
+    const visibleIds = new Set(filteredSections.map((s) => s.id));
+    setSelectedIds((prev) => {
+      const next = new Set([...prev].filter((id) => visibleIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [filteredSections]);
 
   const totalElements = useMemo(
     () => selectedSections.reduce((sum, s) => sum + s.element_count, 0),
