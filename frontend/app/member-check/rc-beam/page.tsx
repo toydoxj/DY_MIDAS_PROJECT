@@ -305,9 +305,14 @@ function MaxTableIntegrated({
                             onChange={(e) => {
                               const d = Number(e.target.value);
                               const newFy = getFyForDia(d);
-                              updateSectionRebar(si, { top_dia: d, bot_dia: d });
-                              const next = [...rebarSections];
-                              next[si] = { ...next[si], fy: newFy };
+                              const next = rebarSections.map((s, i) => {
+                                if (i !== si) return s;
+                                return {
+                                  ...s,
+                                  fy: newFy,
+                                  rebars: s.rebars.map((r) => ({ ...r, top_dia: d, bot_dia: d })),
+                                };
+                              });
                               onRebarChange(next);
                             }}>
                             {REBAR_OPTIONS.map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
