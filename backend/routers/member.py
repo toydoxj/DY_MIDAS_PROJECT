@@ -11,6 +11,8 @@ from models.member import (
     BeamForceMaxRequest,
     BeamForceMaxRow,
     BeamForceMemberRow,
+    BeamDesignCheckRequest,
+    PositionCheckResult,
 )
 from typing import Union
 
@@ -157,3 +159,64 @@ def get_section_elements(sect_id: int) -> SectionDetailResponse:
         type=info["type"],
         element_keys=keys,
     )
+
+
+@router.post("/member/beam-design-check")
+def beam_design_check(req: BeamDesignCheckRequest) -> list[PositionCheckResult]:
+    """KDS 41 30 00 기준 RC보 설계 검토"""
+    from engines.kds_rc_beam import check_position
+
+    # forces를 section_name으로 인덱싱
+    force_map: dict[str, BeamForceMaxRow] = {}
+    for f in req.forces:
+        force_map[f.SectName] = f
+
+    results: list[PositionCheckResult] = []
+    for sec in req.sections:
+        force = force_map.get(sec.section_name)
+        for rb in sec.rebars:
+            pos = rb.position  # "I", "C", "J"
+
+            # 해당 위치의 부재력 매핑
+            Mu_neg = 0.0
+            Mu_pos = 0.0
+            Vu = 0.0
+            if force:
+                Mu_neg = getattr(force, f"My_neg_{pos}", 0.0)
+                Mu_pos = getattr(force, f"My_pos_{pos}", 0.0)
+                Vu = getattr(force, f"Fz_{pos}", 0.0)
+
+            pc = check_position(
+                section_name=sec.section_name,
+                position=pos,
+                B=sec.B, H=sec.H, cover=rb.cover,
+                fck=req.fck, fy=req.fy, fyt=req.fyt,
+                top_dia=rb.top_dia, top_count=rb.top_count,
+                bot_dia=rb.bot_dia, bot_count=rb.bot_count,
+                stirrup_dia=rb.stirrup_dia, stirrup_spacing=rb.stirrup_spacing,
+                Mu_neg_kNm=Mu_neg, Mu_pos_kNm=Mu_pos, Vu_kN=Vu,
+            )
+
+            results.append(PositionCheckResult(
+                section_name=pc.section_name,
+                position=pc.position,
+                Mu_d=pc.flexure.Mu_d,
+                phi_Mn=pc.flexure.phi_Mn,
+                flexure_dcr=pc.flexure.dcr,
+                flexure_ok=pc.flexure.ok,
+                Vu_d=pc.shear.Vu_d,
+                phi_Vn=pc.shear.phi_Vn,
+                shear_dcr=pc.shear.dcr,
+                shear_ok=pc.shear.ok,
+                rho=pc.rebar_ratio.rho,
+                rho_min=pc.rebar_ratio.rho_min,
+                rho_max=pc.rebar_ratio.rho_max,
+                rho_min_ok=pc.rebar_ratio.min_ok,
+                rho_max_ok=pc.rebar_ratio.max_ok,
+                stirrup_spacing=pc.stirrup.spacing,
+                stirrup_max_spacing=pc.stirrup.max_spacing,
+                stirrup_ok=pc.stirrup.ok,
+                all_ok=pc.all_ok,
+            ))
+
+    return results

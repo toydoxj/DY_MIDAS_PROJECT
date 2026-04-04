@@ -7,7 +7,13 @@ import { BACKEND_URL } from "@/lib/types";
 import { flattenResponse } from "@/lib/utils";
 import PageHeader from "@/components/ui/PageHeader";
 import SectionCard from "@/components/ui/SectionCard";
+import Button from "@/components/ui/Button";
 import { ErrorText } from "@/components/ui/StatusMessage";
+import MaterialInput from "./_components/MaterialInput";
+import RebarInputTable, { initSectionRebars } from "./_components/RebarInputTable";
+import DesignResult from "./_components/DesignResult";
+import { DEFAULT_FCK, DEFAULT_FY, DEFAULT_FYT } from "./_lib/constants";
+import type { SectionRebarInput, PositionCheckResult } from "./_lib/types";
 
 interface SectionInfo {
   id: number;
@@ -158,6 +164,14 @@ export default function RcBeamCheckPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("max");
   const [error, setError] = useState("");
   const [lastFetchedAt, setLastFetchedAt] = useState<string | null>(null);
+
+  // 설계 검토 상태
+  const [fck, setFck] = useState(DEFAULT_FCK);
+  const [fy, setFy] = useState(DEFAULT_FY);
+  const [fyt, setFyt] = useState(DEFAULT_FYT);
+  const [rebarSections, setRebarSections] = useState<SectionRebarInput[]>([]);
+  const [checkResults, setCheckResults] = useState<PositionCheckResult[]>([]);
+  const [checkLoading, setCheckLoading] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -349,6 +363,39 @@ export default function RcBeamCheckPage() {
 
   const selectionKey = [...selectedIds].sort().join(",");
 
+  // maxResult 변경 시 배근 입력 폼 초기화
+  useEffect(() => {
+    if (!maxResult || maxResult.length === 0) { setRebarSections([]); return; }
+    setRebarSections(
+      maxResult.map((r) => initSectionRebars(r.SectName, r.B ?? 400, r.H ?? 700))
+    );
+    setCheckResults([]);
+  }, [maxResult]);
+
+  // 검토 실행
+  const runDesignCheck = async () => {
+    if (!maxResult || rebarSections.length === 0) return;
+    setCheckLoading(true);
+    try {
+      const body = {
+        fck, fy, fyt,
+        sections: rebarSections,
+        forces: maxResult,
+      };
+      const res = await fetch(`${BACKEND_URL}/api/member/beam-design-check`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`서버 오류: ${res.status}`);
+      setCheckResults(await res.json());
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setCheckLoading(false);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <PageHeader title="RC보 검토" subtitle="Beam Design Forces" backHref="/member-check" />
@@ -495,6 +542,26 @@ export default function RcBeamCheckPage() {
               조회된 설계결과가 없습니다.
             </div>
           )}
+        </>
+      )}
+
+      {/* ═══ 설계 검토 섹션 ═══ */}
+      {maxResult && maxResult.length > 0 && (
+        <>
+          <MaterialInput
+            fck={fck} fy={fy} fyt={fyt}
+            onChange={(v) => { if (v.fck !== undefined) setFck(v.fck); if (v.fy !== undefined) setFy(v.fy); if (v.fyt !== undefined) setFyt(v.fyt); }}
+          />
+
+          <RebarInputTable sections={rebarSections} onChange={setRebarSections} />
+
+          <div className="flex justify-end">
+            <Button onClick={runDesignCheck} loading={checkLoading}>
+              {checkLoading ? "검토 중..." : "설계 검토 실행"}
+            </Button>
+          </div>
+
+          <DesignResult results={checkResults} />
         </>
       )}
     </div>

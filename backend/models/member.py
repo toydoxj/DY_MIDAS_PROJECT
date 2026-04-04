@@ -50,6 +50,61 @@ class BeamForceMaxRow(BaseModel):
     Fz_J: float = 0
 
 
+# ── RC보 설계 검토 요청/응답 모델 ──
+
+class RebarInput(BaseModel):
+    position: str  # "I", "C", "J"
+    top_dia: int = 25
+    top_count: int = 3
+    bot_dia: int = 25
+    bot_count: int = 3
+    stirrup_dia: int = 10
+    stirrup_spacing: float = 200  # mm
+    cover: float = 40.0  # mm
+
+
+class SectionRebarInput(BaseModel):
+    section_name: str
+    B: float  # mm
+    H: float  # mm
+    rebars: list[RebarInput]  # I, C, J
+
+
+class BeamDesignCheckRequest(BaseModel):
+    fck: float = 27.0
+    fy: float = 400.0
+    fyt: float = 400.0
+    sections: list[SectionRebarInput]
+    forces: list[BeamForceMaxRow]
+
+
+class PositionCheckResult(BaseModel):
+    section_name: str
+    position: str
+    # 휨
+    Mu_d: float = 0
+    phi_Mn: float = 0
+    flexure_dcr: float = 0
+    flexure_ok: bool = True
+    # 전단
+    Vu_d: float = 0
+    phi_Vn: float = 0
+    shear_dcr: float = 0
+    shear_ok: bool = True
+    # 철근비
+    rho: float = 0
+    rho_min: float = 0
+    rho_max: float = 0
+    rho_min_ok: bool = True
+    rho_max_ok: bool = True
+    # 스터럽
+    stirrup_spacing: float = 0
+    stirrup_max_spacing: float = 0
+    stirrup_ok: bool = True
+    # 종합
+    all_ok: bool = True
+
+
 class BeamForceMemberRow(BaseModel):
     Memb: int
     My_neg_I_LC: str = ""
