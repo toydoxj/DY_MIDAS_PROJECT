@@ -24,7 +24,7 @@ export default function DashboardPage() {
         <ProjectSection onAddressChange={setAddress} storyRows={storyRows} />
         <div className="space-y-6">
           <SettingsSection />
-          <MaterialSection />
+          <MaterialSection storyRows={storyRows} />
         </div>
       </div>
 
