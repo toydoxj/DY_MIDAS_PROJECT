@@ -185,8 +185,12 @@ function MaxTableIntegrated({
                   <td className={tdCls}>
                     {rb && si !== undefined && (
                       <div className="flex items-center gap-0.5 justify-center whitespace-nowrap">
-                        <input className={inputCls} type="number" min={1} max={6} value={rb.stirrup_legs ?? 2}
-                          onChange={(e) => updatePositionCount(si, pi, { stirrup_legs: Number(e.target.value) || 2 })} />
+                        {pi === 0 ? (
+                          <input className={inputCls} type="number" min={1} max={6} value={rb.stirrup_legs ?? 2}
+                            onChange={(e) => updateSectionRebar(si, { stirrup_legs: Number(e.target.value) || 2 })} />
+                        ) : (
+                          <span className="text-gray-300 text-[11px] w-10 text-center">{rb0?.stirrup_legs ?? 2}</span>
+                        )}
                         <span className="text-gray-500">-</span>
                         {pi === 0 ? (
                           <select className={selectCls} value={rb.stirrup_dia}
