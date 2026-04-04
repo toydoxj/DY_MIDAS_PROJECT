@@ -160,7 +160,7 @@ function MaxTableIntegrated({
                       </div>
                     )}
                   </td>
-                  {hasResults && (cr ? dcrCell(cr.flexure_dcr, cr.flexure_ok) : <td className={tdCls}></td>)}
+                  {hasResults && (cr ? dcrCell(cr.neg_flexure_dcr, cr.neg_flexure_ok) : <td className={tdCls}></td>)}
                   {/* My(+) + 하부근 (n-Dxx) */}
                   <td className={`${tdCls} font-mono`}>
                     <span className="text-gray-300">{String(force[`My_pos_${pos}`])}</span>
@@ -176,7 +176,7 @@ function MaxTableIntegrated({
                       </div>
                     )}
                   </td>
-                  {hasResults && (cr ? dcrCell(cr.flexure_dcr, cr.flexure_ok) : <td className={tdCls}></td>)}
+                  {hasResults && (cr ? dcrCell(cr.pos_flexure_dcr, cr.pos_flexure_ok) : <td className={tdCls}></td>)}
                   {/* Fz + 스터럽 (Dxx@nnn) */}
                   <td className={`${tdCls} font-mono`}>
                     <span className="text-gray-300">{String(force[`Fz_${pos}`])}</span>
@@ -185,7 +185,7 @@ function MaxTableIntegrated({
                   <td className={tdCls}>
                     {rb && si !== undefined && (
                       <div className="flex items-center gap-0.5 justify-center whitespace-nowrap">
-                        <input className={inputCls} type="number" min={1} max={6} value={rb.stirrup_legs}
+                        <input className={inputCls} type="number" min={1} max={6} value={rb.stirrup_legs ?? 2}
                           onChange={(e) => updatePositionCount(si, pi, { stirrup_legs: Number(e.target.value) || 2 })} />
                         <span className="text-gray-500">-</span>
                         {pi === 0 ? (

@@ -82,11 +82,16 @@ class BeamDesignCheckRequest(BaseModel):
 class PositionCheckResult(BaseModel):
     section_name: str
     position: str
-    # 휨
-    Mu_d: float = 0
-    phi_Mn: float = 0
-    flexure_dcr: float = 0
-    flexure_ok: bool = True
+    # 휨 (상부 = 음의 모멘트)
+    neg_Mu_d: float = 0
+    neg_phi_Mn: float = 0
+    neg_flexure_dcr: float = 0
+    neg_flexure_ok: bool = True
+    # 휨 (하부 = 양의 모멘트)
+    pos_Mu_d: float = 0
+    pos_phi_Mn: float = 0
+    pos_flexure_dcr: float = 0
+    pos_flexure_ok: bool = True
     # 전단
     Vu_d: float = 0
     phi_Vn: float = 0

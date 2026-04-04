@@ -43,10 +43,14 @@ export interface BeamForceMaxRowForCheck {
 export interface PositionCheckResult {
   section_name: string;
   position: string;
-  Mu_d: number;
-  phi_Mn: number;
-  flexure_dcr: number;
-  flexure_ok: boolean;
+  neg_Mu_d: number;
+  neg_phi_Mn: number;
+  neg_flexure_dcr: number;
+  neg_flexure_ok: boolean;
+  pos_Mu_d: number;
+  pos_phi_Mn: number;
+  pos_flexure_dcr: number;
+  pos_flexure_ok: boolean;
   Vu_d: number;
   phi_Vn: number;
   shear_dcr: number;

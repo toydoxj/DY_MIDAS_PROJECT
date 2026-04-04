@@ -202,7 +202,8 @@ def check_stirrup_spacing(
 class PositionCheck:
     section_name: str
     position: str  # "I", "C", "J"
-    flexure: FlexureResult
+    flex_neg: FlexureResult   # 상부근 (음의 모멘트)
+    flex_pos: FlexureResult   # 하부근 (양의 모멘트)
     shear: ShearResult
     rebar_ratio: RebarRatioResult
     stirrup: StirrupSpacingResult
@@ -239,10 +240,9 @@ def check_position(
     d_neg = effective_depth(H, cover, stirrup_dia, top_dia) if top_count > 0 else H * 0.9
     d_pos = effective_depth(H, cover, stirrup_dia, bot_dia) if bot_count > 0 else H * 0.9
 
-    # 휨 검토 (음/양 모멘트 중 critical한 값)
+    # 휨 검토 (상부/하부 별도)
     flex_neg = calc_flexural_strength(B, d_neg, As_top, fck, fy, Mu_neg_kNm)
     flex_pos = calc_flexural_strength(B, d_pos, As_bot, fck, fy, Mu_pos_kNm)
-    flexure = flex_neg if flex_neg.dcr >= flex_pos.dcr else flex_pos
 
     # 전단 검토 (d는 큰 값 사용)
     d_shear = max(d_neg, d_pos)
@@ -257,12 +257,13 @@ def check_position(
     # 스터럽 간격
     stirrup_check = check_stirrup_spacing(d_shear, fck, B, shear.Vs, stirrup_spacing)
 
-    all_ok = flexure.ok and shear.ok and ratio.min_ok and ratio.max_ok and stirrup_check.ok
+    all_ok = flex_neg.ok and flex_pos.ok and shear.ok and ratio.min_ok and ratio.max_ok and stirrup_check.ok
 
     return PositionCheck(
         section_name=section_name,
         position=position,
-        flexure=flexure,
+        flex_neg=flex_neg,
+        flex_pos=flex_pos,
         shear=shear,
         rebar_ratio=ratio,
         stirrup=stirrup_check,

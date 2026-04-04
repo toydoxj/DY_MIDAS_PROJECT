@@ -54,9 +54,12 @@ export default function DesignResult({ results }: Props) {
             <tr className="border-b border-gray-700">
               <th className={th}>단면</th>
               <th className={th}>위치</th>
-              <th className={th}>Mu (kN·m)</th>
-              <th className={th}>φMn (kN·m)</th>
-              <th className={th}>휨 DCR</th>
+              <th className={th}>Mu(-)</th>
+              <th className={th}>φMn(-)</th>
+              <th className={th}>상부DCR</th>
+              <th className={th}>Mu(+)</th>
+              <th className={th}>φMn(+)</th>
+              <th className={th}>하부DCR</th>
               <th className={th}>Vu (kN)</th>
               <th className={th}>φVn (kN)</th>
               <th className={th}>전단 DCR</th>
@@ -77,9 +80,12 @@ export default function DesignResult({ results }: Props) {
                     <td className="px-2 py-1 text-center text-white font-medium" rowSpan={rows.length}>{name}</td>
                   )}
                   <td className="px-2 py-1 text-center text-blue-400 font-medium">{r.position}</td>
-                  <td className={td}>{r.Mu_d.toFixed(1)}</td>
-                  <td className={td}>{r.phi_Mn.toFixed(1)}</td>
-                  <DcrCell dcr={r.flexure_dcr} ok={r.flexure_ok} />
+                  <td className={td}>{r.neg_Mu_d.toFixed(1)}</td>
+                  <td className={td}>{r.neg_phi_Mn.toFixed(1)}</td>
+                  <DcrCell dcr={r.neg_flexure_dcr} ok={r.neg_flexure_ok} />
+                  <td className={td}>{r.pos_Mu_d.toFixed(1)}</td>
+                  <td className={td}>{r.pos_phi_Mn.toFixed(1)}</td>
+                  <DcrCell dcr={r.pos_flexure_dcr} ok={r.pos_flexure_ok} />
                   <td className={td}>{r.Vu_d.toFixed(1)}</td>
                   <td className={td}>{r.phi_Vn.toFixed(1)}</td>
                   <DcrCell dcr={r.shear_dcr} ok={r.shear_ok} />
