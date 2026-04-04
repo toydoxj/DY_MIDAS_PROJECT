@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 import { LayoutDashboard, Search, Weight, ClipboardCheck } from "lucide-react";
 import ConnectionStatus from "./ConnectionStatus";
 
@@ -20,8 +21,8 @@ export default function Sidebar() {
       style={{ background: "linear-gradient(180deg, #1a1a2e 0%, #16213e 100%)" }}>
       {/* 로고 */}
       <div className="p-5 border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white font-bold text-sm">D</div>
+        <div className="flex items-center gap-3">
+          <Image src="/dongyang_logo.svg" alt="동양구조" width={30} height={30} />
           <div>
             <h1 className="text-base font-bold text-white tracking-tight">MIDAS GEN NX</h1>
             <p className="text-[10px] text-gray-400 -mt-0.5">API Dashboard</p>
@@ -53,7 +54,10 @@ export default function Sidebar() {
       {/* 하단 */}
       <div className="p-3 border-t border-white/10 space-y-2">
         <ConnectionStatus />
-        <p className="text-[10px] text-gray-500 px-3">(주)동양구조</p>
+        <div className="flex items-center gap-1.5 px-3">
+          <Image src="/dongyang_logo.svg" alt="" width={12} height={12} className="opacity-40" />
+          <p className="text-[10px] text-gray-500">(주)동양구조</p>
+        </div>
       </div>
     </aside>
   );

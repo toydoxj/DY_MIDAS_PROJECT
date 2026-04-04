@@ -60,10 +60,10 @@ export default function SettingsSection() {
       )}
       <div className="flex items-center gap-3 pt-1">
         {saved && <SavedBadge />}
-        <Button type="button" variant="secondary" size="xs" onClick={handleTest} disabled={testState === "loading"} loading={testState === "loading"}>
+        <Button type="button" variant="outline" size="xs" onClick={handleTest} disabled={testState === "loading"} loading={testState === "loading"}>
           연결 테스트
         </Button>
-        <Button type="submit" size="xs" loading={saving} className="ml-auto">
+        <Button type="submit" size="xs" loading={saving} className="ml-auto bg-emerald-600 hover:bg-emerald-500 text-white">
           {saving ? "저장 중..." : "저장"}
         </Button>
       </div>
