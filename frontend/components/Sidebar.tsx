@@ -29,17 +29,16 @@ export default function Sidebar() {
   return (
     <>
       <aside
-        className={`fixed left-0 top-0 h-full flex flex-col transition-all duration-200 z-30 ${collapsed ? "w-16" : "w-64"}`}
-        style={{ background: "linear-gradient(180deg, #2d4a0f 0%, #1a2e08 100%)" }}
+        className={`fixed left-0 top-0 h-full flex flex-col transition-all duration-200 z-30 bg-gray-800 border-r border-gray-700 ${collapsed ? "w-16" : "w-64"}`}
       >
         {/* 로고 */}
-        <div className="p-4 border-b border-white/10 flex items-center justify-between">
+        <div className="p-4 border-b border-gray-700 flex items-center justify-between">
           <div className={`flex items-center gap-3 ${collapsed ? "justify-center w-full" : ""}`}>
             <Image src="/dongyang_logo.svg" alt="동양구조" width={28} height={28} className="flex-shrink-0" />
             {!collapsed && (
               <div>
                 <h1 className="text-sm font-bold text-white tracking-tight">MIDAS GEN NX</h1>
-                <p className="text-[9px] text-[#669900]/70 -mt-0.5">API Dashboard</p>
+                <p className="text-[9px] text-gray-500 -mt-0.5">API Dashboard</p>
               </div>
             )}
           </div>
@@ -70,11 +69,16 @@ export default function Sidebar() {
         </nav>
 
         {/* 하단 */}
-        <div className="p-2 border-t border-white/10 space-y-2">
+        <div className="p-3 border-t border-gray-700 space-y-3">
           {!collapsed && <ConnectionStatus />}
-          <div className={`flex items-center gap-1.5 px-3 ${collapsed ? "justify-center px-0" : ""}`}>
-            <Image src="/dongyang_logo.svg" alt="" width={12} height={12} className="opacity-30 flex-shrink-0" />
-            {!collapsed && <p className="text-[10px] text-gray-600">(주)동양구조</p>}
+          <div className={`flex items-center gap-3 px-2 ${collapsed ? "justify-center px-0" : ""}`}>
+            <Image src="/dongyang_logo.svg" alt="동양구조" width={collapsed ? 24 : 36} height={collapsed ? 24 : 36} className="opacity-60 flex-shrink-0" />
+            {!collapsed && (
+              <div>
+                <p className="text-sm font-semibold text-gray-300">(주)동양구조</p>
+                <p className="text-[10px] text-gray-500">Dongyang Consulting Engineers</p>
+              </div>
+            )}
           </div>
         </div>
 
