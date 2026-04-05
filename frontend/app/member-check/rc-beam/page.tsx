@@ -55,6 +55,35 @@ type ViewMode = "max" | "member" | "raw";
 
 const POSITIONS = ["I", "C", "J"] as const;
 
+/**
+ * 부재력 기반 배근 형식 자동 판정
+ * - My_neg_I 또는 My_neg_J가 0이면 BOTH
+ * - I/J 편차가 50% 이상이면 BOTH (작은 쪽이 불연속단)
+ * - 그 외 3단
+ */
+function autoDetectRebarType(force: BeamForceMaxRow): { rebarType: RebarType; swapIJ: boolean } {
+  const negI = Math.abs(force.My_neg_I ?? 0);
+  const negJ = Math.abs(force.My_neg_J ?? 0);
+
+  // 둘 다 0이면 기본 3단
+  if (negI === 0 && negJ === 0) return { rebarType: "type3", swapIJ: false };
+
+  // 어느 한쪽이 0이면 BOTH
+  if (negI === 0 || negJ === 0) {
+    // 0인 쪽이 불연속단(J) → I가 0이면 swap 필요
+    return { rebarType: "type2", swapIJ: negI < negJ };
+  }
+
+  // 편차 50% 이상이면 BOTH (작은 쪽이 불연속단 J)
+  const maxVal = Math.max(negI, negJ);
+  const minVal = Math.min(negI, negJ);
+  if ((maxVal - minVal) / maxVal >= 0.5) {
+    return { rebarType: "type2", swapIJ: negI < negJ };
+  }
+
+  return { rebarType: "type3", swapIJ: false };
+}
+
 /** RC 보 구분자만 (강구조 SG, SB, SRG, SRB 제외) */
 const RC_BEAM_SEPARATORS = ["TG", "TB", "WG", "FG", "LB", "G", "B"] as const;
 const RC_BEAM_SEP_REGEX = new RegExp(`^(.*?)(${RC_BEAM_SEPARATORS.join("|")})(\\d+.*)?$`);
@@ -189,16 +218,58 @@ const thCls = "px-3 py-2 text-center text-xs font-semibold uppercase tracking-wi
 const tdCls = "px-3 py-2 text-gray-300 whitespace-nowrap text-sm text-center";
 const tdMergedCls = "px-3 py-2 text-gray-200 whitespace-nowrap text-sm font-medium text-center align-middle";
 
+/** MIDAS에서 Element 활성화 (Active) */
+async function activateElementsInMidas(elementKeys: number[]) {
+  await fetch(`${BACKEND_URL}/api/midas/view/ACTIVE`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      Argument: {
+        ACTIVE_MODE: elementKeys.length === 0 ? "All" : "Active",
+        N_LIST: [] as number[],
+        E_LIST: elementKeys,
+      },
+    }),
+  });
+}
+
 /** 통합 테이블 — 부재력 + 배근 입력 + DCR */
 function MaxTableIntegrated({
-  data, rebarSections, onRebarChange, checkResults, getFyForDia,
+  data, rebarSections, onRebarChange, checkResults, getFyForDia, sectionElementMap,
 }: {
   data: BeamForceMaxRow[];
   rebarSections: SectionRebarInput[];
   onRebarChange: (sections: SectionRebarInput[]) => void;
   checkResults: PositionCheckResult[];
   getFyForDia: (dia: number) => number;
+  sectionElementMap: Map<string, number[]>;
 }) {
+  const [checkedSections, setCheckedSections] = useState<Set<string>>(new Set());
+
+  const applyHighlight = useCallback(async (selectedNames: Set<string>) => {
+    const allKeys: number[] = [];
+    for (const name of selectedNames) {
+      const ek = sectionElementMap.get(name);
+      if (ek) allKeys.push(...ek);
+    }
+    await activateElementsInMidas(allKeys);
+  }, [sectionElementMap]);
+
+  const toggleCheck = useCallback(async (sectName: string) => {
+    const next = new Set(checkedSections);
+    if (next.has(sectName)) next.delete(sectName); else next.add(sectName);
+    setCheckedSections(next);
+    await applyHighlight(next);
+  }, [checkedSections, applyHighlight]);
+
+  const toggleCheckAll = useCallback(async () => {
+    const allNames = data.map((r) => r.SectName);
+    const allChecked = allNames.every((n) => checkedSections.has(n));
+    const next = allChecked ? new Set<string>() : new Set(allNames);
+    setCheckedSections(next);
+    await applyHighlight(next);
+  }, [data, checkedSections, applyHighlight]);
+
   const rebarMap = new Map(rebarSections.map((s, i) => [s.section_name, i]));
   const resultMap = new Map<string, PositionCheckResult>();
   for (const r of checkResults) resultMap.set(`${r.section_name}-${r.position}`, r);
@@ -237,6 +308,13 @@ function MaxTableIntegrated({
       <table className="min-w-full text-xs">
         <thead className="bg-gray-700">
           <tr>
+            <th className={thCls}>
+              <input type="checkbox"
+                checked={data.length > 0 && data.every((r) => checkedSections.has(r.SectName))}
+                onChange={toggleCheckAll}
+                className="w-3.5 h-3.5 rounded bg-gray-600 border-gray-500 cursor-pointer accent-blue-500"
+              />
+            </th>
             <th className={thCls}>단면</th>
             <th className={thCls}>B×H</th>
             <th className={thCls}>Type</th>
@@ -297,6 +375,13 @@ function MaxTableIntegrated({
                 <tr key={`${gi}-${label}`} className={`${gi % 2 === 0 ? "bg-gray-800/80" : "bg-gray-900/60"} ${pi === 0 && gi > 0 ? "border-t-2 border-gray-500" : ""}`}>
                   {pi === 0 && (
                     <>
+                      <td className={`${tdMergedCls} align-middle`} rowSpan={rowCount}>
+                        <input type="checkbox"
+                          checked={checkedSections.has(r.SectName)}
+                          onChange={() => toggleCheck(r.SectName)}
+                          className="w-3.5 h-3.5 rounded bg-gray-600 border-gray-500 cursor-pointer accent-blue-500"
+                        />
+                      </td>
                       <td className={tdMergedCls} rowSpan={rowCount}>{r.SectName}</td>
                       <td className={`${tdMergedCls} font-mono text-xs`} rowSpan={rowCount}>{r.B ?? "-"}×{r.H ?? "-"}</td>
                       <td className={tdMergedCls} rowSpan={rowCount}>
@@ -434,12 +519,12 @@ function MemberTable({ data }: { data: MemberForceMaxRow[] }) {
                   <td className={tdMergedCls} rowSpan={3}>{r.Memb}</td>
                 )}
                 <td className={tdCls}>{pos}</td>
-                <td className={`${tdCls} text-gray-500`}>{(r as Record<string, unknown>)[`My_neg_${pos}_LC`] as string}</td>
-                <td className={tdCls}>{String((r as Record<string, unknown>)[`My_neg_${pos}`])}</td>
-                <td className={`${tdCls} text-gray-500`}>{(r as Record<string, unknown>)[`My_pos_${pos}_LC`] as string}</td>
-                <td className={tdCls}>{String((r as Record<string, unknown>)[`My_pos_${pos}`])}</td>
-                <td className={`${tdCls} text-gray-500`}>{(r as Record<string, unknown>)[`Fz_${pos}_LC`] as string}</td>
-                <td className={tdCls}>{String((r as Record<string, unknown>)[`Fz_${pos}`])}</td>
+                <td className={`${tdCls} text-gray-500`}>{(r as unknown as Record<string, unknown>)[`My_neg_${pos}_LC`] as string}</td>
+                <td className={tdCls}>{String((r as unknown as Record<string, unknown>)[`My_neg_${pos}`])}</td>
+                <td className={`${tdCls} text-gray-500`}>{(r as unknown as Record<string, unknown>)[`My_pos_${pos}_LC`] as string}</td>
+                <td className={tdCls}>{String((r as unknown as Record<string, unknown>)[`My_pos_${pos}`])}</td>
+                <td className={`${tdCls} text-gray-500`}>{(r as unknown as Record<string, unknown>)[`Fz_${pos}_LC`] as string}</td>
+                <td className={tdCls}>{String((r as unknown as Record<string, unknown>)[`Fz_${pos}`])}</td>
               </tr>
             ))
           )}
@@ -498,6 +583,15 @@ export default function RcBeamCheckPage() {
 
   const abortRef = useRef<AbortController | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // SectName → element_keys 매핑 (MIDAS Active용)
+  const sectionElementMap = useMemo(() => {
+    const map = new Map<string, number[]>();
+    for (const s of sections) {
+      map.set(s.name, s.element_keys);
+    }
+    return map;
+  }, [sections]);
 
   // 선택된 Section들의 element_keys 합산
   const selectedKeys = useMemo(() => {
@@ -626,27 +720,25 @@ export default function RcBeamCheckPage() {
         body: JSON.stringify(body),
       });
 
-      const [maxRes, memberRes] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/member/beam-force-max`, fetchOpts({
-          section_names: sectionNames, group_by: "section", force_refresh: forceRefresh,
-        })),
-        fetch(`${BACKEND_URL}/api/member/beam-force-max`, fetchOpts({
-          section_names: sectionNames, group_by: "member", force_refresh: forceRefresh,
-        })),
-      ]);
-
+      // section → member 순차 호출 (첫 호출이 캐시를 채우므로 동시 호출 시 502 방지)
+      const maxRes = await fetch(`${BACKEND_URL}/api/member/beam-force-max`, fetchOpts({
+        section_names: sectionNames, group_by: "section", force_refresh: forceRefresh,
+      }));
       if (controller.signal.aborted) return;
-
       if (!maxRes.ok) {
         const errData = await maxRes.json().catch(() => ({}));
         throw new Error(errData?.detail ?? errData?.error?.message ?? `최대값 조회 HTTP ${maxRes.status}`);
       }
+      const maxData: BeamForceMaxRow[] = await maxRes.json();
+
+      const memberRes = await fetch(`${BACKEND_URL}/api/member/beam-force-max`, fetchOpts({
+        section_names: sectionNames, group_by: "member", force_refresh: false,
+      }));
+      if (controller.signal.aborted) return;
       if (!memberRes.ok) {
         const errData = await memberRes.json().catch(() => ({}));
         throw new Error(errData?.detail ?? errData?.error?.message ?? `부재별 조회 HTTP ${memberRes.status}`);
       }
-
-      const maxData: BeamForceMaxRow[] = await maxRes.json();
       const memberData: MemberForceMaxRow[] = await memberRes.json();
 
       if (controller.signal.aborted) return;
@@ -760,7 +852,10 @@ export default function RcBeamCheckPage() {
         const fromDraft = draftMap?.get(r.SectName);
         const existing = fromServer ?? fromDraft;
         if (existing) return { ...existing, B: r.B ?? existing.B, H: r.H ?? existing.H };
-        return initSectionRebars(r.SectName, r.B ?? 400, r.H ?? 700, defaultFck, getFyForDia(25), defaultFyt);
+        // 부재력 기반 자동 판정
+        const { rebarType } = autoDetectRebarType(r);
+        const init = initSectionRebars(r.SectName, r.B ?? 400, r.H ?? 700, defaultFck, getFyForDia(25), defaultFyt);
+        return { ...init, rebarType };
       })
     );
     setCheckResults([]);
@@ -793,7 +888,32 @@ export default function RcBeamCheckPage() {
     checkAbortRef.current = controller;
     setCheckLoading(true);
     try {
-      const body = { sections: rebarSections, forces: maxResult };
+      // rebarType에 따라 검토용 rebars 변환
+      const adjustedSections = rebarSections.map((sec) => {
+        const rType = sec.rebarType;
+        if (rType === "type3") return sec; // 3단: 그대로
+        if (rType === "type2") {
+          // BOTH: J단(index 2)을 I단(index 0) 철근으로 복사
+          const iRebar = sec.rebars[0];
+          return {
+            ...sec,
+            rebars: sec.rebars.map((r) =>
+              r.position === "J"
+                ? { ...r, top_dia: iRebar.top_dia, top_count: iRebar.top_count, bot_dia: iRebar.bot_dia, bot_count: iRebar.bot_count, stirrup_dia: iRebar.stirrup_dia, stirrup_legs: iRebar.stirrup_legs, stirrup_spacing: iRebar.stirrup_spacing, cover: iRebar.cover }
+                : r
+            ),
+          };
+        }
+        // type1 (ALL): I/C/J 모두 I단 철근으로 통일
+        const iRebar = sec.rebars[0];
+        return {
+          ...sec,
+          rebars: sec.rebars.map((r) => ({
+            ...r, top_dia: iRebar.top_dia, top_count: iRebar.top_count, bot_dia: iRebar.bot_dia, bot_count: iRebar.bot_count, stirrup_dia: iRebar.stirrup_dia, stirrup_legs: iRebar.stirrup_legs, stirrup_spacing: iRebar.stirrup_spacing, cover: iRebar.cover,
+          })),
+        };
+      });
+      const body = { sections: adjustedSections, forces: maxResult };
       const res = await fetch(`${BACKEND_URL}/api/member/beam-design-check`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1035,6 +1155,7 @@ export default function RcBeamCheckPage() {
                 onRebarChange={setRebarSections}
                 checkResults={checkResults}
                 getFyForDia={getFyForDia}
+                sectionElementMap={sectionElementMap}
               />
             </SectionCard>
           )}

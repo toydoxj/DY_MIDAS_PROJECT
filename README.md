@@ -67,17 +67,17 @@ df = MIDAS.to_dataframe(response, id_col="KEY")
 ### Electron 앱 실행
 
 ```bash
-cd electron && npm start
+cd electron ;; npm start
 ```
 
 ### 개발 모드 (백엔드 + 프론트엔드)
 
 ```bash
 # 백엔드 (포트 8000)
-cd backend && ../.venv/Scripts/uvicorn main:app --reload --port 8000
+cd backend ;; ../.venv/Scripts/uvicorn main:app --reload --port 8000
 
 # 프론트엔드 (포트 3000)
-cd frontend && npm run dev
+cd frontend ;; npm run dev
 ```
 
 ## 주요 기능

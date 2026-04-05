@@ -1,4 +1,5 @@
 const { app, BrowserWindow, dialog } = require("electron");
+const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const { spawn } = require("child_process");
 const net = require("net");
@@ -106,6 +107,10 @@ async function createWindow() {
     return;
   }
 
+  // 이전 빌드 캐시 제거 후 로드
+  const { session } = require("electron");
+  await session.defaultSession.clearCache();
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -124,12 +129,49 @@ async function createWindow() {
   });
 }
 
+// 자동 업데이트
+function setupAutoUpdater() {
+  autoUpdater.autoDownload = false;
+  autoUpdater.logger = console;
+
+  autoUpdater.on("update-available", (info) => {
+    dialog
+      .showMessageBox(mainWindow, {
+        type: "info",
+        title: "업데이트 알림",
+        message: `새 버전 ${info.version}이 있습니다. 다운로드하시겠습니까?`,
+        buttons: ["다운로드", "나중에"],
+      })
+      .then(({ response }) => {
+        if (response === 0) autoUpdater.downloadUpdate();
+      });
+  });
+
+  autoUpdater.on("update-downloaded", () => {
+    dialog
+      .showMessageBox(mainWindow, {
+        type: "info",
+        title: "업데이트 준비 완료",
+        message: "업데이트가 다운로드되었습니다. 재시작하여 설치하시겠습니까?",
+        buttons: ["재시작", "나중에"],
+      })
+      .then(({ response }) => {
+        if (response === 0) autoUpdater.quitAndInstall();
+      });
+  });
+
+  autoUpdater.checkForUpdates().catch(() => {});
+}
+
 // 앱 생명주기
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+  await createWindow();
+  if (app.isPackaged) setupAutoUpdater();
+});
 
 app.on("window-all-closed", () => {
   stopBackend();
-  app.quit();
+  if (process.platform !== "darwin") app.quit();
 });
 
 app.on("before-quit", () => {
