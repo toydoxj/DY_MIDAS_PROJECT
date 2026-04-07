@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { BACKEND_URL } from "@/lib/types";
+import { AUTH_URL } from "@/lib/types";
 import { authFetch, getUser } from "@/lib/auth";
 import { UserPlus, Trash2, Shield, User } from "lucide-react";
 
@@ -32,7 +32,7 @@ export default function AdminPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await authFetch(`${BACKEND_URL}/api/auth/users`);
+      const res = await authFetch(`${AUTH_URL}/api/auth/users`);
       if (res.status === 403) { setError("관리자 권한이 필요합니다"); return; }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setUsers(await res.json());
@@ -50,7 +50,7 @@ export default function AdminPage() {
     setSaving(true);
     setError("");
     try {
-      const res = await authFetch(`${BACKEND_URL}/api/auth/users`, {
+      const res = await authFetch(`${AUTH_URL}/api/auth/users`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: newUsername, password: newPassword, name: newName }),
@@ -71,7 +71,7 @@ export default function AdminPage() {
   const handleDelete = async (id: number, username: string) => {
     if (!confirm(`"${username}" 사용자를 삭제하시겠습니까?`)) return;
     try {
-      const res = await authFetch(`${BACKEND_URL}/api/auth/users/${id}`, { method: "DELETE" });
+      const res = await authFetch(`${AUTH_URL}/api/auth/users/${id}`, { method: "DELETE" });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.detail || `삭제 실패`);
