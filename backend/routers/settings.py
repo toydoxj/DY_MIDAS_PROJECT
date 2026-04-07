@@ -1,19 +1,15 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 import MIDAS_API as MIDAS
 
 from models.settings import SettingsResponse, SettingsUpdateRequest, ConnectionTestResponse
-from auth_middleware import get_current_user
-from models.auth import User
-from db import get_db
 import work_dir
 
 router = APIRouter()
 
 
 @router.get("/settings")
-def get_settings(user: User = Depends(get_current_user)) -> SettingsResponse:
+def get_settings() -> SettingsResponse:
     try:
         base_url: str = MIDAS.MIDAS_API_BASEURL.get_url()
     except AttributeError:
@@ -27,18 +23,11 @@ def get_settings(user: User = Depends(get_current_user)) -> SettingsResponse:
 
 
 @router.post("/settings")
-def update_settings(
-    body: SettingsUpdateRequest,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> dict[str, str]:
+def update_settings(body: SettingsUpdateRequest) -> dict[str, str]:
     if body.base_url:
         MIDAS.MIDAS_API_BASEURL(body.base_url)
-        user.midas_url = body.base_url
     if body.api_key:
         MIDAS.MIDAS_API_KEY(body.api_key)
-        user.midas_key = body.api_key
-    db.commit()
     return {"status": "updated"}
 
 

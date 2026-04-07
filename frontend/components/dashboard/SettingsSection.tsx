@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BACKEND_URL, TestResult } from "@/lib/types";
+import { authFetch } from "@/lib/auth";
 import SectionCard from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -28,10 +29,10 @@ export default function SettingsSection() {
   const [workDirError, setWorkDirError] = useState("");
 
   useEffect(() => {
-    fetch(`${BACKEND_URL}/api/settings`).then((r) => r.json()).then((d) => {
+    authFetch(`${BACKEND_URL}/api/settings`).then((r) => r.json()).then((d) => {
       setBaseUrl(d.base_url ?? ""); setMaskedKey(d.api_key_masked ?? "");
     }).catch(() => {});
-    fetch(`${BACKEND_URL}/api/work-dir`).then((r) => r.json()).then((d) => {
+    authFetch(`${BACKEND_URL}/api/work-dir`).then((r) => r.json()).then((d) => {
       setWorkDir(d.path ?? ""); setWorkDirInput(d.path ?? "");
       setWorkDirError(d.error ?? "");
     }).catch(() => {});
@@ -43,17 +44,17 @@ export default function SettingsSection() {
       const body: Record<string, string> = {};
       if (baseUrl) body.base_url = baseUrl;
       if (apiKey) body.api_key = apiKey;
-      const saveRes = await fetch(`${BACKEND_URL}/api/settings`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const saveRes = await authFetch(`${BACKEND_URL}/api/settings`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (!saveRes.ok) throw new Error(`저장 실패: ${saveRes.status}`);
       setSaved(true); setApiKey("");
-      const res = await fetch(`${BACKEND_URL}/api/settings`);
+      const res = await authFetch(`${BACKEND_URL}/api/settings`);
       if (res.ok) { const d = await res.json(); setMaskedKey(d.api_key_masked ?? ""); }
     } finally { setSaving(false); }
   };
 
   const handleTest = async () => {
     setTestState("loading"); setTestResult(null);
-    try { const res = await fetch(`${BACKEND_URL}/api/test-connection`, { cache: "no-store" }); setTestResult(await res.json()); }
+    try { const res = await authFetch(`${BACKEND_URL}/api/test-connection`, { cache: "no-store" }); setTestResult(await res.json()); }
     catch (err) { setTestResult({ connected: false, message: String(err) }); }
     finally { setTestState("idle"); }
   };
@@ -67,7 +68,7 @@ export default function SettingsSection() {
       const folder = await window.electronAPI!.browseFolder(workDir);
       if (folder) {
         setWorkDirInput(folder);
-        const res = await fetch(`${BACKEND_URL}/api/work-dir`, {
+        const res = await authFetch(`${BACKEND_URL}/api/work-dir`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ path: folder }),
         });
@@ -83,7 +84,7 @@ export default function SettingsSection() {
   const handleWorkDirSave = async () => {
     if (!workDirInput || workDirInput === workDir) return;
     try {
-      const res = await fetch(`${BACKEND_URL}/api/work-dir`, {
+      const res = await authFetch(`${BACKEND_URL}/api/work-dir`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: workDirInput }),
       });
