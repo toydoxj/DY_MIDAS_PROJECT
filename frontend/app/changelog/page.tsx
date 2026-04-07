@@ -2,16 +2,6 @@
 
 import { useState, useEffect } from "react";
 
-declare global {
-  interface Window {
-    electronAPI?: {
-      isElectron: boolean;
-      browseFolder: (currentPath: string) => Promise<string | null>;
-      getVersion: () => Promise<string>;
-    };
-  }
-}
-
 interface ChangelogEntry {
   version: string;
   date: string;

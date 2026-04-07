@@ -9,12 +9,6 @@ import Input from "@/components/ui/Input";
 import FormField from "@/components/ui/FormField";
 import { SavedBadge, AlertBanner } from "@/components/ui/StatusMessage";
 
-declare global {
-  interface Window {
-    electronAPI?: { isElectron: boolean; browseFolder: (currentPath: string) => Promise<string | null> };
-  }
-}
-
 export default function SettingsSection() {
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");

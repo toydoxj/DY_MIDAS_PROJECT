@@ -77,3 +77,13 @@ export interface EigenvalueRow {
 
 export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 export const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL ?? "http://3.24.217.252:8000";
+
+declare global {
+  interface Window {
+    electronAPI?: {
+      isElectron: boolean;
+      browseFolder: (currentPath: string) => Promise<string | null>;
+      getVersion: () => Promise<string>;
+    };
+  }
+}
