@@ -34,28 +34,82 @@ const STRUCT_TYPE_OPTIONS = [
   "철골 편심가새골조 및 좌굴방지가새골조",
 ] as const;
 
-const SFRS_OPTIONS = [
-  { id: "1-a", label: "철근콘크리트 특수전단벽 (R=5)" },
-  { id: "1-b", label: "철근콘크리트 보통전단벽 (R=4)" },
-  { id: "2-a", label: "철골 편심가새골조-모멘트저항접합 (R=8)" },
-  { id: "2-c", label: "철골 특수중심가새골조 (R=6)" },
-  { id: "2-d", label: "철골 보통중심가새골조 (R=3.25)" },
-  { id: "2-l", label: "철골 좌굴방지가새골조-모멘트저항접합 (R=8)" },
-  { id: "2-n", label: "철근콘크리트 특수전단벽-건물골조 (R=6)" },
-  { id: "2-o", label: "철근콘크리트 보통전단벽-건물골조 (R=5)" },
-  { id: "3-a", label: "철골 특수모멘트골조 (R=8)" },
-  { id: "3-b", label: "철골 중간모멘트골조 (R=4.5)" },
-  { id: "3-c", label: "철골 보통모멘트골조 (R=3.5)" },
-  { id: "3-h", label: "철근콘크리트 특수모멘트골조 (R=8)" },
-  { id: "3-i", label: "철근콘크리트 중간모멘트골조 (R=5)" },
-  { id: "3-j", label: "철근콘크리트 보통모멘트골조 (R=3)" },
-  { id: "4-a", label: "이중: 철골 편심가새-특수모멘트 (R=8)" },
-  { id: "4-j", label: "이중: RC 특수전단벽-특수모멘트 (R=7)" },
-  { id: "4-k", label: "이중: RC 보통전단벽-특수모멘트 (R=6)" },
-  { id: "5-b", label: "이중: RC 특수전단벽-중간모멘트 (R=6.5)" },
-  { id: "5-c", label: "이중: RC 보통전단벽-중간모멘트 (R=5.5)" },
-  { id: "8", label: "강구조기준 일반규정 철골구조 (R=3)" },
-  { id: "9", label: "RC구조기준 일반규정 RC구조 (R=3)" },
+const SFRS_GROUPS = [
+  { cat: "1. 내력벽시스템", items: [
+    { id: "1-a", label: "1-a. 철근콘크리트 특수전단벽 (R=5, Ω₀=2.5, Cd=5)" },
+    { id: "1-b", label: "1-b. 철근콘크리트 보통전단벽 (R=4, Ω₀=2.5, Cd=4)" },
+    { id: "1-c", label: "1-c. 철근보강 조적 전단벽 (R=2.5, Ω₀=2.5, Cd=1.5)" },
+    { id: "1-d", label: "1-d. 무보강 조적 전단벽 (R=1.5, Ω₀=2.5, Cd=1.5)" },
+    { id: "1-e", label: "1-e. 경골목구조 전단벽 (R=6, Ω₀=3, Cd=4)" },
+    { id: "1-f", label: "1-f. 경량철골조 전단벽 (R=6, Ω₀=3, Cd=4)" },
+  ]},
+  { cat: "2. 건물골조시스템", items: [
+    { id: "2-a", label: "2-a. 철골 편심가새골조 - 모멘트 저항 접합 (R=8, Ω₀=2, Cd=4)" },
+    { id: "2-b", label: "2-b. 철골 편심가새골조 - 비모멘트 저항접합 (R=7, Ω₀=2, Cd=4)" },
+    { id: "2-c", label: "2-c. 철골 특수중심가새골조 (R=6, Ω₀=2, Cd=5)" },
+    { id: "2-d", label: "2-d. 철골 보통중심가새골조 (R=3.25, Ω₀=2, Cd=3.25)" },
+    { id: "2-e", label: "2-e. 합성 편심가새골조 (R=8, Ω₀=2, Cd=4)" },
+    { id: "2-f", label: "2-f. 합성 특수중심가새골조 (R=5, Ω₀=2, Cd=4.5)" },
+    { id: "2-g", label: "2-g. 합성 보통중심가새골조 (R=3, Ω₀=2, Cd=3)" },
+    { id: "2-h", label: "2-h. 합성 강판전단벽 (R=6.5, Ω₀=2.5, Cd=5.5)" },
+    { id: "2-i", label: "2-i. 합성 특수전단벽 (R=6, Ω₀=2.5, Cd=5)" },
+    { id: "2-j", label: "2-j. 합성 보통전단벽 (R=5, Ω₀=2.5, Cd=4.5)" },
+    { id: "2-k", label: "2-k. 철골 특수강판전단벽 (R=7, Ω₀=2, Cd=6)" },
+    { id: "2-l", label: "2-l. 철골 좌굴방지가새골조 - 모멘트 저항 접합 (R=8, Ω₀=2.5, Cd=5)" },
+    { id: "2-m", label: "2-m. 철골 좌굴방지가새골조 - 비모멘트 저항 접합 (R=7, Ω₀=2, Cd=5.5)" },
+    { id: "2-n", label: "2-n. 철근콘크리트 특수전단벽 (R=6, Ω₀=2.5, Cd=5)" },
+    { id: "2-o", label: "2-o. 철근콘크리트 보통전단벽 (R=5, Ω₀=2.5, Cd=4.5)" },
+    { id: "2-p", label: "2-p. 철근보강 조적 전단벽 (R=3, Ω₀=2.5, Cd=2)" },
+    { id: "2-q", label: "2-q. 무보강 조적 전단벽 (R=1.5, Ω₀=2.5, Cd=1.5)" },
+    { id: "2-r", label: "2-r. 경골목구조 전단벽 (R=6.5, Ω₀=2.5, Cd=4.5)" },
+    { id: "2-s", label: "2-s. 경량철골조 전단벽 (R=6.5, Ω₀=2.5, Cd=4.5)" },
+  ]},
+  { cat: "3. 모멘트-저항골조 시스템", items: [
+    { id: "3-a", label: "3-a. 철골 특수모멘트골조 (R=8, Ω₀=3, Cd=5.5)" },
+    { id: "3-b", label: "3-b. 철골 중간모멘트골조 (R=4.5, Ω₀=3, Cd=4)" },
+    { id: "3-c", label: "3-c. 철골 보통모멘트골조 (R=3.5, Ω₀=3, Cd=3)" },
+    { id: "3-d", label: "3-d. 합성 특수모멘트골조 (R=8, Ω₀=3, Cd=5.5)" },
+    { id: "3-e", label: "3-e. 합성 중간모멘트골조 (R=5, Ω₀=3, Cd=4.5)" },
+    { id: "3-f", label: "3-f. 합성 보통모멘트골조 (R=3, Ω₀=3, Cd=2.5)" },
+    { id: "3-g", label: "3-g. 합성 반강접모멘트골조 (R=6, Ω₀=3, Cd=5.5)" },
+    { id: "3-h", label: "3-h. 철근콘크리트 특수모멘트골조 (R=8, Ω₀=3, Cd=5.5)" },
+    { id: "3-i", label: "3-i. 철근콘크리트 중간모멘트골조 (R=5, Ω₀=3, Cd=4.5)" },
+    { id: "3-j", label: "3-j. 철근콘크리트 보통모멘트골조 (R=3, Ω₀=3, Cd=2.5)" },
+  ]},
+  { cat: "4. 이중골조 (특수모멘트골조)", items: [
+    { id: "4-a", label: "4-a. 철골 편심가새골조 (R=8, Ω₀=2.5, Cd=4)" },
+    { id: "4-b", label: "4-b. 철골 특수중심가새골조 (R=7, Ω₀=2.5, Cd=5.5)" },
+    { id: "4-c", label: "4-c. 합성 편심가새골조 (R=8, Ω₀=2.5, Cd=4)" },
+    { id: "4-d", label: "4-d. 합성 특수중심가새골조 (R=6, Ω₀=2.5, Cd=5)" },
+    { id: "4-e", label: "4-e. 합성 강판전단벽 (R=7.5, Ω₀=2.5, Cd=6)" },
+    { id: "4-f", label: "4-f. 합성 특수전단벽 (R=7, Ω₀=2.5, Cd=6)" },
+    { id: "4-g", label: "4-g. 합성 보통전단벽 (R=6, Ω₀=2.5, Cd=5)" },
+    { id: "4-h", label: "4-h. 철골 좌굴방지가새골조 (R=8, Ω₀=2.5, Cd=5)" },
+    { id: "4-i", label: "4-i. 철골 특수강판전단벽 (R=8, Ω₀=2.5, Cd=6.5)" },
+    { id: "4-j", label: "4-j. 철근콘크리트 특수전단벽 (R=7, Ω₀=2.5, Cd=5.5)" },
+    { id: "4-k", label: "4-k. 철근콘크리트 보통전단벽 (R=6, Ω₀=2.5, Cd=5)" },
+  ]},
+  { cat: "5. 이중골조 (중간모멘트골조)", items: [
+    { id: "5-a", label: "5-a. 철골 특수중심가새골조 (R=6, Ω₀=2.5, Cd=5)" },
+    { id: "5-b", label: "5-b. 철근콘크리트 특수전단벽 (R=6.5, Ω₀=2.5, Cd=5)" },
+    { id: "5-c", label: "5-c. 철근콘크리트 보통전단벽 (R=5.5, Ω₀=2.5, Cd=4.5)" },
+    { id: "5-d", label: "5-d. 합성 특수중심가새골조 (R=5.5, Ω₀=2.5, Cd=4.5)" },
+    { id: "5-e", label: "5-e. 합성 보통중심가새골조 (R=3.5, Ω₀=2.5, Cd=3)" },
+    { id: "5-f", label: "5-f. 합성 보통전단벽 (R=5, Ω₀=3, Cd=4.5)" },
+    { id: "5-g", label: "5-g. 철근보강 조적 전단벽 (R=3, Ω₀=3, Cd=2.5)" },
+  ]},
+  { cat: "6. 역추형 시스템", items: [
+    { id: "6-a", label: "6-a. 캔틸레버 기둥 시스템 (R=2.5, Ω₀=2, Cd=2.5)" },
+    { id: "6-b", label: "6-b. 철골 특수모멘트골조 (R=2.5, Ω₀=2, Cd=2.5)" },
+    { id: "6-c", label: "6-c. 철골 보통모멘트골조 (R=1.25, Ω₀=2, Cd=2.5)" },
+    { id: "6-d", label: "6-d. 철근콘크리트 특수모멘트골조 (R=2.5, Ω₀=2, Cd=1.25)" },
+  ]},
+  { cat: "7~10. 기타 시스템", items: [
+    { id: "7", label: "7. RC 보통 전단벽-골조 상호작용 시스템 (R=4.5, Ω₀=2.5, Cd=4)" },
+    { id: "8", label: "8. 강구조기준 일반규정만을 만족하는 철골구조시스템 (R=3, Ω₀=3, Cd=3)" },
+    { id: "9", label: "9. RC구조기준 일반규정만을 만족하는 RC구조 시스템 (R=3, Ω₀=3, Cd=3)" },
+    { id: "10", label: "10. 지하외벽으로 둘러싸인 지하구조시스템 (R=3, Ω₀=3, Cd=2.5)" },
+  ]},
 ] as const;
 
 interface CommentData {
@@ -216,15 +270,23 @@ export default function ProjectSection({ onAddressChange, storyRows }: { onAddre
           </FormField>
           <FormField label="지진력저항시스템 (X)">
             <Select value={cd.sfrsX} onChange={(e) => updateCd({ sfrsX: e.target.value })}>
-              {SFRS_OPTIONS.map((s) => (
-                <option key={s.id} value={s.id}>{s.label}</option>
+              {SFRS_GROUPS.map((g) => (
+                <optgroup key={g.cat} label={g.cat}>
+                  {g.items.map((s) => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
+                  ))}
+                </optgroup>
               ))}
             </Select>
           </FormField>
           <FormField label="지진력저항시스템 (Y)">
             <Select value={cd.sfrsY} onChange={(e) => updateCd({ sfrsY: e.target.value })}>
-              {SFRS_OPTIONS.map((s) => (
-                <option key={s.id} value={s.id}>{s.label}</option>
+              {SFRS_GROUPS.map((g) => (
+                <optgroup key={g.cat} label={g.cat}>
+                  {g.items.map((s) => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
+                  ))}
+                </optgroup>
               ))}
             </Select>
           </FormField>

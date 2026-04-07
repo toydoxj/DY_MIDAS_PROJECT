@@ -19,21 +19,28 @@ from models.floorload import (
 
 router = APIRouter()
 
-_DATA_DIR: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-_FILE: str = os.path.join(_DATA_DIR, "floor_loads.json")
-_CSV_FILE: str = os.path.join(_DATA_DIR, "kds_live_loads.csv")
+import work_dir
+
+_BUNDLE_DATA_DIR: str = work_dir.BUNDLE_DATA_DIR
+_CSV_FILE: str = os.path.join(_BUNDLE_DATA_DIR, "kds_live_loads.csv")
+
+
+def _get_file() -> str:
+    return work_dir.get_save_path("floor_loads.json")
 
 
 def _read() -> list[dict]:
-    if not os.path.isfile(_FILE):
+    path = _get_file()
+    if not os.path.isfile(path):
         return []
-    with open(_FILE, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 def _write(data: list[dict]) -> None:
-    os.makedirs(_DATA_DIR, exist_ok=True)
-    with open(_FILE, "w", encoding="utf-8") as f:
+    path = _get_file()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
@@ -250,7 +257,7 @@ def export_excel() -> StreamingResponse:
     if not entries:
         raise MidasValidationError("내보낼 데이터가 없습니다")
 
-    template_path: str = os.path.join(_DATA_DIR, "floor_load_template.xlsx")
+    template_path: str = os.path.join(_BUNDLE_DATA_DIR, "floor_load_template.xlsx")
     if not os.path.isfile(template_path):
         raise MidasError("Excel 템플릿 파일을 찾을 수 없습니다")
 

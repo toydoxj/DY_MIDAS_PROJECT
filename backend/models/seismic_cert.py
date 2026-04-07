@@ -29,6 +29,10 @@ class SeismicCertAutoData(BaseModel):
     ie: float = 0.0
     r_x: float = 0.0
     r_y: float = 0.0
+    omega_x: float = 0.0
+    omega_y: float = 0.0
+    cd_x: float = 0.0
+    cd_y: float = 0.0
     sds: float = 0.0
     sd1: float = 0.0
 

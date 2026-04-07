@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const { spawn } = require("child_process");
@@ -162,6 +162,17 @@ function setupAutoUpdater() {
 
   autoUpdater.checkForUpdates().catch(() => {});
 }
+
+// 폴더 선택 IPC 핸들러
+ipcMain.handle("browse-folder", async (_event, currentPath) => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "작업 폴더 선택",
+    defaultPath: currentPath || undefined,
+    properties: ["openDirectory", "createDirectory"],
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  return result.filePaths[0];
+});
 
 // 앱 생명주기
 app.whenReady().then(async () => {

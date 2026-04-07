@@ -4,8 +4,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutDashboard, Search, Weight, ClipboardCheck, FileText, ChevronLeft, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Search, Weight, ClipboardCheck, FileText, Users, ChevronLeft, ChevronRight, LogOut, User } from "lucide-react";
 import ConnectionStatus from "./ConnectionStatus";
+import { getUser, clearAuth } from "@/lib/auth";
 
 const navItems = [
   { href: "/", label: "대시보드", icon: LayoutDashboard },
@@ -13,7 +14,8 @@ const navItems = [
   { href: "/member-check", label: "부재검토", icon: ClipboardCheck },
   { href: "/documents", label: "문서 작성", icon: FileText },
   { href: "/explorer", label: "탐색기", icon: Search },
-];
+  { href: "/admin", label: "사용자 관리", icon: Users, adminOnly: true },
+] as const;
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -44,7 +46,7 @@ export default function Sidebar() {
 
         {/* 네비게이션 */}
         <nav className="flex-1 p-2 space-y-1">
-          {navItems.map(({ href, label, icon: Icon }) => {
+          {navItems.filter((item) => !("adminOnly" in item && item.adminOnly) || getUser()?.role === "admin").map(({ href, label, icon: Icon }) => {
             const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
             return (
               <Link
@@ -69,6 +71,25 @@ export default function Sidebar() {
         {/* 하단 */}
         <div className="p-3 border-t border-gray-700 space-y-3">
           {!collapsed && <ConnectionStatus />}
+          {/* 사용자 정보 + 로그아웃 */}
+          {(() => { const user = getUser(); return user ? (
+            <div className={`flex items-center gap-2 px-2 ${collapsed ? "justify-center px-0" : ""}`}>
+              <User size={16} className="text-gray-500 flex-shrink-0" />
+              {!collapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-300 truncate">{user.name || user.username}</p>
+                  <p className="text-[10px] text-gray-500">{user.role === "admin" ? "관리자" : "사용자"}</p>
+                </div>
+              )}
+              <button
+                onClick={() => { clearAuth(); window.location.href = "/login"; }}
+                title="로그아웃"
+                className="text-gray-500 hover:text-red-400 transition p-1"
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
+          ) : null; })()}
           <div className={`flex items-center gap-3 px-2 ${collapsed ? "justify-center px-0" : ""}`}>
             <Image src="/dongyang_logo.svg" alt="동양구조" width={collapsed ? 24 : 36} height={collapsed ? 24 : 36} className="opacity-60 flex-shrink-0" />
             {!collapsed && (

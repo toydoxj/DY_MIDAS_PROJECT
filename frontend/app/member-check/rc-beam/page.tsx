@@ -1173,8 +1173,9 @@ export default function RcBeamCheckPage() {
           )}
 
           {!hasData && (
-            <div className="rounded-xl bg-gray-800 border border-gray-700 p-8 text-center text-gray-500 text-sm">
-              조회된 설계결과가 없습니다.
+            <div className="rounded-xl bg-gray-800 border border-gray-700 p-8 text-center text-gray-500 text-sm leading-relaxed">
+              조회된 설계결과가 없습니다.<br />
+              MIDAS에서 부재설계를 진행 후 새로고침 해주세요.
             </div>
           )}
         </>

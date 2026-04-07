@@ -231,17 +231,17 @@ def beam_design_check(req: BeamDesignCheckRequest) -> list[PositionCheckResult]:
 
 # ===== 배근 데이터 저장/로드 (JSON 파일) =====
 
-_REBARS_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
-_REBARS_FILE = os.path.join(_REBARS_DIR, "rc_beam_rebars.json")
+import work_dir
 
 
 @router.get("/member/rebars")
 def get_rebars() -> dict:
     """저장된 배근 데이터를 로드한다."""
-    if not os.path.isfile(_REBARS_FILE):
+    path = work_dir.get_save_path("rc_beam_rebars.json")
+    if not os.path.isfile(path):
         return {"version": 1, "savedAt": None, "sections": []}
     try:
-        with open(_REBARS_FILE, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return {"version": 1, "savedAt": None, "sections": []}
@@ -250,7 +250,8 @@ def get_rebars() -> dict:
 @router.put("/member/rebars")
 def save_rebars(body: SaveRebarsRequest) -> dict:
     """배근 데이터를 JSON 파일에 저장한다."""
-    os.makedirs(_REBARS_DIR, exist_ok=True)
-    with open(_REBARS_FILE, "w", encoding="utf-8") as f:
+    path = work_dir.get_save_path("rc_beam_rebars.json")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(body.model_dump(), f, ensure_ascii=False, indent=2)
     return {"status": "ok"}

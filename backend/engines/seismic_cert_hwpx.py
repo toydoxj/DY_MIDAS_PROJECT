@@ -43,12 +43,8 @@ for prefix, uri in _EXTRA_NS.items():
 
 def _get_template_path(form_type: str) -> str:
     """양식 파일 경로 반환"""
-    if getattr(sys, "frozen", False):
-        base = sys._MEIPASS
-    else:
-        base = os.path.dirname(os.path.dirname(__file__))
-
-    data_dir = os.path.join(base, "data") if not getattr(sys, "frozen", False) else os.path.join(base, "data")
+    from work_dir import BUNDLE_DATA_DIR
+    data_dir = BUNDLE_DATA_DIR
 
     if form_type == "6층이상":
         fname = "[별지 제1호서식] 구조안전 및 내진설계 확인서(6층 이상의 건축물)(건축물의 구조기준 등에 관한 규칙).hwpx"
@@ -233,10 +229,10 @@ def _build_cell_map_6floor(auto: SeismicCertAutoData, manual: SeismicCertManualD
         (22, 8): manual.sfrs_y_detail or auto.sfrs_y,
         (23, 4): f"Rx= {auto.r_x}",
         (23, 8): f"Ry= {auto.r_y}",
-        (24, 4): f"\u03A9ox= ",
-        (24, 8): f"\u03A9oy= ",
-        (25, 4): f"Cdx= ",
-        (25, 8): f"Cdy= ",
+        (24, 4): f"\u03A9ox= {auto.omega_x}" if auto.omega_x else "",
+        (24, 8): f"\u03A9oy= {auto.omega_y}" if auto.omega_y else "",
+        (25, 4): f"Cdx= {auto.cd_x}" if auto.cd_x else "",
+        (25, 8): f"Cdy= {auto.cd_y}" if auto.cd_y else "",
         (26, 4): f"\u0394ax = {manual.allowable_drift or auto.allowable_drift}",
         # 13) 내진설계 주요결과
         (28, 4): f"Csx= {auto.csx:.4f}" if auto.csx else "",

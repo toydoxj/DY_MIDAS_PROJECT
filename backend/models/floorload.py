@@ -1,5 +1,5 @@
 from typing import Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class KdsLiveLoadItem(BaseModel):
@@ -20,7 +20,7 @@ class FloorLoadEntry(BaseModel):
     floor: str = ""
     roomName: str = ""
     desc: str = ""
-    finishes: list[FinishItem] = []
+    finishes: list[FinishItem] = Field(default_factory=list)
     slabType: str = "없음"
     slabThickness: str = ""
     slabLoad: str = ""

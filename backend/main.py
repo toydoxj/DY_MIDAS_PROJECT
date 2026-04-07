@@ -60,8 +60,12 @@ if api_key:
     MIDAS.MIDAS_API_KEY(api_key)
 
 from exceptions import MidasError
+from db import init_db
 
-app = FastAPI(title="MIDAS GEN NX Dashboard API", version="1.0.0")
+# DB 초기화 (테이블 생성)
+init_db()
+
+app = FastAPI(title="MIDAS GEN NX Dashboard API", version="1.0.2")
 
 
 @app.exception_handler(MidasError)
@@ -82,6 +86,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from routers import auth as auth_router
 from routers import midas as midas_router
 from routers import settings as settings_router
 from routers import project as project_router
@@ -91,6 +96,7 @@ from routers import floorload as floorload_router
 from routers import member as member_router
 from routers import seismic_cert as seismic_cert_router
 
+app.include_router(auth_router.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
 app.include_router(project_router.router, prefix="/api")
 app.include_router(loadcase_router.router, prefix="/api")

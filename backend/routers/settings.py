@@ -1,13 +1,19 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 import MIDAS_API as MIDAS
 
 from models.settings import SettingsResponse, SettingsUpdateRequest, ConnectionTestResponse
+from auth_middleware import get_current_user
+from models.auth import User
+from db import get_db
+import work_dir
 
 router = APIRouter()
 
 
 @router.get("/settings")
-def get_settings() -> SettingsResponse:
+def get_settings(user: User = Depends(get_current_user)) -> SettingsResponse:
     try:
         base_url: str = MIDAS.MIDAS_API_BASEURL.get_url()
     except AttributeError:
@@ -21,12 +27,43 @@ def get_settings() -> SettingsResponse:
 
 
 @router.post("/settings")
-def update_settings(body: SettingsUpdateRequest) -> dict[str, str]:
+def update_settings(
+    body: SettingsUpdateRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
     if body.base_url:
         MIDAS.MIDAS_API_BASEURL(body.base_url)
+        user.midas_url = body.base_url
     if body.api_key:
         MIDAS.MIDAS_API_KEY(body.api_key)
+        user.midas_key = body.api_key
+    db.commit()
     return {"status": "updated"}
+
+
+class WorkDirRequest(BaseModel):
+    path: str
+
+
+@router.get("/work-dir")
+def get_work_dir_endpoint() -> dict[str, str | None]:
+    """현재 작업 폴더 경로를 반환. 폴더가 없으면 에러 상태 포함."""
+    path, error = work_dir.get_work_dir_safe()
+    return {"path": path, "error": error}
+
+
+@router.post("/work-dir")
+def set_work_dir_endpoint(body: WorkDirRequest) -> dict[str, str]:
+    """작업 폴더 경로를 변경"""
+    import os
+    if not os.path.isabs(body.path):
+        return {"error": "절대 경로를 입력해주세요", "path": "", "status": "error"}
+    real = os.path.realpath(body.path)
+    if not os.access(os.path.dirname(real), os.W_OK):
+        return {"error": "쓰기 권한이 없습니다", "path": "", "status": "error"}
+    saved = work_dir.set_work_dir(body.path)
+    return {"path": saved, "status": "updated"}
 
 
 @router.get("/test-connection")

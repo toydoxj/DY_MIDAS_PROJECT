@@ -24,6 +24,10 @@ interface AutoData {
   ie: number;
   r_x: number;
   r_y: number;
+  omega_x: number;
+  omega_y: number;
+  cd_x: number;
+  cd_y: number;
   sds: number;
   sd1: number;
   total_weight: number;
@@ -344,6 +348,8 @@ export default function SeismicCertPage() {
               <Field label="Sds" value={autoData.sds} />
               <Field label="Sd1" value={autoData.sd1} />
               <Field label="반응수정계수 R" value={`X: ${autoData.r_x} / Y: ${autoData.r_y}`} />
+              <Field label="초과강도계수 Ω₀" value={`X: ${autoData.omega_x} / Y: ${autoData.omega_y}`} />
+              <Field label="변위증폭계수 Cd" value={`X: ${autoData.cd_x} / Y: ${autoData.cd_y}`} />
               <Field label="내진설계범주" value={autoData.seismic_category} />
               <Field label="허용층간변위" value={autoData.allowable_drift} />
             </SectionCard>

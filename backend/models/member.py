@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SectionInfo(BaseModel):
@@ -8,19 +8,19 @@ class SectionInfo(BaseModel):
     name: str
     type: str
     element_count: int
-    element_keys: list[int]
+    element_keys: list[int] = Field(default_factory=list)
 
 
 class SectionDetailResponse(BaseModel):
     id: int
     name: str
     type: str
-    element_keys: list[int]
+    element_keys: list[int] = Field(default_factory=list)
 
 
 class BeamForceMaxRequest(BaseModel):
-    element_keys: list[int] = []
-    section_names: list[str] = []  # SectName으로 필터링 (캐시 모드)
+    element_keys: list[int] = Field(default_factory=list)
+    section_names: list[str] = Field(default_factory=list)
     group_by: str = "section"
     force_refresh: bool = False
 
@@ -54,6 +54,7 @@ class BeamForceMaxRow(BaseModel):
 
 class RebarInput(BaseModel):
     position: str  # "I", "C", "J"
+    note: str = ""
     top_dia: int = 25
     top_count: int = 3
     bot_dia: int = 25
@@ -71,18 +72,19 @@ class SectionRebarInput(BaseModel):
     fck: float = 27.0
     fy: float = 400.0
     fyt: float = 400.0
-    rebars: list[RebarInput]  # I, C, J
+    rebarType: str = "type3"  # "type3" | "type2" | "type1"
+    rebars: list[RebarInput] = Field(default_factory=list)
 
 
 class BeamDesignCheckRequest(BaseModel):
-    sections: list[SectionRebarInput]
-    forces: list[BeamForceMaxRow]
+    sections: list[SectionRebarInput] = Field(default_factory=list)
+    forces: list[BeamForceMaxRow] = Field(default_factory=list)
 
 
 class SaveRebarsRequest(BaseModel):
     version: int = 1
     savedAt: Optional[str] = None
-    sections: list[SectionRebarInput] = []
+    sections: list[SectionRebarInput] = Field(default_factory=list)
 
 
 class PositionCheckResult(BaseModel):
