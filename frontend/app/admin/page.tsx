@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { AUTH_URL } from "@/lib/types";
 import { authFetch, getUser } from "@/lib/auth";
-import { UserPlus, Trash2, Shield, User } from "lucide-react";
+import { UserPlus, Trash2, Shield, User, Check, X } from "lucide-react";
 
 interface UserInfo {
   id: number;
   username: string;
   name: string;
   role: string;
+  status: string;
   midas_url: string;
   work_dir: string;
   has_midas_key: boolean;
@@ -66,6 +67,22 @@ export default function AdminPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleApprove = async (id: number) => {
+    try {
+      const res = await authFetch(`${AUTH_URL}/api/auth/users/${id}/approve`, { method: "POST" });
+      if (!res.ok) throw new Error("승인 실패");
+      fetchUsers();
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "승인 실패"); }
+  };
+
+  const handleReject = async (id: number) => {
+    try {
+      const res = await authFetch(`${AUTH_URL}/api/auth/users/${id}/reject`, { method: "POST" });
+      if (!res.ok) throw new Error("거절 실패");
+      fetchUsers();
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "거절 실패"); }
   };
 
   const handleDelete = async (id: number, username: string) => {
@@ -163,6 +180,7 @@ export default function AdminPage() {
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">사용자</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">아이디</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">역할</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">상태</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">MIDAS 연결</th>
               <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">작업</th>
             </tr>
@@ -181,25 +199,42 @@ export default function AdminPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${
+                    u.status === "active" ? "bg-green-100 text-green-700" :
+                    u.status === "pending" ? "bg-yellow-100 text-yellow-700" :
+                    "bg-red-100 text-red-700"
+                  }`}>
+                    {u.status === "active" ? "활성" : u.status === "pending" ? "승인 대기" : "거절"}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
                   <span className={`text-xs ${u.has_midas_key ? "text-green-600" : "text-gray-400"}`}>
                     {u.has_midas_key ? "연결됨" : "미설정"}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  {u.id !== currentUser?.id && (
-                    <button
-                      onClick={() => handleDelete(u.id, u.username)}
-                      className="text-gray-400 hover:text-red-500 transition p-1"
-                      title="삭제"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
+                  <div className="flex items-center justify-end gap-1">
+                    {u.status === "pending" && (
+                      <>
+                        <button onClick={() => handleApprove(u.id)} className="text-green-500 hover:text-green-700 transition p-1" title="승인">
+                          <Check size={14} />
+                        </button>
+                        <button onClick={() => handleReject(u.id)} className="text-red-400 hover:text-red-600 transition p-1" title="거절">
+                          <X size={14} />
+                        </button>
+                      </>
+                    )}
+                    {u.id !== currentUser?.id && (
+                      <button onClick={() => handleDelete(u.id, u.username)} className="text-gray-400 hover:text-red-500 transition p-1" title="삭제">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
             {loading && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">로딩 중...</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">로딩 중...</td></tr>
             )}
           </tbody>
         </table>

@@ -18,6 +18,7 @@ class User(Base):
     password = Column(String, nullable=False)  # bcrypt 해시
     name = Column(String, default="")
     role = Column(String, default="user")  # "admin" | "user"
+    status = Column(String, default="active")  # "active" | "pending" | "rejected"
     midas_url = Column(String, default="")
     midas_key = Column(String, default="")
     work_dir = Column(String, default="")
@@ -48,6 +49,7 @@ class UserInfo(BaseModel):
     username: str
     name: str
     role: str
+    status: str = "active"
     midas_url: str = ""
     work_dir: str = ""
     has_midas_key: bool = False

@@ -23,6 +23,7 @@ def _user_to_info(user: User) -> UserInfo:
         username=user.username,
         name=user.name or "",
         role=user.role or "user",
+        status=user.status or "active",
         midas_url=user.midas_url or "",
         work_dir=user.work_dir or "",
         has_midas_key=bool(user.midas_key),
@@ -69,6 +70,10 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     user = db.query(User).filter(User.username == body.username).first()
     if not user or not verify_password(body.password, user.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="아이디 또는 비밀번호가 올바르지 않습니다")
+    if user.status == "pending":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="가입 승인 대기 중입니다. 관리자에게 문의하세요.")
+    if user.status == "rejected":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="가입이 거절되었습니다.")
 
     # 로그인 시 사용자의 MIDAS 설정 적용
     if user.midas_url:
@@ -124,11 +129,52 @@ def create_user(body: RegisterRequest, admin: User = Depends(require_admin), db:
     return _user_to_info(user)
 
 
+@router.post("/request")
+def request_join(body: RegisterRequest, db: Session = Depends(get_db)) -> dict:
+    """가입 신청 (누구나 가능) — pending 상태로 저장"""
+    if db.query(User).filter(User.username == body.username).first():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 존재하는 아이디입니다")
+
+    user = User(
+        username=body.username,
+        password=hash_password(body.password),
+        name=body.name,
+        role="user",
+        status="pending",
+    )
+    db.add(user)
+    db.commit()
+    return {"status": "pending", "message": "가입 신청이 완료되었습니다. 관리자 승인을 기다려주세요."}
+
+
 @router.get("/users")
 def list_users(admin: User = Depends(require_admin), db: Session = Depends(get_db)) -> list[UserInfo]:
     """사용자 목록 (관리자만)"""
     users = db.query(User).order_by(User.id).all()
     return [_user_to_info(u) for u in users]
+
+
+@router.post("/users/{user_id}/approve")
+def approve_user(user_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)) -> UserInfo:
+    """가입 승인 (관리자만)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="사용자를 찾을 수 없습니다")
+    user.status = "active"
+    db.commit()
+    db.refresh(user)
+    return _user_to_info(user)
+
+
+@router.post("/users/{user_id}/reject")
+def reject_user(user_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
+    """가입 거절 (관리자만)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="사용자를 찾을 수 없습니다")
+    user.status = "rejected"
+    db.commit()
+    return {"status": "rejected"}
 
 
 @router.delete("/users/{user_id}")
