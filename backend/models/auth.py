@@ -19,6 +19,7 @@ class User(Base):
     name = Column(String, default="")
     role = Column(String, default="user")  # "admin" | "user"
     status = Column(String, default="active")  # "active" | "pending" | "rejected"
+    session_id = Column(String, default="")
     midas_url = Column(String, default="")
     midas_key = Column(String, default="")
     work_dir = Column(String, default="")

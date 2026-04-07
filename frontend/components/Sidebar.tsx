@@ -90,7 +90,7 @@ export default function Sidebar() {
               </button>
             </div>
           ) : null; })()}
-          <div className={`flex items-center gap-3 px-2 ${collapsed ? "justify-center px-0" : ""}`}>
+          <Link href="/changelog" className={`flex items-center gap-3 px-2 hover:opacity-80 transition ${collapsed ? "justify-center px-0" : ""}`} title="버전 기록">
             <Image src="/dongyang_logo.svg" alt="동양구조" width={collapsed ? 24 : 36} height={collapsed ? 24 : 36} className="opacity-60 flex-shrink-0" />
             {!collapsed && (
               <div>
@@ -98,7 +98,7 @@ export default function Sidebar() {
                 <p className="text-[10px] text-gray-500">Dongyang Consulting Engineers</p>
               </div>
             )}
-          </div>
+          </Link>
         </div>
 
         {/* 접기/펼치기 버튼 */}

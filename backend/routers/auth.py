@@ -1,5 +1,6 @@
 """인증 라우터 — 로그인, 회원가입, 사용자 관리"""
 
+from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -50,17 +51,19 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> TokenRespo
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 존재하는 아이디입니다")
 
     # 최초 사용자 = 관리자
+    sid = uuid4().hex
     user = User(
         username=body.username,
         password=hash_password(body.password),
         name=body.name,
         role="admin",
+        session_id=sid,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    token = create_token(user.username, user.role)
+    token = create_token(user.username, user.role, sid)
     return TokenResponse(access_token=token, user=_user_to_info(user))
 
 
@@ -75,13 +78,18 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     if user.status == "rejected":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="가입이 거절되었습니다.")
 
+    # 세션 ID 생성 (이전 세션 자동 만료)
+    sid = uuid4().hex
+    user.session_id = sid
+    db.commit()
+
     # 로그인 시 사용자의 MIDAS 설정 적용
     if user.midas_url:
         MIDAS.MIDAS_API_BASEURL(user.midas_url)
     if user.midas_key:
         MIDAS.MIDAS_API_KEY(user.midas_key)
 
-    token = create_token(user.username, user.role)
+    token = create_token(user.username, user.role, sid)
     return TokenResponse(access_token=token, user=_user_to_info(user))
 
 

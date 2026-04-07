@@ -41,9 +41,9 @@ def verify_password(plain: str, hashed: str) -> bool:
     return hmac.compare_digest(h, stored_hash)
 
 
-def create_token(username: str, role: str) -> str:
+def create_token(username: str, role: str, session_id: str = "") -> str:
     expire = datetime.now(timezone.utc) + timedelta(hours=_TOKEN_EXPIRE_HOURS)
-    payload = {"sub": username, "role": role, "exp": expire}
+    payload = {"sub": username, "role": role, "sid": session_id, "exp": expire}
     return jwt.encode(payload, _SECRET_KEY, algorithm=_ALGORITHM)
 
 
@@ -69,6 +69,12 @@ def get_current_user(
     user = db.query(User).filter(User.username == username).first()
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="사용자를 찾을 수 없습니다")
+
+    # 이중 로그인 방지: JWT의 session_id와 DB의 session_id 비교
+    token_sid = payload.get("sid", "")
+    if token_sid and user.session_id and token_sid != user.session_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="다른 기기에서 로그인되었습니다")
+
     return user
 
 

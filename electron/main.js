@@ -111,10 +111,13 @@ async function createWindow() {
   const { session } = require("electron");
   await session.defaultSession.clearCache();
 
+  const appVersion = app.getVersion();
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    title: "MIDAS Dashboard",
+    title: `MIDAS Dashboard v${appVersion}`,
+    icon: path.join(__dirname, "build", "icon.ico"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -134,25 +137,72 @@ function setupAutoUpdater() {
   autoUpdater.autoDownload = false;
   autoUpdater.logger = console;
 
+  let progressWin = null;
+
   autoUpdater.on("update-available", (info) => {
+    const releaseNotes = typeof info.releaseNotes === "string"
+      ? info.releaseNotes
+      : Array.isArray(info.releaseNotes)
+        ? info.releaseNotes.map((n) => n.note || n).join("\n")
+        : "";
+
+    const message = `새 버전 v${info.version}이 있습니다.\n\n${releaseNotes ? "변경사항:\n" + releaseNotes + "\n\n" : ""}다운로드하시겠습니까?`;
+
     dialog
       .showMessageBox(mainWindow, {
         type: "info",
         title: "업데이트 알림",
-        message: `새 버전 ${info.version}이 있습니다. 다운로드하시겠습니까?`,
+        message,
         buttons: ["다운로드", "나중에"],
       })
       .then(({ response }) => {
-        if (response === 0) autoUpdater.downloadUpdate();
+        if (response === 0) {
+          // 진행률 창 생성
+          progressWin = new BrowserWindow({
+            width: 400, height: 160,
+            parent: mainWindow, modal: true,
+            resizable: false, minimizable: false,
+            title: "업데이트 다운로드 중",
+            webPreferences: { contextIsolation: true },
+          });
+          progressWin.setMenuBarVisibility(false);
+          progressWin.loadURL(`data:text/html;charset=utf-8,
+            <html><body style="font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;background:%231a1a2e;color:white">
+              <p id="msg" style="font-size:14px;margin-bottom:12px">다운로드 준비 중...</p>
+              <div style="width:80%;height:20px;background:%23333;border-radius:10px;overflow:hidden">
+                <div id="bar" style="width:0%;height:100%;background:%23669900;transition:width 0.3s"></div>
+              </div>
+              <p id="pct" style="font-size:12px;color:%23aaa;margin-top:8px">0%</p>
+            </body></html>
+          `);
+          autoUpdater.downloadUpdate();
+        }
       });
   });
 
-  autoUpdater.on("update-downloaded", () => {
+  autoUpdater.on("download-progress", (progress) => {
+    if (progressWin && !progressWin.isDestroyed()) {
+      const pct = Math.round(progress.percent);
+      const speed = (progress.bytesPerSecond / 1024 / 1024).toFixed(1);
+      progressWin.webContents.executeJavaScript(`
+        document.getElementById('bar').style.width='${pct}%';
+        document.getElementById('pct').textContent='${pct}% (${speed} MB/s)';
+        document.getElementById('msg').textContent='다운로드 중...';
+      `).catch(() => {});
+    }
+  });
+
+  autoUpdater.on("update-downloaded", (info) => {
+    if (progressWin && !progressWin.isDestroyed()) {
+      progressWin.close();
+      progressWin = null;
+    }
+
     dialog
       .showMessageBox(mainWindow, {
         type: "info",
         title: "업데이트 준비 완료",
-        message: "업데이트가 다운로드되었습니다. 재시작하여 설치하시겠습니까?",
+        message: `v${info.version} 업데이트가 다운로드되었습니다.\n재시작하여 설치하시겠습니까?`,
         buttons: ["재시작", "나중에"],
       })
       .then(({ response }) => {
@@ -162,6 +212,9 @@ function setupAutoUpdater() {
 
   autoUpdater.checkForUpdates().catch(() => {});
 }
+
+// 버전 정보 IPC 핸들러
+ipcMain.handle("get-version", () => app.getVersion());
 
 // 폴더 선택 IPC 핸들러
 ipcMain.handle("browse-folder", async (_event, currentPath) => {
