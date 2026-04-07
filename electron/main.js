@@ -69,8 +69,29 @@ async function startBackend() {
     ? path.dirname(backendExe)
     : path.join(__dirname, "..");
 
+  // .env 파일 탐색: 앱 실행 경로 근처에서 찾기
+  const envCandidates = app.isPackaged
+    ? [
+        path.join(path.dirname(app.getPath("exe")), ".env"),  // exe 옆
+        path.join(app.getPath("userData"), ".env"),            // AppData
+      ]
+    : [path.join(__dirname, "..", ".env")];
+
+  const fs = require("fs");
+  let envVars = {};
+  for (const envPath of envCandidates) {
+    if (fs.existsSync(envPath)) {
+      const lines = fs.readFileSync(envPath, "utf-8").split("\n");
+      for (const line of lines) {
+        const m = line.match(/^([^#=]+)=(.*)$/);
+        if (m) envVars[m[1].trim()] = m[2].trim();
+      }
+      break;
+    }
+  }
+
   backendProcess = spawn(backendExe, [], {
-    env: { ...process.env, BACKEND_PORT: String(BACKEND_PORT) },
+    env: { ...process.env, ...envVars, BACKEND_PORT: String(BACKEND_PORT) },
     cwd: backendCwd,
     stdio: ["ignore", "pipe", "pipe"],
   });
