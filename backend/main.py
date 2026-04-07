@@ -38,6 +38,16 @@ for _candidate in _env_candidates:
 if not _env_loaded:
     load_dotenv()  # 기본 탐색
 
+# gmaps.env: Google Maps 키만 별도 로드 (번들 포함용, .env와 겹쳐도 override하지 않음)
+_gmaps_candidates: list[str] = [
+    os.path.join(_BASE_DIR, "gmaps.env"),
+    os.path.join(_PROJECT_ROOT, "gmaps.env"),
+]
+for _gc in _gmaps_candidates:
+    if os.path.isfile(_gc):
+        load_dotenv(_gc, override=False)
+        break
+
 import MIDAS_API as MIDAS
 
 base_url: str = os.environ.get("MIDAS_BASE_URL", "")
