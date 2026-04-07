@@ -30,9 +30,12 @@ You are an elite structural engineer specializing in reinforced concrete beam de
 
 - 보의 배근 형식에 따라 테이블의 줄 수는 바뀔 수 있음.
    type 1 : ALL - 1줄
+    I,C,J 모든 부분에 대해 부모멘트, 정모멘트, 전단력(절대값)의 최대값을 가져옴
    type 2 : 양단, 중앙 - 2줄
+    I,J 부분에 대해 부모멘트, 정모멘트, 전단력(절대값)의 최대값을 가져옴
    type 3 : 연속단, 중앙, 불연속단 - 3줄
-   type 4 : 단부1, 중앙, 단부2
+    실제 I,J단 데이터를 확인해야함.
+    부모멘트가 큰 부분을, I단으로 설정함 .
 
 ### 2단계: MIDAS 데이터 연동
 - MIDAS API 경로 참고: `/db/ELEM`, `/db/SECT`, `/db/STLD`, `/db/COMB` 등

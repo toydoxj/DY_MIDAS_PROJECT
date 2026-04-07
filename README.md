@@ -19,7 +19,8 @@ Task_MIDAS/
 ├── backend/                    # FastAPI 백엔드
 │   ├── main.py
 │   ├── engines/
-│   │   └── kds_rc_beam.py      # KDS 41 30 00 RC보 설계 검토 엔진
+│   │   ├── kds_rc_beam.py      # KDS 41 30 00 RC보 설계 검토 엔진
+│   │   └── seismic_cert_hwpx.py # 내진확인서 hwpx 생성 엔진
 │   ├── models/                 # Pydantic 데이터 모델
 │   └── routers/                # midas, project, settings, loadcase, analysis, member
 │
@@ -32,6 +33,8 @@ Task_MIDAS/
 │   │   │       ├── page.tsx    # 통합 테이블 (부재력+배근+DCR)
 │   │   │       ├── _components/# MaterialInput, RebarInputTable, DesignResult
 │   │   │       └── _lib/       # 타입, 철근규격 상수
+│   │   ├── documents/           # 문서 작성
+│   │   │   └── seismic-cert/   # 내진설계 확인서 자동 생성
 │   │   ├── explorer/           # API 탐색기
 │   │   └── settings/           # 설정
 │   ├── components/
@@ -107,6 +110,15 @@ cd frontend ;; npm run dev
 - 배근/재료 변경 시 자동 검토 (300ms 디바운스)
 - 대시보드 재료 강도 연동 (주근 지름별 fy 자동 매칭)
 - 배근 데이터 영구 저장 (JSON 파일 + localStorage 자동 임시 저장)
+
+### 문서 작성 (Documents)
+- 구조안전 및 내진설계 확인서 자동 생성 (별지 제1호/제2호서식)
+  - MIDAS 데이터 자동 수집 (프로젝트, SPFC, STOR, 밑면전단력, 고유주기)
+  - SFRS 자동 매핑 (KDS 41 17 00:2022 표 6.2-1)
+  - 내진설계범주(Sds 기반), 허용층간변위(중요도 기반) 자동 계산
+  - 모드 해석 상위 3개 모드 자동 수집
+  - hwpx 양식에 데이터 삽입 후 다운로드
+  - 지상층수 기반 양식 자동 선택 (5층이하/6층이상)
 
 ### 하중정보
 - Static Load Case / Floor Load / Seismic Load
