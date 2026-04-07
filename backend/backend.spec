@@ -12,6 +12,9 @@ a = Analysis(
         (os.path.join('..', 'MIDAS_API'), 'MIDAS_API'),
         (os.path.join('..', 'frontend', 'out'), 'frontend_out'),
         ('routers', 'routers'),
+        ('models', 'models'),
+        ('engines', 'engines'),
+        ('data', 'data'),
     ],
     hiddenimports=[
         'uvicorn.logging',
@@ -30,6 +33,9 @@ a = Analysis(
         'uvicorn.lifespan.off',
         'multipart',
         'python_multipart',
+        'engines.seismic_cert_hwpx',
+        'models.seismic_cert',
+        'routers.seismic_cert',
         # MIDAS_API 의존성 (datas로 포함된 패키지의 런타임 의존성)
         'requests',
         'pandas',
