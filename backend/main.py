@@ -62,9 +62,6 @@ if api_key:
 from exceptions import MidasError
 from db import init_db
 
-# DB 초기화 (테이블 생성)
-init_db()
-
 app = FastAPI(title="MIDAS GEN NX Dashboard API", version="1.0.2")
 
 
@@ -88,6 +85,9 @@ app.add_middleware(
 
 from routers import auth as auth_router
 from routers import midas as midas_router
+
+# DB 초기화 (라우터 import 후 — User 모델이 Base에 등록된 상태)
+init_db()
 from routers import settings as settings_router
 from routers import project as project_router
 from routers import loadcase as loadcase_router
