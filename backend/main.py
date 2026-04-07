@@ -22,6 +22,7 @@ from dotenv import load_dotenv
 
 # .env 파일 탐색: 여러 경로 후보를 시도
 _env_candidates: list[str] = [
+    os.path.join(_BASE_DIR, ".env"),               # PyInstaller 번들 내부 (_MEIPASS/.env)
     os.path.join(_PROJECT_ROOT, ".env"),           # 개발: 프로젝트 루트 (backend/../.env)
     os.path.join(os.getcwd(), ".env"),              # cwd에서 직접
     os.path.join(os.getcwd(), "..", ".env"),         # cwd 상위 (backend/ → ../)

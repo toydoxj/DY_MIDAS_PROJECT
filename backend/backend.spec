@@ -9,6 +9,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
+        (os.path.join('..', '.env'), '.'),
         (os.path.join('..', 'MIDAS_API'), 'MIDAS_API'),
         (os.path.join('..', 'frontend', 'out'), 'frontend_out'),
         ('routers', 'routers'),
