@@ -10,6 +10,24 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.0.7",
+    date: "2026-04-08",
+    changes: [
+      "바닥하중 동기화 단위 kN/m 통일 + 삭제 반영",
+      "MIDAS 접속 설정 영구 저장",
+      "FBLD DESC에 전체 상세 정보 JSON 저장 (import 시 완전 복원)",
+    ],
+  },
+  {
+    version: "1.0.6",
+    date: "2026-04-08",
+    changes: [
+      "Electron UX 개선 + 이중 로그인 방지",
+      "앱 아이콘 256x256 이상으로 재생성",
+      "electronAPI 타입 중복 선언 해결",
+    ],
+  },
+  {
     version: "1.0.5",
     date: "2026-04-08",
     changes: [
