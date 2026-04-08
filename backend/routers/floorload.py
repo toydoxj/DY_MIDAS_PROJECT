@@ -131,7 +131,25 @@ def _build_fbld_entry(entry: dict, dead_lc: str, live_lc: str, idx: int) -> dict
     if live_load > 0:
         items.append({"LCNAME": live_lc, "FLOOR_LOAD": -live_load, "OPT_SUB_BEAM_WEIGHT": False})
 
-    return {"NAME": name, "DESC": entry.get("usageDetail", ""), "ITEM": items}
+    # DESC에 전체 상세 정보를 JSON으로 저장 (불러오기 시 역파싱용)
+    desc_data: dict = {
+        "floor": floor,
+        "room": room,
+        "desc": entry.get("desc", ""),
+        "usageCategory": entry.get("usageCategory", ""),
+        "usageDetail": entry.get("usageDetail", ""),
+        "finishes": [
+            {k: f.get(k, "") for k in ("material", "density", "thickness", "load")}
+            for f in entry.get("finishes", [])
+            if f.get("material") or f.get("load")
+        ],
+        "slabType": entry.get("slabType", "없음"),
+        "slabThickness": entry.get("slabThickness", ""),
+        "slabLoad": entry.get("slabLoad", ""),
+        "liveLoad": entry.get("liveLoad", ""),
+    }
+
+    return {"NAME": name, "DESC": json.dumps(desc_data, ensure_ascii=False), "ITEM": items}
 
 
 @router.post("/floor-loads/sync-midas")
@@ -218,52 +236,84 @@ def import_from_midas() -> ImportMidasResponse:
     dead_lc_name: str = _find_dead_lc()
     live_lc_name: str = _find_live_lc()
 
+    _empty_finish: dict = {"material": "", "density": "", "thickness": "", "load": ""}
+
     for val in fbld.values():
         if not isinstance(val, dict):
             continue
         name: str = val.get("NAME", "")
+        desc_str: str = val.get("DESC", "")
 
-        if "_" in name:
-            parts: list[str] = name.split("_", 1)
-            floor: str = parts[0]
-            room: str = parts[1]
+        # DESC에서 JSON 파싱 시도
+        desc_data: dict = {}
+        try:
+            desc_data = json.loads(desc_str)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        if desc_data:
+            # JSON 매핑 성공 — 저장된 상세 정보 복원
+            floor = desc_data.get("floor", "")
+            room = desc_data.get("room", "")
+            finishes = desc_data.get("finishes", [])
+            # 6행으로 패딩
+            while len(finishes) < 6:
+                finishes.append(_empty_finish.copy())
+            slab_type = desc_data.get("slabType", "없음")
+            slab_thickness = desc_data.get("slabThickness", "")
+            slab_load = desc_data.get("slabLoad", "")
+            usage_category = desc_data.get("usageCategory", "")
+            usage_detail = desc_data.get("usageDetail", "")
+            live_load = desc_data.get("liveLoad", "")
+            desc = desc_data.get("desc", "")
         else:
-            floor = ""
-            room = name
+            # JSON 아님 — 기존 방식으로 fallback
+            if "_" in name:
+                parts: list[str] = name.split("_", 1)
+                floor = parts[0]
+                room = parts[1]
+            else:
+                floor = ""
+                room = name
 
-        dead_load: str = ""
-        live_load: str = ""
-        for item in val.get("ITEM", []):
-            load_val: float = abs(item.get("FLOOR_LOAD", 0))
-            lc: str = item.get("LCNAME", "")
-            if lc == dead_lc_name:
-                dead_load = str(round(load_val, 2))
-            elif lc == live_lc_name:
-                live_load = str(round(load_val, 2))
-            elif not dead_load:
-                dead_load = str(round(load_val, 2))
-            elif not live_load:
-                live_load = str(round(load_val, 2))
+            dead_load_str: str = ""
+            live_load = ""
+            for item in val.get("ITEM", []):
+                load_val: float = abs(item.get("FLOOR_LOAD", 0))
+                lc: str = item.get("LCNAME", "")
+                if lc == dead_lc_name:
+                    dead_load_str = str(round(load_val, 2))
+                elif lc == live_lc_name:
+                    live_load = str(round(load_val, 2))
+                elif not dead_load_str:
+                    dead_load_str = str(round(load_val, 2))
+                elif not live_load:
+                    live_load = str(round(load_val, 2))
+
+            finishes = [
+                {"material": "MIDAS 불러오기", "density": "", "thickness": "", "load": dead_load_str},
+            ]
+            while len(finishes) < 6:
+                finishes.append(_empty_finish.copy())
+            slab_type = "없음"
+            slab_thickness = ""
+            slab_load = ""
+            usage_category = ""
+            usage_detail = desc_str
+            desc = ""
 
         max_id += 1
         imported.append(ImportedFloorLoadItem(
             id=max_id,
             floor=floor,
             roomName=room,
-            desc="",
-            finishes=[
-                {"material": "MIDAS 불러오기", "density": "", "thickness": "", "load": dead_load},
-                {"material": "", "density": "", "thickness": "", "load": ""},
-                {"material": "", "density": "", "thickness": "", "load": ""},
-                {"material": "", "density": "", "thickness": "", "load": ""},
-                {"material": "", "density": "", "thickness": "", "load": ""},
-                {"material": "", "density": "", "thickness": "", "load": ""},
-            ],
-            slabType="없음",
-            slabThickness="",
-            slabLoad="",
-            usageCategory="",
-            usageDetail=val.get("DESC", ""),
+            desc=desc,
+            finishes=finishes,
+            slabType=slab_type,
+            slabThickness=slab_thickness,
+            slabLoad=slab_load,
+            usageCategory=usage_category,
+            usageDetail=usage_detail,
             liveLoad=live_load,
         ))
 
