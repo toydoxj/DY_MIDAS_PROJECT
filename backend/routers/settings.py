@@ -1,3 +1,6 @@
+import json
+import os
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 import MIDAS_API as MIDAS
@@ -6,6 +9,50 @@ from models.settings import SettingsResponse, SettingsUpdateRequest, ConnectionT
 import work_dir
 
 router = APIRouter()
+
+# MIDAS 설정 파일 경로 (work_dir 모듈의 _APP_DATA 재사용)
+from work_dir import _APP_DATA
+_SETTINGS_FILE = os.path.join(_APP_DATA, "midas_settings.json")
+
+
+def _load_saved_settings():
+    """저장된 MIDAS 설정을 로드하여 전역 상태에 적용"""
+    if not os.path.isfile(_SETTINGS_FILE):
+        return
+    try:
+        with open(_SETTINGS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if data.get("base_url"):
+            MIDAS.MIDAS_API_BASEURL(data["base_url"])
+        if data.get("api_key"):
+            MIDAS.MIDAS_API_KEY(data["api_key"])
+    except Exception:
+        pass
+
+
+def _save_settings(base_url: str = "", api_key: str = ""):
+    """MIDAS 설정을 파일에 영구 저장"""
+    # 기존 설정 로드
+    existing = {}
+    if os.path.isfile(_SETTINGS_FILE):
+        try:
+            with open(_SETTINGS_FILE, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        except Exception:
+            pass
+
+    if base_url:
+        existing["base_url"] = base_url
+    if api_key:
+        existing["api_key"] = api_key
+
+    os.makedirs(os.path.dirname(_SETTINGS_FILE), exist_ok=True)
+    with open(_SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(existing, f, ensure_ascii=False, indent=2)
+
+
+# 앱 시작 시 저장된 설정 자동 로드
+_load_saved_settings()
 
 
 @router.get("/settings")
@@ -28,6 +75,8 @@ def update_settings(body: SettingsUpdateRequest) -> dict[str, str]:
         MIDAS.MIDAS_API_BASEURL(body.base_url)
     if body.api_key:
         MIDAS.MIDAS_API_KEY(body.api_key)
+    # 파일에 영구 저장
+    _save_settings(base_url=body.base_url or "", api_key=body.api_key or "")
     return {"status": "updated"}
 
 

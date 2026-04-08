@@ -101,8 +101,16 @@ def _find_live_lc() -> str:
     return "Live Load"
 
 
+def _kpa_to_kn_m2(value_str: str) -> float:
+    """문자열 하중값을 kN/m² 단위로 변환. 입력은 kN/m² 기준."""
+    try:
+        return float(value_str)
+    except (ValueError, TypeError):
+        return 0.0
+
+
 def _build_fbld_entry(entry: dict, dead_lc: str, live_lc: str, idx: int) -> dict:
-    """단일 Floor Load 엔트리를 FBLD 형식으로 변환"""
+    """단일 Floor Load 엔트리를 FBLD 형식으로 변환 (kN/m² 단위)"""
     floor: str = entry.get("floor", "")
     room: str = entry.get("roomName", "")
     name: str = f"{floor}_{room}" if floor and room else f"FloorLoad_{idx}"
@@ -111,22 +119,11 @@ def _build_fbld_entry(entry: dict, dead_lc: str, live_lc: str, idx: int) -> dict
     for f in entry.get("finishes", []):
         v = f.get("load", "")
         if v:
-            try:
-                finish_total += float(v)
-            except ValueError:
-                pass
-    slab_load: float = 0.0
-    try:
-        slab_load = float(entry.get("slabLoad", "0"))
-    except ValueError:
-        pass
+            finish_total += _kpa_to_kn_m2(v)
+    slab_load: float = _kpa_to_kn_m2(entry.get("slabLoad", "0"))
     dead_load: float = finish_total + slab_load
 
-    live_load: float = 0.0
-    try:
-        live_load = float(entry.get("liveLoad", "0"))
-    except ValueError:
-        pass
+    live_load: float = _kpa_to_kn_m2(entry.get("liveLoad", "0"))
 
     items: list[dict] = []
     if dead_load > 0:
@@ -139,10 +136,21 @@ def _build_fbld_entry(entry: dict, dead_lc: str, live_lc: str, idx: int) -> dict
 
 @router.post("/floor-loads/sync-midas")
 def sync_floor_loads_to_midas() -> SyncMidasResponse:
-    """저장된 Floor Load 데이터를 MIDAS FBLD로 동기화 (NAME 기준 매칭, 없으면 신규)"""
+    """저장된 Floor Load 데이터를 MIDAS FBLD로 동기화
+
+    - 단위: kN, m (MIDAS 단위계에 맞춤)
+    - NAME 기준 매칭: 있으면 업데이트, 없으면 신규 추가
+    - 로컬에서 삭제된 항목은 MIDAS에서도 삭제
+    """
     entries: list[dict] = _read()
     if not entries:
         raise MidasValidationError("동기화할 데이터가 없습니다")
+
+    # 단위를 kN, m로 설정
+    try:
+        MIDAS.MidasAPI("PUT", "/db/UNIT", {"UNIT": {"FORCE": "KN", "DIST": "M", "HEAT": "KCAL", "TEMPER": "C"}})
+    except Exception:
+        pass
 
     dead_lc: str = _find_dead_lc()
     live_lc: str = _find_live_lc()
@@ -160,16 +168,31 @@ def sync_floor_loads_to_midas() -> SyncMidasResponse:
 
     max_key: int = max((int(k) for k in existing_fbld if k.isdigit()), default=0)
 
+    # 로컬 데이터로 FBLD 구성
     updated_fbld: dict[str, dict] = {}
+    new_names: set[str] = set()
     for idx, entry in enumerate(entries, start=1):
         fbld_entry: dict = _build_fbld_entry(entry, dead_lc, live_lc, idx)
         name: str = fbld_entry["NAME"]
+        new_names.add(name)
 
         if name in name_to_key:
             updated_fbld[name_to_key[name]] = fbld_entry
         else:
             max_key += 1
             updated_fbld[str(max_key)] = fbld_entry
+
+    # 로컬에 없는 기존 항목 삭제
+    deleted_keys: list[str] = []
+    for name, key in name_to_key.items():
+        if name not in new_names:
+            deleted_keys.append(key)
+
+    for key in deleted_keys:
+        try:
+            MIDAS.MidasAPI("DELETE", f"/db/FBLD/{key}")
+        except Exception:
+            pass
 
     try:
         MIDAS.floorLoadDB._data = {"FBLD": updated_fbld}
