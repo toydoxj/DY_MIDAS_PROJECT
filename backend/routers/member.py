@@ -114,9 +114,26 @@ def get_beam_force_max(req: BeamForceMaxRequest) -> list[Union[BeamForceMaxRow, 
         if req.force_refresh:
             MIDAS.sectionDB.get()
             MIDAS.elementDB.get()
-            MIDAS.beamForceDB.get(keys=None)  # 전체 재조회
-        else:
-            MIDAS.beamForceDB.ensure_loaded_all()  # 전체 캐시 사용 (비어있으면 자동 로드)
+            MIDAS.beamForceDB.clear_cache()
+
+        # 필요한 element만 누적 조회 (전체 조회 대신)
+        target_keys: list[int] = []
+        if req.element_keys:
+            target_keys = req.element_keys
+        elif req.section_names:
+            # 단면명 → element ID 역매핑
+            elem_map = MIDAS.elementDB.beam_section_map()
+            sect_info = MIDAS.sectionDB.info()
+            name_to_id: dict[str, int] = {
+                v.get("name", ""): int(k)
+                for k, v in sect_info.items()
+            }
+            target_sect_ids = {name_to_id[n] for n in req.section_names if n in name_to_id}
+            target_keys = [eid for eid, sid in elem_map.items() if sid in target_sect_ids]
+
+        if target_keys:
+            MIDAS.beamForceDB.ensure_keys(target_keys)
+
         df = MIDAS.beamForceDB.to_max_dataframe(
             group_by=req.group_by,
             section_names=req.section_names if req.section_names else None,

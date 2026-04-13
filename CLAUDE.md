@@ -4,7 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-MIDAS GEN NX API를 Python에서 사용하기 위한 래퍼 라이브러리. (주)동양구조 개발 중
+MIDAS GEN NX API를 Python에서 사용하기 위한 래퍼 라이브러리. (주)동양구조 개발 중.
+공식 `midas-gen` 라이브러리(v1.5.9)를 기반으로 하며, 서버 안전성을 위한 래퍼 계층을 유지한다.
 
 ## 개발 환경
 
@@ -22,15 +23,23 @@ source .venv/Scripts/activate
 python test.py
 ```
 
-**설치된 주요 패키지:** `requests`, `pandas`, `colorama`
+**설치된 주요 패키지:** `midas-gen`, `requests`, `pandas`, `polars`, `colorama`
 
 ## 코드 아키텍처
 
 ```
 MIDAS_API/
-├── __init__.py       # 공개 API 노출: MIDAS_API_BASEURL, MIDAS_API_KEY, MidasAPI
-├── _midas_api.py     # API 클라이언트 구현 (핵심 모듈)
-└── _to_excel.py      # JSON 응답 → DataFrame/행 변환 유틸리티
+├── __init__.py       # 공개 API + midas-gen 기능 re-export (Result, TableOptions, Model 등)
+├── _midas_api.py     # midas-gen MAPI_BASEURL/MAPI_KEY alias + 안전한 MidasAPI() 래퍼
+├── _client.py        # MidasClient (ContextVar 기반, sys.exit 방지)
+├── _to_excel.py      # JSON 응답 → DataFrame/행 변환 유틸리티
+├── _section.py       # sectionDB — 단면 캐싱/info()
+├── _element.py       # elementDB — 요소 캐싱/beam_section_map()
+├── _beam_force.py    # beamForceDB — 설계 부재력 추출/피벗/최대값
+├── _project.py       # projectDB (/db/PJCF)
+├── _loads.py         # loadCaseDB, selfWeightDB, loadToMassDB
+├── _floorload.py     # floorLoadDB (/db/FBLD)
+└── _analysis.py      # structureTypeDB (/db/STYP)
 ```
 
 ### 핵심 패턴
@@ -39,20 +48,21 @@ MIDAS_API/
 ```python
 import MIDAS_API as MIDAS
 
-MIDAS.MIDAS_API_BASEURL("https://...")   # 클래스 변수에 URL 저장
-MIDAS.MIDAS_API_KEY("your-api-key")     # 클래스 변수에 키 저장
-response = MIDAS.MidasAPI("GET", "/db/STOR")  # REST 호출
+MIDAS.MIDAS_API_BASEURL("https://...")   # → midas_gen.MAPI_BASEURL 위임
+MIDAS.MIDAS_API_KEY("your-api-key")     # → midas_gen.MAPI_KEY 위임
+response = MIDAS.MidasAPI("GET", "/db/STOR")  # MidasClient 경유 (안전)
 ```
 
-- `MIDAS_API_BASEURL`과 `MIDAS_API_KEY`는 **클래스 변수**를 사용하므로 전역 상태로 관리됨
-- `MidasAPI()` 함수는 POST/GET/PUT/DELETE 메서드 지원, JSON dict 반환
-- `_to_excel.py`의 `dict_to_rows()`, `to_dataframe()`은 중첩 dict 응답을 평탄화
+- `MIDAS_API_BASEURL`/`MIDAS_API_KEY`는 `midas_gen.MAPI_BASEURL`/`MAPI_KEY`의 alias
+- `MidasAPI()` 함수는 `MidasClient.request()`를 통해 호출 (midas-gen의 `sys.exit()` 방지)
+- midas-gen 공식 기능도 직접 사용 가능: `MIDAS.Result.TABLE.BeamForce(...)`, `MIDAS.TableOptions(...)`
 
 ### API 응답 구조
 
 MIDAS API는 중첩된 dict를 반환함. `_to_excel.py`의 유틸리티로 변환:
 - `dict_to_rows(data, id_col="ID")` → list of dicts
 - `to_dataframe(data, id_col="ID")` → pandas DataFrame
+- midas-gen의 `Result.TABLE.*()` → polars DataFrame 직접 반환
 
 ## 웹 대시보드
 

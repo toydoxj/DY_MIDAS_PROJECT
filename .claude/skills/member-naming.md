@@ -28,7 +28,8 @@ M : 중간층(메자닌)
   B : Beam (Girder와 연결되는 부재로 대부분 지진력 저항시스템의 영향을 받지 않음)
   SG 또는 SB : Girder와 Beam 중 강구조를 의미함.
   SRG 또는 SRB : 매립형합성보 의미
-  TG 또는 TB : 전이보를 의미함 (ALL 배근 적용), 최하층의 경우 지중보(Tie Girder를 의미하는 경우도 있음)
+  TG 또는 TB : 전이보를 의미함 (ALL 배근 적용), 최하층의 경우 지중보(Tie Girder를 의미하
+  경우도 있음)
   WG : Wall Girder (벽체와 연결되는 Girder로 대부분 힘이 작음, ALL 배근 적용, 부재력이 과다하게 큰 경우 검토 필요함)
   FG : 지붕보 (Footing Girder)
   LB : 인방보 (Lintel Beam)

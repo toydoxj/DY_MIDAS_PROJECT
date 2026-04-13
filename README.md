@@ -8,12 +8,12 @@ MIDAS GEN NX REST API를 Python에서 사용하기 위한 래퍼 라이브러리
 
 ```
 Task_MIDAS/
-├── MIDAS_API/                  # Python API 래퍼 라이브러리 (도메인별 구성)
-│   ├── _midas_api.py           # REST API 클라이언트 (핵심)
-│   ├── _project.py             # 프로젝트 DB (PJCF)
-│   ├── _loads.py               # 하중 DB (STLD, BODF, LTOM)
-│   ├── _analysis.py            # 해석 설정 DB (STYP)
-│   ├── _beam_force.py          # 보 설계 부재력 추출/피벗/Excel
+├── MIDAS_API/                  # Python API 래퍼 라이브러리 (midas-gen 기반)
+│   ├── _midas_api.py           # midas-gen MAPI_BASEURL/KEY alias + 안전한 MidasAPI 래퍼
+│   ├── _client.py              # MidasClient (ContextVar, sys.exit 방지)
+│   ├── _beam_force.py          # 설계 부재력 누적 캐싱/피벗/최대값
+│   ├── _section.py / _element.py # 단면·요소 캐싱 + JOIN
+│   ├── _project.py / _loads.py / _analysis.py / _floorload.py  # 도메인별 DB
 │   └── _to_excel.py            # JSON → DataFrame 변환
 │
 ├── backend/                    # FastAPI 백엔드

@@ -10,6 +10,17 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.0.8",
+    date: "2026-04-13",
+    changes: [
+      "midas-gen 공식 라이브러리 통합 (v1.5.9)",
+      "MIDAS_API: URL/KEY를 midas-gen alias로 교체, Result/TableOptions re-export",
+      "부재력 누적 캐싱 도입 (선택 element만 조회, 502 에러 방지)",
+      "RC 보 단면 필터: 기둥(C/SC/SRC) 제외, 공백 구분 부재명 파싱 개선",
+      "층 범위 매칭: 하이픈(3-5) 지원 추가",
+    ],
+  },
+  {
     version: "1.0.7",
     date: "2026-04-08",
     changes: [

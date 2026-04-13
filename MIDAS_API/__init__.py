@@ -9,10 +9,21 @@ from ._section import sectionDB
 from ._element import elementDB
 from ._beam_force import beamForceDB
 
-_version_ = "0.0.1"
+# midas-gen 공식 기능 re-export (선택적 사용)
+from midas_gen import (
+    MAPI_COUNTRY,
+    Result,
+    TableOptions,
+    Section,
+    Element,
+    Node,
+    Load,
+    Material,
+    Model,
+)
+
+_version_ = "0.0.2"
 _author_ = "Jeong, Jihun"
 _copyright_ = "Copyright 2026 Dongyang Consulting Engineering Co., Ltd."
 _description_ = "MIDAS-API is a Python library for the MIDAS GEN NX API."
-
-
 

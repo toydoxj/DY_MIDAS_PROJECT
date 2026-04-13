@@ -84,25 +84,65 @@ function autoDetectRebarType(force: BeamForceMaxRow): { rebarType: RebarType; sw
   return { rebarType: "type3", swapIJ: false };
 }
 
-/** RC 보 구분자만 (강구조 SG, SB, SRG, SRB 제외) */
-const RC_BEAM_SEPARATORS = ["TG", "TB", "WG", "FG", "LB", "G", "B"] as const;
-const RC_BEAM_SEP_REGEX = new RegExp(`^(.*?)(${RC_BEAM_SEPARATORS.join("|")})(\\d+.*)?$`);
+/**
+ * 부재명 구분자 (member-naming skill 기준)
+ * 보: TG, TB, WG, FG, LB, G, B
+ * 기둥: SRC, SC, C
+ * 강구조: SRG, SRB, SG, SB
+ */
+const BEAM_SEPS = new Set(["TG", "TB", "WG", "FG", "LB", "G", "B"]);
+/** 모든 구분자 — 긴 것부터 (prefix 충돌 방지) */
+const ALL_SEPS = ["SRC", "SRG", "SRB", "SC", "SG", "SB", "TG", "TB", "WG", "FG", "LB", "G", "B", "C"] as const;
+/** 번호 유효성: 숫자로 시작, 뒤에 알파벳 가능 (1, 2A, 12, 8E) */
+const VALID_NUM = /^\d+[A-Za-z]*$/;
 
-/** 강구조 구분자 (제외용) */
-const STEEL_PREFIX_REGEX = /^(.*?)(SRG|SRB|SG|SB)/;
-
-/** 단면명에서 층 정보를 파싱 (RC만) */
-function parseBeamName(name: string): { floor: string; sep: string; num: string } | null {
-  // 강구조 제외
-  if (STEEL_PREFIX_REGEX.test(name)) return null;
-  const m = name.match(RC_BEAM_SEP_REGEX);
-  if (!m) return null;
-  return { floor: m[1] || "", sep: m[2], num: m[3] || "" };
+/** 문자열에서 구분자를 찾아 {floor, sep, num} 분리 */
+function findSeparator(s: string): { floor: string; sep: string; num: string } | null {
+  for (let i = 0; i <= s.length; i++) {
+    for (const sep of ALL_SEPS) {
+      if (s.substring(i, i + sep.length) === sep) {
+        const num = s.substring(i + sep.length);
+        // 번호가 있으면 유효해야 함 (숫자 시작), 없으면 허용
+        if (num && !VALID_NUM.test(num)) continue;
+        return { floor: s.substring(0, i), sep, num };
+      }
+    }
+  }
+  return null;
 }
 
-/** RC 보 단면만 필터 */
+/** 단면명에서 층·구분자·번호를 파싱 (RC 보만, 기둥·강구조 제외)
+ *
+ * 공백 있음: "B1 G1"  → floor="B1", sep="G", num="1"
+ * 공백 없음: "8G2"    → floor="8",  sep="G", num="2"
+ * 공백 없음: "B1G1"   → floor="B1", sep="G", num="1" (B를 보 구분자로 오인하지 않음)
+ */
+function parseBeamName(name: string): { floor: string; sep: string; num: string } | null {
+  const parts = name.split(/\s+/);
+
+  let result: { floor: string; sep: string; num: string } | null;
+
+  if (parts.length >= 2) {
+    // 공백 있음: 마지막 파트가 구분자+번호, 앞부분이 층
+    const floor = parts.slice(0, -1).join(" ");
+    const memberPart = parts[parts.length - 1];
+    const parsed = findSeparator(memberPart);
+    if (!parsed) return null;
+    result = { floor, sep: parsed.sep, num: parsed.num };
+  } else {
+    // 공백 없음: 전체에서 구분자 탐색
+    result = findSeparator(name);
+    if (!result) return null;
+  }
+
+  // RC 보 구분자만 통과 (기둥 C/SC/SRC, 강구조 SG/SB/SRG/SRB 제외)
+  if (!BEAM_SEPS.has(result.sep)) return null;
+  return result;
+}
+
+/** RC 보 단면만 필터 (구분선 "---1F---" 등 제외) */
 function filterRcBeamSections(sects: SectionInfo[]): SectionInfo[] {
-  return sects.filter((s) => parseBeamName(s.name) !== null);
+  return sects.filter((s) => !s.name.startsWith("---") && parseBeamName(s.name) !== null);
 }
 
 interface StoryItem {
@@ -137,16 +177,16 @@ function sectionMatchesStory(sectName: string, storyName: string): boolean {
   // 단일 층 매칭
   if (normalizedFloor === normalizedStory) return true;
 
-  // 범위 매칭: 2~4 → 2,3,4 (범위 내 각 토큰 정규화)
-  const rangeMatch = floor.match(/^(-?\d+)~(-?\d+)$/);
+  // 범위 매칭: "3-5" 또는 "3~5" → 3,4,5층 (하이픈·틸데 모두 지원)
+  const rangeMatch = floor.match(/^(-?\d+)[-~](-?\d+)$/);
   if (rangeMatch) {
     const lo = parseInt(rangeMatch[1]);
     const hi = parseInt(rangeMatch[2]);
     const nVal = parseInt(normalizedStory);
-    if (!isNaN(nVal) && nVal >= lo && nVal <= hi) return true;
+    if (!isNaN(nVal) && nVal >= Math.min(lo, hi) && nVal <= Math.max(lo, hi)) return true;
   }
 
-  // 불연속 매칭: 2,8
+  // 불연속 매칭: "2,8"
   if (floor.includes(",")) {
     const parts = floor.split(",").map((p) => normalizeFloor(p.trim()));
     if (parts.includes(normalizedStory)) return true;
