@@ -59,6 +59,14 @@ electron/dist/
 .claude/settings.json
 .claude/worktrees/
 
+# Runtime / local state
+dashboard.db
+work_dir.json
+.mcp.json
+shrimp-rules.md
+shrimp_data/
+.playwright-mcp/
+
 # OS
 .DS_Store
 Thumbs.db
