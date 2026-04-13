@@ -1,5 +1,13 @@
 import os
 import sys
+import io
+
+# PyInstaller exe에서 midas_gen 배너의 유니코드 문자(╭╰ 등)가
+# cp949 인코딩에서 깨지는 문제 방지
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # PyInstaller 번들 여부에 따라 경로 설정
 if getattr(sys, "frozen", False):

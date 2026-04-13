@@ -48,6 +48,13 @@ a = Analysis(
         'requests',
         'pandas',
         'colorama',
+        # midas-gen 공식 라이브러리 및 의존성
+        'midas_gen',
+        'polars',
+        'scipy',
+        'numpy',
+        'tqdm',
+        'openpyxl',
     ],
     hookspath=[],
     hooksconfig={},

@@ -70,7 +70,7 @@ async function startBackend() {
     : path.join(__dirname, "..");
 
   backendProcess = spawn(backendExe, [], {
-    env: { ...process.env, BACKEND_PORT: String(BACKEND_PORT) },
+    env: { ...process.env, BACKEND_PORT: String(BACKEND_PORT), PYTHONIOENCODING: "utf-8" },
     cwd: backendCwd,
     stdio: ["ignore", "pipe", "pipe"],
   });
