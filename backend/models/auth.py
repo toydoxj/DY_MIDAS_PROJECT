@@ -1,6 +1,6 @@
 """사용자 인증 모델 (SQLAlchemy 테이블 + Pydantic 스키마)"""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from pydantic import BaseModel
@@ -15,7 +15,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, nullable=False, index=True)
-    password = Column(String, nullable=False)  # bcrypt 해시
+    password = Column(String, nullable=False)  # SHA-256 + salt 해시
     name = Column(String, default="")
     role = Column(String, default="user")  # "admin" | "user"
     status = Column(String, default="active")  # "active" | "pending" | "rejected"
@@ -23,7 +23,7 @@ class User(Base):
     midas_url = Column(String, default="")
     midas_key = Column(String, default="")
     work_dir = Column(String, default="")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 # ── Pydantic 요청/응답 스키마 ──

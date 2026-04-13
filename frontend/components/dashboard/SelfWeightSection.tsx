@@ -7,7 +7,7 @@ import SectionCard from "@/components/ui/SectionCard";
 import RefreshButton from "@/components/ui/RefreshButton";
 import { ErrorText } from "@/components/ui/StatusMessage";
 
-export default function SettingSection() {
+export default function SelfWeightSection() {
   const [rows, setRows] = useState<SelfWeightRow[]>([]);
   const [massDat, setMassDat] = useState<StructureMass | null>(null);
   const [ltomDat, setLtomDat] = useState<LoadToMassData | null>(null);

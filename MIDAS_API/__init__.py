@@ -22,8 +22,8 @@ from midas_gen import (
     Model,
 )
 
-_version_ = "0.0.2"
-_author_ = "Jeong, Jihun"
-_copyright_ = "Copyright 2026 Dongyang Consulting Engineering Co., Ltd."
-_description_ = "MIDAS-API is a Python library for the MIDAS GEN NX API."
+__version__ = "0.0.2"
+__author__ = "Jeong, Jihun"
+__copyright__ = "Copyright 2026 Dongyang Consulting Engineering Co., Ltd."
+__description__ = "MIDAS-API is a Python library for the MIDAS GEN NX API."
 
