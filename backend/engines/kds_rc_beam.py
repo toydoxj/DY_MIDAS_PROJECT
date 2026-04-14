@@ -8,6 +8,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from .kds_common import clamp, demand_capacity_ratio, linear_interpolate
+
 
 # ── 철근 규격 (공칭 단면적, mm²) ──
 
@@ -30,15 +32,30 @@ def stirrup_area(dia: int, legs: int = 2) -> float:
 # ── 기본 계수 ──
 
 def beta1(fck: float) -> float:
-    """등가직사각형 응력블록 계수 β₁"""
+    """[KDS 41 30 00] 등가직사각형 응력블록 계수 beta1."""
     if fck <= 28:
         return 0.85
     return max(0.85 - 0.007 * (fck - 28), 0.65)
 
 
 def effective_depth(H: float, cover: float, stirrup_dia: float, main_dia: float) -> float:
-    """유효깊이 d (mm)"""
+    """[KDS 41 30 00] 유효깊이 d (mm)."""
     return H - cover - stirrup_dia - main_dia / 2
+
+
+def flexure_phi_from_tension_strain(epsilon_t: float) -> float:
+    """[KDS 41 30 00] 인장철근 변형률 기반 강도감소계수 phi 계산."""
+    if epsilon_t >= 0.005:
+        return 0.85
+    if epsilon_t <= 0.002:
+        return 0.65
+    phi = linear_interpolate(epsilon_t, 0.002, 0.65, 0.005, 0.85)
+    return clamp(phi, 0.65, 0.85)
+
+
+def concrete_shear_strength_kN(B: float, d: float, fck: float) -> float:
+    """[KDS 41 30 00] 콘크리트 전단강도 Vc = (1/6)*sqrt(fck)*B*d (kN)."""
+    return (1 / 6) * math.sqrt(fck) * B * d / 1000
 
 
 # ── 휨강도 ──
@@ -58,7 +75,7 @@ class FlexureResult:
 def calc_flexural_strength(
     B: float, d: float, As: float, fck: float, fy: float, Mu_kNm: float,
 ) -> FlexureResult:
-    """휨강도 검토 (등가직사각형 응력블록법)
+    """[KDS 41 30 00] 휨강도 검토 (등가직사각형 응력블록법).
 
     Args:
         B: 폭 (mm), d: 유효깊이 (mm), As: 인장철근 단면적 (mm²)
@@ -76,22 +93,14 @@ def calc_flexural_strength(
     # 인장철근 변형률
     epsilon_t = 0.003 * (d - c) / c if c > 0 else 999
 
-    # 강도감소계수 (변형률 기반, KDS 41 30 00)
-    # phi = 0.65 + (epsilon_t - 0.002) × (0.85 - 0.65) / (0.005 - 0.002)
-    _PHI_SLOPE = (0.85 - 0.65) / (0.005 - 0.002)  # = 200/3 ≈ 66.67
-    if epsilon_t >= 0.005:
-        phi = 0.85
-    elif epsilon_t <= 0.002:
-        phi = 0.65
-    else:
-        phi = 0.65 + (epsilon_t - 0.002) * _PHI_SLOPE
-        phi = min(max(phi, 0.65), 0.85)
+    # [KDS 41 30 00] 변형률 기반 강도감소계수
+    phi = flexure_phi_from_tension_strain(epsilon_t)
 
     # 설계휨강도 (N·mm → kN·m)
     phi_Mn = phi * As * fy * (d - a / 2) / 1e6
 
     Mu_abs = abs(Mu_kNm)
-    dcr = Mu_abs / phi_Mn if phi_Mn > 0 else 999
+    dcr = demand_capacity_ratio(Mu_abs, phi_Mn)
 
     return FlexureResult(
         Mu_d=Mu_abs, phi_Mn=round(phi_Mn, 2), dcr=round(dcr, 4),
@@ -117,7 +126,7 @@ def calc_shear_strength(
     B: float, d: float, fck: float, fyt: float,
     Av: float, s: float, Vu_kN: float,
 ) -> ShearResult:
-    """전단강도 검토
+    """[KDS 41 30 00] 전단강도 검토.
 
     Args:
         B, d: mm, fck, fyt: MPa, Av: 스터럽 단면적 (mm²),
@@ -125,15 +134,15 @@ def calc_shear_strength(
     """
     phi = 0.75
 
-    # Vc = (1/6)√fck × B × d (N) → kN
-    Vc = (1 / 6) * math.sqrt(fck) * B * d / 1000
+    # [KDS 41 30 00] Vc = (1/6)*sqrt(fck)*B*d (N) -> kN
+    Vc = concrete_shear_strength_kN(B, d, fck)
 
     # Vs = Av × fyt × d / s (N) → kN
     Vs = (Av * fyt * d / s / 1000) if s > 0 and Av > 0 else 0
 
     phi_Vn = phi * (Vc + Vs)
     Vu_abs = abs(Vu_kN)
-    dcr = Vu_abs / phi_Vn if phi_Vn > 0 else 999
+    dcr = demand_capacity_ratio(Vu_abs, phi_Vn)
 
     return ShearResult(
         Vu_d=Vu_abs, phi_Vn=round(phi_Vn, 2), dcr=round(dcr, 4),
@@ -155,13 +164,13 @@ class RebarRatioResult:
 def check_rebar_ratio(
     As: float, B: float, d: float, fck: float, fy: float,
 ) -> RebarRatioResult:
-    """최소/최대 철근비 검토"""
+    """[KDS 41 30 00] 최소/최대 철근비 검토."""
     rho = As / (B * d) if B * d > 0 else 0
 
-    # 최소철근비: max(0.25√fck/fy, 1.4/fy)
+    # [KDS 41 30 00] 최소철근비: max(0.25*sqrt(fck)/fy, 1.4/fy)
     rho_min = max(0.25 * math.sqrt(fck) / fy, 1.4 / fy)
 
-    # 최대철근비: 0.85 × β₁ × fck/fy × 600/(600+fy) × 0.75
+    # [KDS 41 30 00] 최대철근비: 0.75 * rho_b
     b1 = beta1(fck)
     rho_b = 0.85 * b1 * fck / fy * 600 / (600 + fy)
     rho_max = 0.75 * rho_b
@@ -184,9 +193,9 @@ class StirrupSpacingResult:
 def check_stirrup_spacing(
     d: float, fck: float, B: float, Vs_kN: float, s: float,
 ) -> StirrupSpacingResult:
-    """스터럽 최대간격 검토"""
-    # Vs 한계 = (1/6)√fck × B × d (N) → kN
-    Vs_limit = (1 / 6) * math.sqrt(fck) * B * d / 1000
+    """[KDS 41 30 00] 스터럽 최대간격 검토."""
+    # [KDS 41 30 00] Vs 한계 = (1/6)*sqrt(fck)*B*d (N) -> kN
+    Vs_limit = concrete_shear_strength_kN(B, d, fck)
 
     if Vs_kN <= Vs_limit:
         s_max = min(d / 2, 600)
@@ -232,7 +241,7 @@ def check_position(
     Mu_pos_kNm: float = 0,  # 양의 모멘트 (하부근 인장)
     Vu_kN: float = 0,       # 전단력
 ) -> PositionCheck:
-    """단일 위치(I/C/J)에 대한 통합 검토"""
+    """[KDS 41 30 00] 단일 위치(I/C/J)에 대한 통합 검토."""
 
     As_top = rebar_area(top_dia, top_count)
     As_bot = rebar_area(bot_dia, bot_count)

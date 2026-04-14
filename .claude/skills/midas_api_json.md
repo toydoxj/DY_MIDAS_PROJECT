@@ -1,11 +1,19 @@
 ---
 name: midas-api-json
-description: MIDAS GEN NX REST API 엔드포인트 전체 목록 및 JSON 스키마 참조. API 엔드포인트, JSON 구조, 스키마를 다룰 때 참조할 것.
+description: MIDAS GEN NX REST API 엔드포인트 인덱스/링크 허브. 상세 요청 스키마는 하위 schema 문서에서 다룬다.
+last_reviewed: 2026-04-13
+source: https://support.midasuser.com/hc/ko/articles/33016922742937
 ---
 
 # MIDAS API JSON Manual
 
 출처: https://support.midasuser.com/hc/ko/articles/33016922742937
+
+## 문서 역할
+
+- 이 문서는 엔드포인트 목록과 공식 링크를 빠르게 찾기 위한 인덱스다.
+- 상세 JSON 요청/응답 스키마는 `.claude/skills/midas_api_json/` 하위 문서를 우선 참조한다.
+- 구조 해석 규정 검토(예: 내진 설계 검토)는 `seismic.md`를 참조한다.
 
 ## 섹션 구조
 

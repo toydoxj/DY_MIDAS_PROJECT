@@ -1,0 +1,264 @@
+{
+  "version": 1,
+  "savedAt": "2026-04-05T00:46:56.912Z",
+  "sections": [
+    {
+      "section_name": "2B2A",
+      "B": 500.0,
+      "H": 700.0,
+      "fck": 30.0,
+      "fy": 500.0,
+      "fyt": 400.0,
+      "rebars": [
+        {
+          "position": "I",
+          "top_dia": 22,
+          "top_count": 4,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 10,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        },
+        {
+          "position": "C",
+          "top_dia": 22,
+          "top_count": 3,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 10,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        },
+        {
+          "position": "J",
+          "top_dia": 22,
+          "top_count": 3,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 10,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        }
+      ]
+    },
+    {
+      "section_name": "2G11",
+      "B": 500.0,
+      "H": 700.0,
+      "fck": 30.0,
+      "fy": 500.0,
+      "fyt": 400.0,
+      "rebars": [
+        {
+          "position": "I",
+          "top_dia": 22,
+          "top_count": 5,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 10,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        },
+        {
+          "position": "C",
+          "top_dia": 22,
+          "top_count": 3,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 10,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        },
+        {
+          "position": "J",
+          "top_dia": 22,
+          "top_count": 3,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 10,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        }
+      ]
+    },
+    {
+      "section_name": "2G3",
+      "B": 500.0,
+      "H": 700.0,
+      "fck": 30.0,
+      "fy": 500.0,
+      "fyt": 400.0,
+      "rebars": [
+        {
+          "position": "I",
+          "top_dia": 22,
+          "top_count": 4,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 10,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        },
+        {
+          "position": "C",
+          "top_dia": 22,
+          "top_count": 3,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 10,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        },
+        {
+          "position": "J",
+          "top_dia": 22,
+          "top_count": 3,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 10,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        }
+      ]
+    },
+    {
+      "section_name": "4~7G5",
+      "B": 500.0,
+      "H": 700.0,
+      "fck": 30.0,
+      "fy": 500.0,
+      "fyt": 400.0,
+      "rebars": [
+        {
+          "position": "I",
+          "top_dia": 22,
+          "top_count": 6,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 10,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        },
+        {
+          "position": "C",
+          "top_dia": 22,
+          "top_count": 3,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 10,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        },
+        {
+          "position": "J",
+          "top_dia": 22,
+          "top_count": 3,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 10,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        }
+      ]
+    },
+    {
+      "section_name": "4~7G11",
+      "B": 500.0,
+      "H": 700.0,
+      "fck": 30.0,
+      "fy": 500.0,
+      "fyt": 400.0,
+      "rebars": [
+        {
+          "position": "I",
+          "top_dia": 22,
+          "top_count": 5,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 10,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        },
+        {
+          "position": "C",
+          "top_dia": 22,
+          "top_count": 3,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 10,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        },
+        {
+          "position": "J",
+          "top_dia": 22,
+          "top_count": 3,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 10,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        }
+      ]
+    },
+    {
+      "section_name": "4~7G4",
+      "B": 400.0,
+      "H": 700.0,
+      "fck": 30.0,
+      "fy": 500.0,
+      "fyt": 400.0,
+      "rebars": [
+        {
+          "position": "I",
+          "top_dia": 22,
+          "top_count": 7,
+          "bot_dia": 22,
+          "bot_count": 6,
+          "stirrup_dia": 13,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 150.0,
+          "cover": 40.0
+        },
+        {
+          "position": "C",
+          "top_dia": 22,
+          "top_count": 3,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 13,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        },
+        {
+          "position": "J",
+          "top_dia": 22,
+          "top_count": 3,
+          "bot_dia": 22,
+          "bot_count": 3,
+          "stirrup_dia": 13,
+          "stirrup_legs": 2,
+          "stirrup_spacing": 200.0,
+          "cover": 40.0
+        }
+      ]
+    }
+  ]
+}

@@ -1,9 +1,36 @@
 ---
-name : seismic review
-description : 지진하중에 대한 적정성 검토. 코드에서 지진하중 관련된 부분 검토 시 아래 규칙에 적합한지 확인함.
+name: seismic-review
+description: KDS 기준 지진하중 적정성 검토 체크리스트. API 엔드포인트 목록은 midas_api_json 스킬을 참조.
+last_reviewed: 2026-04-13
+source: KDS 41 17 00:2022
 ---
 
 # 지진하중 검토를 위한 자료 체크
+
+## 사용 범위
+
+- 사용: 설계응답스펙트럼, 내진등급, 시스템계수(R/Omega0/Cd), 등가정적지진하중 검토
+- 제외: MIDAS API 엔드포인트 목록 검색 (-> `midas_api_json.md`)
+
+## 코드 규칙
+
+- **KDS 지진하중 계산은 반드시 `backend/engines/kds_seismic.py`의 함수를 사용한다.**
+  - `classify_soil()`: 지반분류 (Vs, H → S1~S5)
+  - `calc_cs()`: 등가정적 지진응답계수 Cs (상·하한 포함)
+  - `calc_applied_period()`: 적용주기 T (Ta, Cu, T_eigen)
+  - `calc_seismic_category()`: 내진설계범주 (A~D)
+  - `interpolate_site_coeff()`: Fa/Fv 선형보간
+  - `interpolate_cu()`: Cu 선형보간
+  - 테이블 데이터: `SFRS_TABLE`, `FA_TABLE`, `FV_TABLE`, `STRUCT_PERIOD_COEFF`, `ALLOWABLE_DRIFT`, `STRUCT_TYPE_LABELS`
+- 프론트엔드(`frontend/app/loadcase/seismic/page.tsx`)에도 동일 계산 로직이 있다. 양쪽의 계산 결과가 항상 일치해야 한다.
+- 지반분류는 SPFC의 `SC_` 입력값이 아닌, 프로젝트 정보의 전단파속도(Vs)와 기반암깊이(H)로 계산한다.
+
+## 빠른 체크리스트
+
+- [ ] 지반 분류(S1~S6)와 `Fa`, `Fv` 산정 근거가 명시되었는가
+- [ ] `Sds`, `Sd1`, `T0`, `Ts`, `TL` 계산식과 단위가 일치하는가
+- [ ] 구조시스템별 `R`, `Omega0`, `Cd` 선택 근거가 기록되었는가
+- [ ] `Ta`, `Cu`, `T`, `Cs`의 상/하한 적용이 누락되지 않았는가
 
 유효지반가속도 : S
 단주기 설계스펙트럼 가속도 : Sds = S \* 2.5 \* Fa \* 2/3

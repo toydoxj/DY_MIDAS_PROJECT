@@ -1,21 +1,49 @@
-config.yaml 또는 지정된 설정 파일의 FormConfig/DY_Form 구조를 검증한다.
+# validate-config
 
-## 검증 항목
+## 목적
 
-1. **필수 최상위 필드**: `formConfig`, `dyForm` 존재 여부
-2. **DY_Form 6개 필수 항목**: `geometry`, `section`, `material`, `load`, `boundary`, `view`
-3. **geometry 구조**: `origin` 필드 존재 및 dict 타입 확인
-4. **section/material**: 각 항목에 `name`, `type` 필드 존재
-5. **load**: `name`, `type`, `value` 필드 존재
-6. **exportFormat/outputPath**: 유효한 포맷 및 경로
+`config.yaml`의 `formConfig`/`dyForm` 구조를 사전에 검증해 변환 및 API 호출 실패를 방지한다.
 
-## 실행 방법
+## 전제 조건
 
-1. config.yaml (또는 인자로 받은 파일)을 읽는다
-2. 위 항목을 순서대로 검증한다
-3. 검증 결과를 테이블 형태로 출력한다 (항목 | 상태 | 비고)
-4. 오류가 있으면 수정 방법을 제안한다
+- 입력 파일은 UTF-8 YAML이어야 한다.
+- 최상위에 `formConfig`, `dyForm` 키가 있어야 한다.
 
-## 참고
-- DY_Form 스키마: memory의 project_dyform_concept.md
-- config 템플릿: config/templates/*.yaml
+## 입력
+
+- 파일 경로: 기본 `config.yaml` 또는 사용자 지정 YAML 경로
+- 필수 키 계약:
+  - `formConfig`: `exportFormat`, `outputPath`
+  - `dyForm`: `geometry`, `section`, `material`, `load`, `boundary`, `view`
+
+## 출력
+
+- 검증 결과 테이블: `항목 | 상태(PASS/FAIL) | 비고`
+- FAIL 항목이 있으면 수정 가이드 목록
+
+## 실행 절차
+
+1. YAML 파일을 읽고 파싱 오류 여부를 확인한다.
+2. 최상위 키(`formConfig`, `dyForm`) 존재 여부를 확인한다.
+3. `dyForm` 하위 6개 필수 항목 존재 여부를 확인한다.
+4. `geometry.origin`이 dict인지 확인한다.
+5. `section`, `material` 배열 각 항목의 `name`, `type`을 확인한다.
+6. `load` 배열 각 항목의 `name`, `type`, `value`를 확인한다.
+7. `formConfig.exportFormat` 허용값(`json`, `excel`, `mct`, `mgb`)을 확인한다.
+8. `formConfig.outputPath`가 문자열 경로인지 확인한다.
+
+## 실패 기준 및 복구
+
+- YAML 파싱 실패: 들여쓰기/콜론/따옴표 오류를 수정한다.
+- 필수 키 누락: 누락된 키를 최소 스키마로 채운다.
+- 타입 불일치: dict/array/string 기대 타입으로 수정한다.
+
+## 관련 문서
+
+- `.claude/commands/convert-api.md`
+- `.claude/commands/export-results.md`
+
+## 마지막 검증
+
+- 검증일: 2026-04-13
+- 검증자: Codex

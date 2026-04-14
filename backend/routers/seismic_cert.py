@@ -9,122 +9,16 @@ from fastapi.responses import StreamingResponse
 import MIDAS_API as MIDAS
 
 from exceptions import MidasApiError
+from engines.kds_seismic import (
+    SFRS_TABLE, ALLOWABLE_DRIFT, STRUCT_TYPE_LABELS, STRUCT_PERIOD_COEFF,
+    classify_soil, calc_cs, calc_seismic_category, calc_applied_period,
+)
 from models.seismic_cert import SeismicCertAutoData, SeismicCertRequest
 
 router = APIRouter()
 
 # 지반분류 코드 → 라벨 매핑
 _SC_LABELS: dict[int, str] = {1: "S1", 2: "S2", 3: "S3", 4: "S4", 5: "S5"}
-
-# SFRS 코드 → (시스템명, R, Ω₀, Cd) 매핑 (KDS 41 17 00:2022 표 6.2-1)
-_SFRS_TABLE: dict[str, tuple[str, float, float, float]] = {
-    # 1. 내력벽시스템
-    "1-a": ("1-a. 철근콘크리트 특수전단벽", 5, 2.5, 5),
-    "1-b": ("1-b. 철근콘크리트 보통전단벽", 4, 2.5, 4),
-    "1-c": ("1-c. 철근보강 조적 전단벽", 2.5, 2.5, 1.5),
-    "1-d": ("1-d. 무보강 조적 전단벽", 1.5, 2.5, 1.5),
-    "1-e": ("1-e. 구조용 목재패널을 덧댄 경골목구조 전단벽", 6, 3, 4),
-    "1-f": ("1-f. 구조용 목재패널 또는 강판시트를 덧댄 경량철골조 전단벽", 6, 3, 4),
-    # 2. 건물골조시스템
-    "2-a": ("2-a. 철골 편심가새골조 (링크 타단 모멘트 저항 접합)", 8, 2, 4),
-    "2-b": ("2-b. 철골 편심가새골조 (링크 타단 비모멘트 저항접합)", 7, 2, 4),
-    "2-c": ("2-c. 철골 특수중심가새골조", 6, 2, 5),
-    "2-d": ("2-d. 철골 보통중심가새골조", 3.25, 2, 3.25),
-    "2-e": ("2-e. 합성 편심가새골조", 8, 2, 4),
-    "2-f": ("2-f. 합성 특수중심가새골조", 5, 2, 4.5),
-    "2-g": ("2-g. 합성 보통중심가새골조", 3, 2, 3),
-    "2-h": ("2-h. 합성 강판전단벽", 6.5, 2.5, 5.5),
-    "2-i": ("2-i. 합성 특수전단벽", 6, 2.5, 5),
-    "2-j": ("2-j. 합성 보통전단벽", 5, 2.5, 4.5),
-    "2-k": ("2-k. 철골 특수강판전단벽", 7, 2, 6),
-    "2-l": ("2-l. 철골 좌굴방지가새골조 (모멘트 저항 접합)", 8, 2.5, 5),
-    "2-m": ("2-m. 철골 좌굴방지가새골조 (비모멘트 저항 접합)", 7, 2, 5.5),
-    "2-n": ("2-n. 철근콘크리트 특수전단벽", 6, 2.5, 5),
-    "2-o": ("2-o. 철근콘크리트 보통전단벽", 5, 2.5, 4.5),
-    "2-p": ("2-p. 철근보강 조적 전단벽", 3, 2.5, 2),
-    "2-q": ("2-q. 무보강 조적 전단벽", 1.5, 2.5, 1.5),
-    "2-r": ("2-r. 구조용 목조패널을 덧댄 경골목구조 전단벽", 6.5, 2.5, 4.5),
-    "2-s": ("2-s. 구조용 목재패널 또는 강판시트를 덧댄 경량철골조 전단벽", 6.5, 2.5, 4.5),
-    # 3. 모멘트-저항골조 시스템
-    "3-a": ("3-a. 철골 특수모멘트골조", 8, 3, 5.5),
-    "3-b": ("3-b. 철골 중간모멘트골조", 4.5, 3, 4),
-    "3-c": ("3-c. 철골 보통모멘트골조", 3.5, 3, 3),
-    "3-d": ("3-d. 합성 특수모멘트골조", 8, 3, 5.5),
-    "3-e": ("3-e. 합성 중간모멘트골조", 5, 3, 4.5),
-    "3-f": ("3-f. 합성 보통모멘트골조", 3, 3, 2.5),
-    "3-g": ("3-g. 합성 반강접모멘트골조", 6, 3, 5.5),
-    "3-h": ("3-h. 철근콘크리트 특수모멘트골조", 8, 3, 5.5),
-    "3-i": ("3-i. 철근콘크리트 중간모멘트골조", 5, 3, 4.5),
-    "3-j": ("3-j. 철근콘크리트 보통모멘트골조", 3, 3, 2.5),
-    # 4. 특수모멘트골조를 가진 이중골조시스템
-    "4-a": ("4-a. 철골 편심가새골조", 8, 2.5, 4),
-    "4-b": ("4-b. 철골 특수중심가새골조", 7, 2.5, 5.5),
-    "4-c": ("4-c. 합성 편심가새골조", 8, 2.5, 4),
-    "4-d": ("4-d. 합성 특수중심가새골조", 6, 2.5, 5),
-    "4-e": ("4-e. 합성 강판전단벽", 7.5, 2.5, 6),
-    "4-f": ("4-f. 합성 특수전단벽", 7, 2.5, 6),
-    "4-g": ("4-g. 합성 보통전단벽", 6, 2.5, 5),
-    "4-h": ("4-h. 철골 좌굴방지가새골조", 8, 2.5, 5),
-    "4-i": ("4-i. 철골 특수강판전단벽", 8, 2.5, 6.5),
-    "4-j": ("4-j. 철근콘크리트 특수전단벽", 7, 2.5, 5.5),
-    "4-k": ("4-k. 철근콘크리트 보통전단벽", 6, 2.5, 5),
-    # 5. 중간모멘트골조를 가진 이중골조시스템
-    "5-a": ("5-a. 철골 특수중심가새골조", 6, 2.5, 5),
-    "5-b": ("5-b. 철근콘크리트 특수전단벽", 6.5, 2.5, 5),
-    "5-c": ("5-c. 철근콘크리트 보통전단벽", 5.5, 2.5, 4.5),
-    "5-d": ("5-d. 합성 특수중심가새골조", 5.5, 2.5, 4.5),
-    "5-e": ("5-e. 합성 보통중심가새골조", 3.5, 2.5, 3),
-    "5-f": ("5-f. 합성 보통전단벽", 5, 3, 4.5),
-    "5-g": ("5-g. 철근보강 조적 전단벽", 3, 3, 2.5),
-    # 6. 역추형 시스템
-    "6-a": ("6-a. 캔틸레버 기둥 시스템", 2.5, 2, 2.5),
-    "6-b": ("6-b. 철골 특수모멘트골조", 2.5, 2, 2.5),
-    "6-c": ("6-c. 철골 보통모멘트골조", 1.25, 2, 2.5),
-    "6-d": ("6-d. 철근콘크리트 특수모멘트골조", 2.5, 2, 1.25),
-    # 7~10. 기타 시스템
-    "7": ("7. 철근콘크리트 보통 전단벽-골조 상호작용 시스템", 4.5, 2.5, 4),
-    "8": ("8. 강구조기준 일반규정만을 만족하는 철골구조시스템", 3, 3, 3),
-    "9": ("9. 철근콘크리트구조기준 일반규정만을 만족하는 철근콘크리트구조 시스템", 3, 3, 3),
-    "10": ("10. 지하외벽으로 둘러싸인 지하구조시스템", 3, 3, 2.5),
-}
-
-# 허용층간변위 자동 결정 (중요도 기반)
-_ALLOWABLE_DRIFT: dict[str, str] = {
-    "특": "0.010hs",
-    "(1)": "0.015hs",
-    "(2)": "0.020hs",
-    "(3)": "0.020hs",
-}
-
-# 구조형식 코드 → 라벨
-_STRUCT_TYPE_LABELS: dict[int, str] = {
-    0: "철근콘크리트 구조",
-    1: "철골 구조",
-    2: "철골철근콘크리트 구조",
-    3: "조적 구조",
-}
-
-
-def _calc_seismic_category(sds: float, importance: str) -> str:
-    """KDS 41 17 00 기준 내진설계범주 계산"""
-    if importance in ("특", "(1)"):
-        if sds < 0.167:
-            return "B"
-        elif sds < 0.33:
-            return "C"
-        elif sds < 0.50:
-            return "D"
-        else:
-            return "D"
-    else:
-        if sds < 0.167:
-            return "A"
-        elif sds < 0.33:
-            return "B"
-        elif sds < 0.50:
-            return "C"
-        else:
-            return "D"
 
 
 def _count_floors(stor: dict) -> tuple[int, int]:
@@ -147,6 +41,12 @@ def get_seismic_cert_auto() -> SeismicCertAutoData:
     """MIDAS API에서 구조안전확인서에 필요한 데이터를 통합 조회"""
     result = SeismicCertAutoData()
 
+    # 프로젝트 COMMENT에서 추출할 값 (Step 7 계산에 사용)
+    _vs: float = 0.0      # 전단파속도
+    _h: float = 0.0       # 기반암깊이
+    _struct_code_x: int = 0  # 구조형식 코드 (X)
+    _struct_code_y: int = 0  # 구조형식 코드 (Y)
+
     # 1. 프로젝트 정보
     try:
         raw: dict = MIDAS.projectDB.get()
@@ -159,23 +59,60 @@ def get_seismic_cert_auto() -> SeismicCertAutoData:
         if comment_str:
             try:
                 comment = json.loads(comment_str)
+            except json.JSONDecodeError:
+                comment = {}
+
+            if comment:
                 result.importance = comment.get("IMPORTANCE", "")
-                result.floor_area = float(comment.get("FLOOR_AREA", 0) or 0)
-                result.actual_height = float(comment.get("ACTUAL_HEIGHT", 0) or 0)
+                # 콤마 포함 숫자 문자열 안전 변환
+                try:
+                    raw_fa = str(comment.get("FLOOR_AREA", "") or "").replace(",", "")
+                    result.floor_area = float(raw_fa) if raw_fa else 0.0
+                except (ValueError, TypeError):
+                    pass
+                try:
+                    raw_ah = str(comment.get("ACTUAL_HEIGHT", "") or "").replace(",", "")
+                    result.actual_height = float(raw_ah) if raw_ah else 0.0
+                except (ValueError, TypeError):
+                    pass
+
+                # STRUCT_TYPE: int 또는 문자열 "0","1" 등으로 저장될 수 있음
                 struct_x = comment.get("STRUCT_TYPE_X", "")
                 struct_y = comment.get("STRUCT_TYPE_Y", "")
-                if isinstance(struct_x, int):
-                    result.struct_type_x = _STRUCT_TYPE_LABELS.get(struct_x, str(struct_x))
-                else:
+                try:
+                    result.struct_type_x = STRUCT_TYPE_LABELS.get(int(struct_x), str(struct_x))
+                except (ValueError, TypeError):
                     result.struct_type_x = str(struct_x) if struct_x else ""
-                if isinstance(struct_y, int):
-                    result.struct_type_y = _STRUCT_TYPE_LABELS.get(struct_y, str(struct_y))
-                else:
+                try:
+                    result.struct_type_y = STRUCT_TYPE_LABELS.get(int(struct_y), str(struct_y))
+                except (ValueError, TypeError):
                     result.struct_type_y = str(struct_y) if struct_y else ""
-                sfrs_x_id = comment.get("SFRS_X", "")
-                sfrs_y_id = comment.get("SFRS_Y", "")
-                sfrs_x_entry = _SFRS_TABLE.get(sfrs_x_id)
-                sfrs_y_entry = _SFRS_TABLE.get(sfrs_y_id)
+
+                # 전단파속도·기반암깊이 → 지반분류 계산용
+                try:
+                    _vs = float(str(comment.get("SHEAR_WAVE_VELOCITY", "") or "").replace(",", "") or "0")
+                except (ValueError, TypeError):
+                    _vs = 0.0
+                try:
+                    _h = float(str(comment.get("BEDROCK_DEPTH", "") or "").replace(",", "") or "0")
+                except (ValueError, TypeError):
+                    _h = 0.0
+
+                # 구조형식 코드 (근사고유주기 계산용)
+                try:
+                    _struct_code_x = int(struct_x)
+                except (ValueError, TypeError):
+                    _struct_code_x = 0
+                try:
+                    _struct_code_y = int(struct_y)
+                except (ValueError, TypeError):
+                    _struct_code_y = 0
+
+                # SFRS 테이블 조회 → R, Ω₀, Cd
+                sfrs_x_id = str(comment.get("SFRS_X", "")).strip()
+                sfrs_y_id = str(comment.get("SFRS_Y", "")).strip()
+                sfrs_x_entry = SFRS_TABLE.get(sfrs_x_id)
+                sfrs_y_entry = SFRS_TABLE.get(sfrs_y_id)
                 result.sfrs_x = sfrs_x_entry[0] if sfrs_x_entry else sfrs_x_id
                 result.sfrs_y = sfrs_y_entry[0] if sfrs_y_entry else sfrs_y_id
                 if sfrs_x_entry:
@@ -186,8 +123,6 @@ def get_seismic_cert_auto() -> SeismicCertAutoData:
                     result.r_y = sfrs_y_entry[1]
                     result.omega_y = sfrs_y_entry[2]
                     result.cd_y = sfrs_y_entry[3]
-            except (json.JSONDecodeError, ValueError):
-                pass
     except Exception:
         pass
 
@@ -221,10 +156,21 @@ def get_seismic_cert_auto() -> SeismicCertAutoData:
             result.sc = opt_data.get("SC_", 0)
             result.sc_label = _SC_LABELS.get(result.sc, f"S{result.sc}")
             result.ie = val_data.get("IE", 0)
-            result.r_x = val_data.get("R_", 0)
-            result.r_y = val_data.get("R_", 0)
+            # SFRS 테이블에서 R이 설정되지 않은 경우에만 SPFC의 R_ 사용
+            spfc_r = val_data.get("R_", 0)
+            if not result.r_x:
+                result.r_x = spfc_r
+            if not result.r_y:
+                result.r_y = spfc_r
             result.sds = a_sra[0] if len(a_sra) > 0 else 0
             result.sd1 = a_sra[1] if len(a_sra) > 1 else 0
+
+            # 프로젝트 정보(Vs, H)가 있으면 지반분류를 KDS 기준으로 재계산
+            if _vs > 0 and _h > 0:
+                calc_sc = classify_soil(_h, _vs)
+                result.sc_label = calc_sc
+                sc_map = {"S1": 1, "S2": 2, "S3": 3, "S4": 4, "S5": 5}
+                result.sc = sc_map.get(calc_sc, result.sc)
     except Exception:
         pass
 
@@ -370,14 +316,27 @@ def get_seismic_cert_auto() -> SeismicCertAutoData:
     except Exception:
         pass
 
-    # 7. 자동 계산
-    if result.total_weight > 0:
-        result.csx = result.vsx / result.total_weight if result.vsx else 0.0
-        result.csy = result.vsy / result.total_weight if result.vsy else 0.0
+    # 7. 등가정적 지진응답계수 (Cs) 및 밑면전단력 계산
+    # 건물높이 결정 (실제높이 > STOR높이 > 0)
+    hn = result.actual_height if result.actual_height > 0 else result.total_height
 
-    result.seismic_category = _calc_seismic_category(result.sds, result.importance)
+    if result.sds > 0 and result.ie > 0 and hn > 0:
+        # 적용주기 T (근사고유주기 + Cu 상한 + 고유치 주기)
+        t_x = calc_applied_period(hn, _struct_code_x, result.sd1, result.tax)
+        t_y = calc_applied_period(hn, _struct_code_y, result.sd1, result.tay)
+
+        # 등가정적 Cs
+        result.csx = calc_cs(result.sds, result.sd1, result.r_x, result.ie, t_x)
+        result.csy = calc_cs(result.sds, result.sd1, result.r_y, result.ie, t_y)
+
+        # 등가정적 밑면전단력 V = Cs × W
+        if result.total_weight > 0:
+            result.vsx = result.csx * result.total_weight
+            result.vsy = result.csy * result.total_weight
+
+    result.seismic_category = calc_seismic_category(result.sds, result.importance)
     result.form_type = "5층이하" if result.above_floors <= 5 else "6층이상"
-    result.allowable_drift = _ALLOWABLE_DRIFT.get(result.importance, "0.020hs")
+    result.allowable_drift = ALLOWABLE_DRIFT.get(result.importance, "0.020hs")
 
     # 8. 모드 해석 (상위 3개 모드 - 질량참여율 합산 기준 정렬)
     try:

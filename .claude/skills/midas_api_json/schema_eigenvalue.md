@@ -1,11 +1,21 @@
 ---
-name : eigenvalue schema
-description : 마이다스 API 호출 시 참고하는 스키마
+name: eigenvalue-schema
+description: /post/TABLE 고유치 결과 조회 요청 스키마 예시. TABLE_TYPE, UNIT, STYLES, MODES 설정 시 참조.
+last_reviewed: 2026-04-13
+source: https://support.midasuser.com/hc/ko/articles/33016922742937
 ---
 
-## 고유치 해석
-URL : /post/TABLE
-'''json
+## 목적
+
+고유치 해석 결과를 `/post/TABLE`로 조회할 때 사용하는 요청 JSON 구조 예시를 제공한다.
+
+## 엔드포인트
+
+- `POST /post/TABLE`
+
+## 요청 스키마 예시
+
+```json
 {
     "TABLE": {
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -115,4 +125,9 @@ URL : /post/TABLE
         }
     }
 }
-'''
+```
+
+## 사용 메모
+
+- `TABLE_TYPE`은 고유치 관련 조회 시 `EIGENVALUEMODE` 또는 `PARTICIPATIONVECTORMODE`를 사용한다.
+- 문서와 실제 API 동작이 다를 경우 공식 문서를 우선한다.
