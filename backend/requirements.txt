@@ -7,4 +7,4 @@ colorama
 openpyxl
 sqlalchemy
 python-jose[cryptography]
-pyinstaller
+midas-gen

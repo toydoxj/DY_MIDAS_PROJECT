@@ -149,6 +149,13 @@ MIDAS_API_KEY=your-api-key
 GOOGLE_API_KEY=your-google-maps-api-key
 ```
 
+## 배포 (Render)
+
+- Python 버전은 루트 `runtime.txt`로 고정 (`python-3.12.7`)
+- Build Command: `pip install -r backend/requirements.txt`
+- Start Command: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+- `backend/requirements.txt`에 `midas-gen` 포함 필수
+
 ## 라이선스
 
 Proprietary — (주)동양구조
