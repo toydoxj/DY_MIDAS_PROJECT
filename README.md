@@ -151,10 +151,16 @@ GOOGLE_API_KEY=your-google-maps-api-key
 
 ## 배포 (Render)
 
-- Python 버전은 루트 `runtime.txt`로 고정 (`python-3.12.7`)
-- Build Command: `pip install -r backend/requirements.txt`
-- Start Command: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+루트의 `render.yaml` Blueprint로 관리한다.
+
+- Root Directory: `backend`
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+- Health Check: `/health`
+- Python 버전: `.python-version` + `runtime.txt` (3.12.7)
 - `backend/requirements.txt`에 `midas-gen` 포함 필수
+
+기존 Dashboard 서비스 사용 시에도 Start Command는 위와 동일하게 한 줄로 설정한다.
 
 ## 라이선스
 

@@ -23,7 +23,7 @@ function isPortAvailable(port) {
 }
 
 // 백엔드 서버가 응답할 때까지 대기
-function waitForBackend(port, maxRetries = 30) {
+function waitForBackend(port, maxRetries = 120) {
   return new Promise((resolve, reject) => {
     let retries = 0;
     const check = () => {
@@ -42,7 +42,7 @@ function waitForBackend(port, maxRetries = 30) {
     };
     const retry = () => {
       if (++retries >= maxRetries) {
-        reject(new Error("백엔드 서버 시작 시간 초과 (15초)"));
+        reject(new Error("백엔드 서버 시작 시간 초과 (60초)"));
         return;
       }
       setTimeout(check, 500);
