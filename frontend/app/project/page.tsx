@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CheckCircle, RefreshCw } from "lucide-react";
-
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+import { BACKEND_URL } from "@/lib/types";
 
 const FIELDS = [
   { key: "PROJECT", label: "프로젝트명", placeholder: "프로젝트명을 입력하세요" },

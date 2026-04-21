@@ -3,9 +3,7 @@
 import { useState, useRef } from "react";
 import DataTable from "./DataTable";
 import { flattenResponse, extractSubTables, SubTableData } from "@/lib/utils";
-
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+import { BACKEND_URL } from "@/lib/types";
 
 type Method = "GET" | "POST" | "PUT" | "DELETE";
 type EndpointCode = { code: string; desc: string };

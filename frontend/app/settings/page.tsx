@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import FormField from "@/components/ui/FormField";
 import { SavedBadge, AlertBanner } from "@/components/ui/StatusMessage";
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+import { BACKEND_URL } from "@/lib/types";
 
 type TestResult = { connected: boolean; message: string } | null;
 type TestState = "idle" | "loading";

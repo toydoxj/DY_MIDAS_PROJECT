@@ -75,7 +75,13 @@ export interface EigenvalueRow {
   sum_rotn_y: number;
 }
 
-export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+export const BACKEND_URL = (() => {
+  if (typeof window !== "undefined") {
+    if (window.location.port === "3000") return "http://localhost:8000";
+    return window.location.origin;
+  }
+  return process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+})();
 export const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL ?? "http://3.24.217.252:8000";
 
 declare global {

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, dialog, ipcMain } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
+const fs = require("fs");
 const { spawn } = require("child_process");
 const net = require("net");
 const http = require("http");
@@ -8,25 +9,37 @@ const kill = require("tree-kill");
 
 let mainWindow;
 let backendProcess;
-const BACKEND_PORT = 8000;
+let backendPort = 0;
+let backendExitInfo = null;
 
-// 포트 사용 가능 여부 확인
-function isPortAvailable(port) {
-  return new Promise((resolve) => {
+// OS에서 사용 가능한 빈 포트 확보
+function getFreePort() {
+  return new Promise((resolve, reject) => {
     const server = net.createServer();
-    server.once("error", () => resolve(false));
-    server.once("listening", () => {
-      server.close(() => resolve(true));
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const { port } = server.address();
+      server.close(() => resolve(port));
     });
-    server.listen(port, "127.0.0.1");
   });
 }
 
-// 백엔드 서버가 응답할 때까지 대기
-function waitForBackend(port, maxRetries = 120) {
+// 백엔드 로그 파일 경로 (사용자 진단용)
+function getBackendLogPath() {
+  const logDir = app.getPath("userData");
+  if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+  return path.join(logDir, "backend.log");
+}
+
+// 백엔드 서버가 응답할 때까지 대기 (기본 180초)
+function waitForBackend(port, maxRetries = 360) {
   return new Promise((resolve, reject) => {
     let retries = 0;
     const check = () => {
+      if (backendExitInfo) {
+        reject(new Error(`백엔드 프로세스가 예기치 않게 종료되었습니다 (exit code ${backendExitInfo.code}).`));
+        return;
+      }
       const req = http.get(`http://127.0.0.1:${port}/health`, (res) => {
         if (res.statusCode === 200) {
           resolve();
@@ -42,7 +55,7 @@ function waitForBackend(port, maxRetries = 120) {
     };
     const retry = () => {
       if (++retries >= maxRetries) {
-        reject(new Error("백엔드 서버 시작 시간 초과 (60초)"));
+        reject(new Error("백엔드 서버 시작 시간 초과 (180초)"));
         return;
       }
       setTimeout(check, 500);
@@ -53,12 +66,7 @@ function waitForBackend(port, maxRetries = 120) {
 
 // 백엔드 프로세스 시작
 async function startBackend() {
-  const available = await isPortAvailable(BACKEND_PORT);
-  if (!available) {
-    throw new Error(
-      `포트 ${BACKEND_PORT}이 이미 사용 중입니다.\n다른 프로그램이 포트를 점유하고 있는지 확인하세요.`
-    );
-  }
+  backendPort = await getFreePort();
 
   const backendExe = app.isPackaged
     ? path.join(process.resourcesPath, "backend", "backend.exe")
@@ -69,24 +77,44 @@ async function startBackend() {
     ? path.dirname(backendExe)
     : path.join(__dirname, "..");
 
+  // 로그 파일 초기화 (파일 잠금 예외 무시)
+  const logPath = getBackendLogPath();
+  let logStream = null;
+  try {
+    logStream = fs.createWriteStream(logPath, { flags: "w" });
+    logStream.write(`[launcher] backend.exe=${backendExe}\n`);
+    logStream.write(`[launcher] cwd=${backendCwd}\n`);
+    logStream.write(`[launcher] BACKEND_PORT=${backendPort}\n\n`);
+  } catch (_) {}
+
+  backendExitInfo = null;
   backendProcess = spawn(backendExe, [], {
-    env: { ...process.env, BACKEND_PORT: String(BACKEND_PORT), PYTHONIOENCODING: "utf-8" },
+    env: { ...process.env, BACKEND_PORT: String(backendPort), PYTHONIOENCODING: "utf-8" },
     cwd: backendCwd,
     stdio: ["ignore", "pipe", "pipe"],
   });
 
   backendProcess.stdout.on("data", (data) => {
-    console.log(`[backend] ${data}`);
+    const text = `[backend] ${data}`;
+    console.log(text);
+    if (logStream) logStream.write(data);
   });
   backendProcess.stderr.on("data", (data) => {
-    console.error(`[backend] ${data}`);
+    const text = `[backend:err] ${data}`;
+    console.error(text);
+    if (logStream) logStream.write(data);
   });
-  backendProcess.on("exit", (code) => {
+  backendProcess.on("exit", (code, signal) => {
+    backendExitInfo = { code, signal };
     console.log(`Backend exited with code ${code}`);
+    if (logStream) {
+      logStream.write(`\n[launcher] backend exited code=${code} signal=${signal}\n`);
+      logStream.end();
+    }
     backendProcess = null;
   });
 
-  await waitForBackend(BACKEND_PORT);
+  await waitForBackend(backendPort);
 }
 
 // 백엔드 프로세스 종료
@@ -102,7 +130,11 @@ async function createWindow() {
   try {
     await startBackend();
   } catch (err) {
-    dialog.showErrorBox("MIDAS Dashboard 오류", err.message);
+    const logPath = getBackendLogPath();
+    dialog.showErrorBox(
+      "MIDAS Dashboard 오류",
+      `${err.message}\n\n진단 로그: ${logPath}\n이 파일을 개발자에게 전달해주세요.`
+    );
     app.quit();
     return;
   }
@@ -125,7 +157,7 @@ async function createWindow() {
     },
   });
 
-  mainWindow.loadURL(`http://localhost:${BACKEND_PORT}`);
+  mainWindow.loadURL(`http://127.0.0.1:${backendPort}`);
 
   mainWindow.on("closed", () => {
     mainWindow = null;

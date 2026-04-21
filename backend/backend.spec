@@ -48,18 +48,25 @@ a = Analysis(
         'requests',
         'pandas',
         'colorama',
-        # midas-gen 공식 라이브러리 및 의존성
+        # midas-gen 공식 라이브러리 및 실제 사용 의존성
         'midas_gen',
-        'polars',
-        'scipy',
         'numpy',
         'tqdm',
-        'openpyxl',
+        'openpyxl',  # backend/routers/floorload.py 에서 lazy import
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    # midas-gen이 pip requires-dist로 선언하나 실제 코드에서 import하지 않는 heavy 패키지 제거
+    # (번들 ~200MB 감소, 실행시 Python startup 단축)
+    excludes=[
+        'polars',
+        'polars_runtime_32',
+        'scipy',
+        'gmsh',
+        'PIL',
+        'Pillow',
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

@@ -149,6 +149,24 @@ MIDAS_API_KEY=your-api-key
 GOOGLE_API_KEY=your-google-maps-api-key
 ```
 
+## Electron 데스크톱 앱 빌드
+
+```bash
+# 1. Frontend 정적 빌드
+cd frontend && npm run build
+
+# 2. Backend PyInstaller 번들
+cd backend && ../.venv/Scripts/pyinstaller backend.spec --noconfirm
+
+# 3. Electron 설치파일
+cd electron && npm run build
+```
+
+산출물: `electron/dist/MIDAS Dashboard Setup X.Y.Z.exe`
+GitHub Release 업로드 시에는 공백을 하이픈으로 변경: `MIDAS-Dashboard-Setup-X.Y.Z.exe`
+
+**번들 슬림화 (중요)**: `backend.spec`의 `excludes`는 `polars/scipy/gmsh/PIL`을 제거해 번들 크기를 절반 가까이 줄인다 (203 MB → 118 MB). `midas-gen` pip 의존성에 있으나 실제로는 사용되지 않는 패키지들이다.
+
 ## 배포 (Render)
 
 루트의 `render.yaml` Blueprint로 관리한다.
