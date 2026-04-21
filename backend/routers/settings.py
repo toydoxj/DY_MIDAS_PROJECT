@@ -59,12 +59,12 @@ _load_saved_settings()
 def get_settings() -> SettingsResponse:
     try:
         base_url: str = MIDAS.MIDAS_API_BASEURL.get_url()
-    except AttributeError:
+    except (Exception, SystemExit):
         base_url = ""
     try:
         key: str = MIDAS.MIDAS_API_KEY.get_key()
         masked: str = key[:4] + "****" + key[-4:] if len(key) > 8 else "****"
-    except AttributeError:
+    except (Exception, SystemExit):
         masked = ""
     return SettingsResponse(base_url=base_url, api_key_masked=masked)
 
@@ -114,7 +114,7 @@ def test_connection() -> ConnectionTestResponse:
                 connected=False,
                 message="Base URL 또는 API Key가 설정되지 않았습니다.",
             )
-    except AttributeError:
+    except (Exception, SystemExit):
         return ConnectionTestResponse(
             connected=False,
             message="Base URL 또는 API Key가 설정되지 않았습니다.",

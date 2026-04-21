@@ -10,6 +10,15 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.0.12",
+    date: "2026-04-21",
+    changes: [
+      "미구성 상태(API 키 미입력)에서 /health 가 500을 반환하던 문제 수정",
+      "midas_gen 내부 SystemExit를 health_check · get_settings · test_connection 에서 차단",
+      "설정 파일(midas_settings.json)이 없어도 앱이 정상 기동 · 응답",
+    ],
+  },
+  {
     version: "1.0.8",
     date: "2026-04-13",
     changes: [

@@ -126,7 +126,8 @@ def health_check() -> dict[str, object]:
     try:
         configured_url: str = MIDAS.MIDAS_API_BASEURL.get_url()
         configured_key: bool = bool(MIDAS.MIDAS_API_KEY.get_key())
-    except AttributeError:
+    except (Exception, SystemExit):
+        # midas_gen 내부에서 키 미설정 시 SystemExit을 던지므로 함께 차단
         configured_url = ""
         configured_key = False
     return {
