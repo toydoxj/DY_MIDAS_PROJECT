@@ -4,6 +4,7 @@ import os
 from fastapi import APIRouter
 from pydantic import BaseModel
 import MIDAS_API as MIDAS
+from MIDAS_API._client import MidasAuthExpiredError
 
 from models.settings import SettingsResponse, SettingsUpdateRequest, ConnectionTestResponse
 import work_dir
@@ -16,7 +17,12 @@ _SETTINGS_FILE = os.path.join(_APP_DATA, "midas_settings.json")
 
 
 def _load_saved_settings():
-    """저장된 MIDAS 설정을 로드하여 전역 상태에 적용"""
+    """midas_settings.json 을 읽어 MIDAS 전역 설정에 적용한다.
+
+    이 함수가 MIDAS API 설정의 단일 진실 소스(SSOT)다.
+    - main.py 의 .env 적용은 부트스트랩 fallback (파일이 없을 때만 의미)
+    - routers/auth.py 는 의도적으로 전역을 건드리지 않음 (사용자 메모만 저장)
+    """
     if not os.path.isfile(_SETTINGS_FILE):
         return
     try:
@@ -125,5 +131,15 @@ def test_connection() -> ConnectionTestResponse:
         if isinstance(result, dict) and "error" in str(result).lower():
             return ConnectionTestResponse(connected=False, message=str(result))
         return ConnectionTestResponse(connected=True, message="MIDAS GEN NX 연결 성공")
+    except MidasAuthExpiredError as e:
+        # 401/404 — 좀비 세션/키 만료 안내 메시지를 그대로 전달
+        return ConnectionTestResponse(connected=False, message=str(e))
+    except ConnectionError as e:
+        return ConnectionTestResponse(
+            connected=False,
+            message=f"MIDAS 서버에 연결할 수 없습니다. Base URL을 확인하세요. ({e})",
+        )
+    except TimeoutError as e:
+        return ConnectionTestResponse(connected=False, message=str(e))
     except Exception as e:
         return ConnectionTestResponse(connected=False, message=str(e))

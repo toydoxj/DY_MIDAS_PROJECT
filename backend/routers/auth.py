@@ -1,4 +1,10 @@
-"""인증 라우터 — 로그인, 회원가입, 사용자 관리"""
+"""인증 라우터 — 로그인, 회원가입, 사용자 관리.
+
+MIDAS API 설정은 본 라우터가 건드리지 않는다. 단일 진실 소스(SSOT)는
+backend/routers/settings.py 의 _load_saved_settings() (midas_settings.json).
+사용자별 midas_url/midas_key 컬럼은 메모용으로만 유지되며 로그인 시
+전역에 자동 적용되지 않는다 (사내 단일 사용자 도구 전제).
+"""
 
 from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -9,7 +15,6 @@ from models.auth import (
     User, LoginRequest, RegisterRequest, TokenResponse,
     UserInfo, UserUpdateRequest,
 )
-import MIDAS_API as MIDAS
 from auth_middleware import (
     hash_password, verify_password, create_token,
     get_current_user, require_admin,
@@ -83,11 +88,9 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     user.session_id = sid
     db.commit()
 
-    # 로그인 시 사용자의 MIDAS 설정 적용
-    if user.midas_url:
-        MIDAS.MIDAS_API_BASEURL(user.midas_url)
-    if user.midas_key:
-        MIDAS.MIDAS_API_KEY(user.midas_key)
+    # 주의: MIDAS 설정 전역 적용은 의도적으로 제거됨.
+    # 모든 요청은 settings.py 가 로드한 midas_settings.json (SSOT)을 사용한다.
+    # User.midas_url/midas_key 컬럼은 사용자 메모용이며 자동 적용되지 않음.
 
     token = create_token(user.username, user.role, sid)
     return TokenResponse(access_token=token, user=_user_to_info(user))
