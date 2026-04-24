@@ -28,19 +28,27 @@ Task_MIDAS/
 │   ├── models/                 # Pydantic 데이터 모델
 │   │   ├── auth.py, common.py, project.py, settings.py
 │   │   ├── loadcase.py, floorload.py, analysis.py
-│   │   └── member.py, seismic_cert.py
+│   │   ├── member.py, seismic_cert.py
+│   │   └── slab_span.py         # 슬래브 경간/패널/하중/배근 분석
+│   ├── engines/
+│   │   ├── kds_rc_beam.py      # RC보 KDS 설계 검토
+│   │   └── slab_span.py         # 슬래브 패널 탐색 + Floor Load 매칭
 │   └── routers/                # auth, settings, project, loadcase, analysis,
-│                                # floorload, member, seismic_cert, midas
+│                                # floorload, member, slab_span, seismic_cert, midas
 │
 ├── frontend/                   # Next.js 프론트엔드
 │   ├── app/
 │   │   ├── page.tsx            # 대시보드
 │   │   ├── loadcase/           # 하중정보 (Static, Floor, Seismic)
 │   │   ├── member-check/       # 부재검토
-│   │   │   └── rc-beam/        # RC보 설계 검토
-│   │   │       ├── page.tsx    # 통합 테이블 (부재력+배근+DCR)
-│   │   │       ├── _components/# MaterialInput, RebarInputTable, DesignResult
-│   │   │       └── _lib/       # 타입, 철근규격 상수
+│   │   │   ├── rc-beam/        # RC보 설계 검토
+│   │   │   │   ├── page.tsx    # 통합 테이블 (부재력+배근+DCR)
+│   │   │   │   ├── _components/# MaterialInput, RebarInputTable, DesignResult
+│   │   │   │   └── _lib/       # 타입, 철근규격 상수
+│   │   │   └── slab-span/      # 슬래브 경간/하중/배근 자동 분석
+│   │   │       ├── page.tsx    # 평면 SVG + 분류(S) 테이블 + 배근표
+│   │   │       ├── _components/# SlabPlanView, SlabSectionsTable
+│   │   │       └── _lib/       # Panel/LevelReport/SlabSection 타입
 │   │   ├── documents/           # 문서 작성
 │   │   │   └── seismic-cert/   # 내진설계 확인서 자동 생성
 │   │   ├── explorer/           # API 탐색기
@@ -179,6 +187,10 @@ GitHub Release 업로드 시에는 공백을 하이픈으로 변경: `MIDAS-Dash
 - `backend/requirements.txt`에 `midas-gen` 포함 필수
 
 기존 Dashboard 서비스 사용 시에도 Start Command는 위와 동일하게 한 줄로 설정한다.
+
+## 관련 문서
+
+- [BACKLOG.md](./BACKLOG.md) — 보류 중인 운영/보안 개선 항목과 승격 트리거
 
 ## 라이선스
 

@@ -1,10 +1,11 @@
 "use client";
 
-import { RectangleHorizontal, Columns3, PilcrowSquare, Warehouse, BrickWall, Landmark } from "lucide-react";
+import { RectangleHorizontal, Columns3, PilcrowSquare, Warehouse, BrickWall, Landmark, Grid3x3 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import CategoryGrid, { CategoryItem } from "@/components/ui/CategoryGrid";
 
 const memberCategories: CategoryItem[] = [
+  { href: "/member-check/slab-span", label: "Slab Span Check", desc: "슬래브 경간 분석", icon: Grid3x3, ready: true },
   { href: "/member-check/slab", label: "Slab Check", desc: "슬래브 검토", icon: RectangleHorizontal, ready: false },
   { href: "/member-check/rc-beam", label: "RC Beam Check", desc: "RC보 검토", icon: Columns3, ready: true },
   { href: "/member-check/rc-column", label: "RC Column Check", desc: "RC기둥 검토", icon: PilcrowSquare, ready: false },
