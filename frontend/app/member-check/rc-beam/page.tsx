@@ -3,16 +3,21 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { RefreshCw, Loader2, ChevronDown } from "lucide-react";
 import DataTable from "@/components/DataTable";
-import { BACKEND_URL } from "@/lib/types";
-import { flattenResponse } from "@/lib/utils";
 import PageHeader from "@/components/ui/PageHeader";
 import SectionCard from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 import { ErrorText } from "@/components/ui/StatusMessage";
-import { initSectionRebars } from "./_components/RebarInputTable";
-import { saveDraftToLocal, loadDraftFromLocal, clearDraftLocal, loadRebarsFromServer, saveRebarsToServer } from "./_lib/storage";
-import { REBAR_OPTIONS, REBAR_TYPE_CONFIG } from "./_lib/constants";
-import type { SectionRebarInput, RebarInput, RebarType, PositionCheckResult } from "./_lib/types";
+import type {
+  BeamForceMaxRow,
+  MemberForceMaxRow,
+  RebarType,
+  SectionRebarInput,
+} from "./_lib/types";
+import { MaxTableIntegrated } from "./_components/MaxTableIntegrated";
+import { MemberTable } from "./_components/MemberTable";
+import { useRcBeamSelection } from "./_hooks/useRcBeamSelection";
+import { useMidasFetch } from "./_hooks/useMidasFetch";
+import { useRebarDesign } from "./_hooks/useRebarDesign";
 
 interface SectionInfo {
   id: number;
@@ -22,38 +27,7 @@ interface SectionInfo {
   element_keys: number[];
 }
 
-interface BeamForceMaxRow {
-  SectName: string;
-  B: number | null;
-  H: number | null;
-  D: number | null;
-  My_neg_I_LC: string; My_neg_I: number;
-  My_pos_I_LC: string; My_pos_I: number;
-  Fz_I_LC: string; Fz_I: number;
-  My_neg_C_LC: string; My_neg_C: number;
-  My_pos_C_LC: string; My_pos_C: number;
-  Fz_C_LC: string; Fz_C: number;
-  My_neg_J_LC: string; My_neg_J: number;
-  My_pos_J_LC: string; My_pos_J: number;
-  Fz_J_LC: string; Fz_J: number;
-}
-
-interface MemberForceMaxRow {
-  Memb: number;
-  My_neg_I_LC: string; My_neg_I: number;
-  My_pos_I_LC: string; My_pos_I: number;
-  Fz_I_LC: string; Fz_I: number;
-  My_neg_C_LC: string; My_neg_C: number;
-  My_pos_C_LC: string; My_pos_C: number;
-  Fz_C_LC: string; Fz_C: number;
-  My_neg_J_LC: string; My_neg_J: number;
-  My_pos_J_LC: string; My_pos_J: number;
-  Fz_J_LC: string; Fz_J: number;
-}
-
 type ViewMode = "max" | "member" | "raw";
-
-const POSITIONS = ["I", "C", "J"] as const;
 
 /**
  * 부재력 기반 배근 형식 자동 판정
@@ -254,325 +228,6 @@ function filterSectionsByStories(sects: SectionInfo[], stories: Set<string>): Se
   });
 }
 
-const thCls = "px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-300";
-const tdCls = "px-3 py-2 text-gray-300 whitespace-nowrap text-sm text-center";
-const tdMergedCls = "px-3 py-2 text-gray-200 whitespace-nowrap text-sm font-medium text-center align-middle";
-
-/** MIDAS에서 Element 활성화 (Active) */
-async function activateElementsInMidas(elementKeys: number[]) {
-  await fetch(`${BACKEND_URL}/api/midas/view/ACTIVE`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      Argument: {
-        ACTIVE_MODE: elementKeys.length === 0 ? "All" : "Active",
-        N_LIST: [] as number[],
-        E_LIST: elementKeys,
-      },
-    }),
-  });
-}
-
-/** 통합 테이블 — 부재력 + 배근 입력 + DCR */
-function MaxTableIntegrated({
-  data, rebarSections, onRebarChange, checkResults, getFyForDia, sectionElementMap,
-}: {
-  data: BeamForceMaxRow[];
-  rebarSections: SectionRebarInput[];
-  onRebarChange: (sections: SectionRebarInput[]) => void;
-  checkResults: PositionCheckResult[];
-  getFyForDia: (dia: number) => number;
-  sectionElementMap: Map<string, number[]>;
-}) {
-  const [checkedSections, setCheckedSections] = useState<Set<string>>(new Set());
-
-  const applyHighlight = useCallback(async (selectedNames: Set<string>) => {
-    const allKeys: number[] = [];
-    for (const name of selectedNames) {
-      const ek = sectionElementMap.get(name);
-      if (ek) allKeys.push(...ek);
-    }
-    await activateElementsInMidas(allKeys);
-  }, [sectionElementMap]);
-
-  const toggleCheck = useCallback(async (sectName: string) => {
-    const next = new Set(checkedSections);
-    if (next.has(sectName)) next.delete(sectName); else next.add(sectName);
-    setCheckedSections(next);
-    await applyHighlight(next);
-  }, [checkedSections, applyHighlight]);
-
-  const toggleCheckAll = useCallback(async () => {
-    const allNames = data.map((r) => r.SectName);
-    const allChecked = allNames.every((n) => checkedSections.has(n));
-    const next = allChecked ? new Set<string>() : new Set(allNames);
-    setCheckedSections(next);
-    await applyHighlight(next);
-  }, [data, checkedSections, applyHighlight]);
-
-  const rebarMap = new Map(rebarSections.map((s, i) => [s.section_name, i]));
-  const resultMap = new Map<string, PositionCheckResult>();
-  for (const r of checkResults) resultMap.set(`${r.section_name}-${r.position}`, r);
-
-  // 단면 단위 배근 업데이트 (모든 위치에 동일 적용)
-  const updateSectionRebar = (si: number, patch: Partial<RebarInput>) => {
-    const next = rebarSections.map((s, i) => {
-      if (i !== si) return s;
-      return { ...s, rebars: s.rebars.map((r) => ({ ...r, ...patch })) };
-    });
-    onRebarChange(next);
-  };
-
-  // 위치별 배근 업데이트 (개수만)
-  const updatePositionCount = (si: number, ri: number, patch: Partial<RebarInput>) => {
-    const next = rebarSections.map((s, i) => {
-      if (i !== si) return s;
-      return { ...s, rebars: s.rebars.map((r, j) => (j === ri ? { ...r, ...patch } : r)) };
-    });
-    onRebarChange(next);
-  };
-
-  const inputCls = "w-12 rounded bg-gray-700 border border-gray-600 px-1 py-0.5 text-[11px] text-white text-center focus:outline-none focus:ring-1 focus:ring-blue-500";
-  const selectCls = "w-14 rounded bg-gray-700 border border-gray-600 px-0.5 py-0.5 text-[11px] text-white text-center focus:outline-none focus:ring-1 focus:ring-blue-500";
-
-  const hasResults = checkResults.length > 0;
-
-  const dcrCell = (dcr: number, ok: boolean) => (
-    <td className={`${tdCls} font-mono font-semibold text-center ${ok ? "text-green-400" : "text-red-400"}`}>
-      {dcr < 900 ? dcr.toFixed(3) : "-"}
-    </td>
-  );
-
-  return (
-    <div className="overflow-x-auto rounded-lg border border-gray-700">
-      <table className="min-w-full text-xs">
-        <thead className="bg-gray-700">
-          <tr>
-            <th className={thCls}>
-              <input type="checkbox"
-                checked={data.length > 0 && data.every((r) => checkedSections.has(r.SectName))}
-                onChange={toggleCheckAll}
-                className="w-3.5 h-3.5 rounded bg-gray-600 border-gray-500 cursor-pointer accent-blue-500"
-              />
-            </th>
-            <th className={thCls}>단면</th>
-            <th className={thCls}>B×H</th>
-            <th className={thCls}>Type</th>
-            <th className={thCls}>위치</th>
-            <th className={thCls}>표기</th>
-            <th className={`${thCls} border-l border-gray-600`}>My(-)</th>
-            <th className={thCls}>상부근</th>
-            {hasResults && <th className={thCls}>휨DCR</th>}
-            <th className={`${thCls} border-l border-gray-600`}>My(+)</th>
-            <th className={thCls}>하부근</th>
-            {hasResults && <th className={thCls}>휨DCR</th>}
-            <th className={`${thCls} border-l border-gray-600`}>Fz</th>
-            <th className={thCls}>스터럽</th>
-            {hasResults && <th className={thCls}>전단DCR</th>}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-700">
-          {data.map((r, gi) => {
-            const si = rebarMap.get(r.SectName);
-            const sec = si !== undefined ? rebarSections[si] : null;
-            const rb0 = sec?.rebars[0];
-            const rType = sec?.rebarType ?? "type3";
-            const typeConfig = REBAR_TYPE_CONFIG[rType];
-            const posLabels = typeConfig.positions;
-            const rowCount = posLabels.length;
-
-            // type에 따른 I/C/J 매핑
-            const posMap: ("I" | "C" | "J")[][] = rType === "type1"
-              ? [["I", "C", "J"]]  // ALL: 3개 중 최대
-              : rType === "type2"
-              ? [["I", "J"], ["C"]]  // 양단(I+J 최대), 중앙
-              : [["I"], ["C"], ["J"]];  // 연속단, 중앙, 불연속단
-
-            return posLabels.map((label, pi) => {
-              const rb = sec?.rebars[pi];
-              const mappedPositions = posMap[pi];
-              // 해당 위치들 중 최대 부재력
-              const force = r as unknown as Record<string, unknown>;
-              const getMax = (prefix: string) => {
-                let maxVal = 0;
-                let maxPos = mappedPositions[0];
-                for (const p of mappedPositions) {
-                  const v = Math.abs(Number(force[`${prefix}_${p}`]) || 0);
-                  if (v > maxVal) { maxVal = v; maxPos = p; }
-                }
-                return { val: Number(force[`${prefix}_${maxPos}`]) || 0, lc: (force[`${prefix}_${maxPos}_LC`] as string) ?? "", pos: maxPos };
-              };
-              const myNeg = getMax("My_neg");
-              const myPos = getMax("My_pos");
-              const fz = getMax("Fz");
-
-              // DCR: 각 부재력의 지배적 위치에서 가져옴
-              const crNeg = resultMap.get(`${r.SectName}-${myNeg.pos}`);
-              const crPos = resultMap.get(`${r.SectName}-${myPos.pos}`);
-              const crShear = resultMap.get(`${r.SectName}-${fz.pos}`);
-
-              return (
-                <tr key={`${gi}-${label}`} className={`${gi % 2 === 0 ? "bg-gray-800/80" : "bg-gray-900/60"} ${pi === 0 && gi > 0 ? "border-t-2 border-gray-500" : ""}`}>
-                  {pi === 0 && (
-                    <>
-                      <td className={`${tdMergedCls} align-middle`} rowSpan={rowCount}>
-                        <input type="checkbox"
-                          checked={checkedSections.has(r.SectName)}
-                          onChange={() => toggleCheck(r.SectName)}
-                          className="w-3.5 h-3.5 rounded bg-gray-600 border-gray-500 cursor-pointer accent-blue-500"
-                        />
-                      </td>
-                      <td className={tdMergedCls} rowSpan={rowCount}>{r.SectName}</td>
-                      <td className={`${tdMergedCls} font-mono text-xs`} rowSpan={rowCount}>{r.B ?? "-"}×{r.H ?? "-"}</td>
-                      <td className={tdMergedCls} rowSpan={rowCount}>
-                        {si !== undefined && sec ? (
-                          <select className={selectCls} value={sec.rebarType}
-                            onChange={(e) => { const next = [...rebarSections]; next[si] = { ...sec, rebarType: e.target.value as RebarType }; onRebarChange(next); }}>
-                            <option value="type3">3단</option>
-                            <option value="type2">BOTH</option>
-                            <option value="type1">ALL</option>
-                          </select>
-                        ) : "-"}
-                      </td>
-                    </>
-                  )}
-                  <td className={`${tdCls} text-blue-400 font-medium`}>{label}</td>
-                  <td className={tdCls}>
-                    {rb && si !== undefined && (
-                      <input className={inputCls} value={rb.note ?? ""} placeholder=""
-                        onChange={(e) => updatePositionCount(si, pi, { note: e.target.value })} />
-                    )}
-                  </td>
-                  {/* My(-) + 상부근 (n-Dxx) */}
-                  <td className={`${tdCls} font-mono border-l border-gray-600`}>
-                    <div className="text-white">{myNeg.val.toFixed(1)}</div>
-                    <div className="text-gray-400 text-[10px] truncate max-w-[80px]" title={myNeg.lc}>{myNeg.lc}</div>
-                  </td>
-                  <td className={tdCls}>
-                    {rb && si !== undefined && (
-                      <div className="flex items-center gap-0.5 justify-center whitespace-nowrap">
-                        <input className={inputCls} type="number" min={0} value={rb.top_count}
-                          onChange={(e) => updatePositionCount(si, pi, { top_count: Number(e.target.value) || 0 })} />
-                        <span className="text-gray-500">-</span>
-                        {pi === 0 ? (
-                          <select className={selectCls} value={rb.top_dia}
-                            onChange={(e) => {
-                              const d = Number(e.target.value);
-                              const newFy = getFyForDia(d);
-                              const next = rebarSections.map((s, i) => {
-                                if (i !== si) return s;
-                                return {
-                                  ...s,
-                                  fy: newFy,
-                                  rebars: s.rebars.map((r) => ({ ...r, top_dia: d, bot_dia: d })),
-                                };
-                              });
-                              onRebarChange(next);
-                            }}>
-                            {REBAR_OPTIONS.map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
-                          </select>
-                        ) : (
-                          <span className="text-gray-300 text-[11px]">D{rb0?.top_dia ?? rb.top_dia}</span>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                  {hasResults && (crNeg ? dcrCell(crNeg.neg_flexure_dcr, crNeg.neg_flexure_ok) : <td className={tdCls}></td>)}
-                  {/* My(+) + 하부근 (n-Dxx) */}
-                  <td className={`${tdCls} font-mono border-l border-gray-600`}>
-                    <div className="text-white">{myPos.val.toFixed(1)}</div>
-                    <div className="text-gray-400 text-[10px] truncate max-w-[80px]" title={myPos.lc}>{myPos.lc}</div>
-                  </td>
-                  <td className={tdCls}>
-                    {rb && si !== undefined && (
-                      <div className="flex items-center gap-0.5 justify-center whitespace-nowrap">
-                        <input className={inputCls} type="number" min={0} value={rb.bot_count}
-                          onChange={(e) => updatePositionCount(si, pi, { bot_count: Number(e.target.value) || 0 })} />
-                        <span className="text-gray-500">-</span>
-                        <span className="text-gray-300 text-[11px]">D{rb0?.bot_dia ?? rb.bot_dia}</span>
-                      </div>
-                    )}
-                  </td>
-                  {hasResults && (crPos ? dcrCell(crPos.pos_flexure_dcr, crPos.pos_flexure_ok) : <td className={tdCls}></td>)}
-                  {/* Fz + 스터럽 (Dxx@nnn) */}
-                  <td className={`${tdCls} font-mono border-l border-gray-600`}>
-                    <div className="text-white">{fz.val.toFixed(1)}</div>
-                    <div className="text-gray-400 text-[10px] truncate max-w-[80px]" title={fz.lc}>{fz.lc}</div>
-                  </td>
-                  <td className={tdCls}>
-                    {rb && si !== undefined && (
-                      <div className="flex items-center gap-0.5 justify-center whitespace-nowrap">
-                        {pi === 0 ? (
-                          <input className={inputCls} type="number" min={1} max={6} value={rb.stirrup_legs ?? 2}
-                            onChange={(e) => updateSectionRebar(si, { stirrup_legs: Number(e.target.value) || 2 })} />
-                        ) : (
-                          <span className="text-gray-300 text-[11px] w-10 text-center">{rb0?.stirrup_legs ?? 2}</span>
-                        )}
-                        <span className="text-gray-500">-</span>
-                        {pi === 0 ? (
-                          <select className={selectCls} value={rb.stirrup_dia}
-                            onChange={(e) => updateSectionRebar(si, { stirrup_dia: Number(e.target.value) })}>
-                            {REBAR_OPTIONS.filter((o) => o.dia <= 16).map((o) => <option key={o.dia} value={o.dia}>{o.label}</option>)}
-                          </select>
-                        ) : (
-                          <span className="text-gray-300 text-[11px]">D{rb0?.stirrup_dia ?? rb.stirrup_dia}</span>
-                        )}
-                        <span className="text-gray-500">@</span>
-                        <input className={inputCls} type="number" min={50} step={25} value={rb.stirrup_spacing}
-                          onChange={(e) => updatePositionCount(si, pi, { stirrup_spacing: Number(e.target.value) || 200 })} />
-                      </div>
-                    )}
-                  </td>
-                  {hasResults && (crShear ? dcrCell(crShear.shear_dcr, crShear.shear_ok) : <td className={tdCls}></td>)}
-                </tr>
-              );
-            });
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/** rowSpan 병합 테이블 — 부재별 정리 */
-function MemberTable({ data }: { data: MemberForceMaxRow[] }) {
-  return (
-    <div className="overflow-x-auto rounded-lg border border-gray-700">
-      <table className="min-w-full text-sm">
-        <thead className="bg-gray-700">
-          <tr>
-            <th className={thCls}>부재</th>
-            <th className={thCls}>위치</th>
-            <th className={thCls}>LC</th>
-            <th className={thCls}>My(-)</th>
-            <th className={thCls}>LC</th>
-            <th className={thCls}>My(+)</th>
-            <th className={thCls}>LC</th>
-            <th className={thCls}>Fz</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-700">
-          {data.map((r, gi) =>
-            POSITIONS.map((pos, pi) => (
-              <tr key={`${gi}-${pos}`} className={`${gi % 2 === 0 ? "bg-gray-800/80" : "bg-gray-900/60"} ${pi === 0 && gi > 0 ? "border-t-2 border-gray-500" : ""}`}>
-                {pi === 0 && (
-                  <td className={tdMergedCls} rowSpan={3}>{r.Memb}</td>
-                )}
-                <td className={tdCls}>{pos}</td>
-                <td className={`${tdCls} text-gray-500`}>{(r as unknown as Record<string, unknown>)[`My_neg_${pos}_LC`] as string}</td>
-                <td className={tdCls}>{String((r as unknown as Record<string, unknown>)[`My_neg_${pos}`])}</td>
-                <td className={`${tdCls} text-gray-500`}>{(r as unknown as Record<string, unknown>)[`My_pos_${pos}_LC`] as string}</td>
-                <td className={tdCls}>{String((r as unknown as Record<string, unknown>)[`My_pos_${pos}`])}</td>
-                <td className={`${tdCls} text-gray-500`}>{(r as unknown as Record<string, unknown>)[`Fz_${pos}_LC`] as string}</td>
-                <td className={tdCls}>{String((r as unknown as Record<string, unknown>)[`Fz_${pos}`])}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 const TAB_ITEMS: { key: ViewMode; label: string }[] = [
   { key: "max", label: "최대값 요약" },
@@ -581,26 +236,46 @@ const TAB_ITEMS: { key: ViewMode; label: string }[] = [
 ];
 
 export default function RcBeamCheckPage() {
-  const [sections, setSections] = useState<SectionInfo[]>([]);
-  const [stories, setStories] = useState<StoryItem[]>([]);
-  const [selectedStories, setSelectedStories] = useState<Set<string>>(new Set());
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const {
+    sections,
+    stories,
+    result,
+    maxResult,
+    memberResult,
+    savedRebars,
+    defaults,
+    loadingSections,
+    loadingResult,
+    error,
+    lastFetchedAt,
+    fetchSections,
+    fetchDesignResult,
+    fetchRawData,
+    resetResults,
+    setError,
+    setSavedRebars,
+  } = useMidasFetch<SectionInfo, StoryItem, BeamForceMaxRow, MemberForceMaxRow>();
+  const {
+    selectedStories,
+    setSelectedStories,
+    selectedIds,
+    selectedSections,
+    selectedKeys,
+    selectedNames,
+    filteredSections,
+    totalElements,
+    toggleSection,
+    selectAllVisible,
+    clearSelection,
+  } = useRcBeamSelection<SectionInfo>({
+    sections,
+    filterByStories: filterSectionsByStories,
+  });
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [loadingSections, setLoadingSections] = useState(false);
-  const [loadingResult, setLoadingResult] = useState(false);
-  const [result, setResult] = useState<Record<string, unknown>[] | null>(null);
-  const [maxResult, setMaxResult] = useState<BeamForceMaxRow[] | null>(null);
-  const [memberResult, setMemberResult] = useState<MemberForceMaxRow[] | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("max");
-  const [error, setError] = useState("");
-  const [lastFetchedAt, setLastFetchedAt] = useState<string | null>(null);
 
-  // 대시보드 재료 규칙
-  interface RebarRule { strength: number; dia_threshold: number; dia_dir: string }
-  const [defaultFck, setDefaultFck] = useState(27);
-  const [defaultFy, setDefaultFy] = useState(400);
-  const [defaultFyt, setDefaultFyt] = useState(400);
-  const [rebarRules, setRebarRules] = useState<RebarRule[]>([]);
+  // 호출 측에서는 재료 기본값을 단순 참조로 사용
+  const { fck: defaultFck, fy: defaultFy, fyt: defaultFyt, rebarRules } = defaults;
 
   /** 철근 지름에 맞는 강도 찾기 */
   const getFyForDia = useCallback((dia: number): number => {
@@ -614,58 +289,32 @@ export default function RcBeamCheckPage() {
     if (allRule) return allRule.strength;
     return defaultFy;
   }, [rebarRules, defaultFy]);
-  const [rebarSections, setRebarSections] = useState<SectionRebarInput[]>([]);
-  const savedRebarsRef = useRef<SectionRebarInput[]>([]);
-  const [checkResults, setCheckResults] = useState<PositionCheckResult[]>([]);
-  const [checkLoading, setCheckLoading] = useState(false);
-  const [rebarSaving, setRebarSaving] = useState(false);
-  const [rebarSaved, setRebarSaved] = useState(false);
+  const {
+    rebarSections,
+    setRebarSections,
+    checkResults,
+    checkLoading,
+    rebarSaving,
+    rebarSaved,
+    handleSaveRebars,
+  } = useRebarDesign({
+    maxResult,
+    savedRebars,
+    setSavedRebars,
+    defaults,
+    getFyForDia,
+    autoDetectRebarType,
+    onError: setError,
+  });
 
-  const abortRef = useRef<AbortController | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // SectName → element_keys 매핑 (MIDAS Active용)
+  // SectName → element_keys 매핑 (MIDAS Active 표시용)
   const sectionElementMap = useMemo(() => {
     const map = new Map<string, number[]>();
-    for (const s of sections) {
-      map.set(s.name, s.element_keys);
-    }
+    for (const s of sections) map.set(s.name, s.element_keys);
     return map;
   }, [sections]);
-
-  // 선택된 Section들의 element_keys 합산
-  const selectedKeys = useMemo(() => {
-    const keys: number[] = [];
-    for (const s of sections) {
-      if (selectedIds.has(s.id)) keys.push(...s.element_keys);
-    }
-    return keys;
-  }, [sections, selectedIds]);
-
-  const selectedSections = useMemo(
-    () => sections.filter((s) => selectedIds.has(s.id)),
-    [sections, selectedIds],
-  );
-
-  // 선택된 층에 해당하는 RC 보 섹션 목록
-  const filteredSections = useMemo(
-    () => filterSectionsByStories(sections, selectedStories),
-    [sections, selectedStories],
-  );
-
-  // 층 필터 변경 시 보이지 않는 선택 제거
-  useEffect(() => {
-    const visibleIds = new Set(filteredSections.map((s) => s.id));
-    setSelectedIds((prev) => {
-      const next = new Set([...prev].filter((id) => visibleIds.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [filteredSections]);
-
-  const totalElements = useMemo(
-    () => selectedSections.reduce((sum, s) => sum + s.element_count, 0),
-    [selectedSections],
-  );
 
   // 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
@@ -678,175 +327,11 @@ export default function RcBeamCheckPage() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const fetchSections = async () => {
-    setLoadingSections(true);
-    setError("");
-    try {
-      const [sectRes, storRes, projRes, rebarsData] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/member/sections`),
-        fetch(`${BACKEND_URL}/api/midas/db/STOR`),
-        fetch(`${BACKEND_URL}/api/project`),
-        loadRebarsFromServer(),
-      ]);
-      if (!sectRes.ok) throw new Error(`Section HTTP ${sectRes.status}`);
-      const data: SectionInfo[] = await sectRes.json();
-      setSections(data);
-      setSelectedIds(new Set());
-      setResult(null);
-      setMaxResult(null);
-      setMemberResult(null);
-
-      // STOR 층 정보
-      if (storRes.ok) {
-        const storRaw = await storRes.json();
-        const stor = storRaw.STOR ?? {};
-        const items: StoryItem[] = Object.values(stor)
-          .filter((v): v is { STORY_NAME: string; STORY_LEVEL: number } =>
-            typeof v === "object" && v !== null && "STORY_NAME" in v)
-          .map((v) => ({ name: v.STORY_NAME, level: v.STORY_LEVEL }))
-          .sort((a, b) => a.level - b.level);
-        setStories(items);
-      }
-
-      // 대시보드 재료 강도 기본값
-      if (projRes.ok) {
-        try {
-          const proj = await projRes.json();
-          const c = JSON.parse(proj.COMMENT ?? "{}");
-          const mat = c.MATERIALS_V2;
-          if (mat?.concrete?.[0]?.strength) setDefaultFck(Number(mat.concrete[0].strength));
-          if (mat?.rebar && Array.isArray(mat.rebar)) {
-            const rules: RebarRule[] = mat.rebar.map((r: { strength?: number; dia_threshold?: number; dia_dir?: string }) => ({
-              strength: Number(r.strength ?? 400),
-              dia_threshold: Number(r.dia_threshold ?? 0),
-              dia_dir: r.dia_dir ?? "전부재",
-            }));
-            setRebarRules(rules);
-            // 기본값: 전부재 규칙 또는 첫 번째
-            const allRule = rules.find((r) => r.dia_dir === "전부재");
-            const baseStrength = allRule?.strength ?? rules[0]?.strength ?? 400;
-            setDefaultFy(baseStrength);
-            setDefaultFyt(baseStrength);
-          }
-        } catch { /* ignore */ }
-      }
-
-      // 서버 저장 배근 데이터 로드
-      savedRebarsRef.current = rebarsData;
-    } catch (e) {
-      setError(`Section 조회 실패: ${e}`);
-    } finally {
-      setLoadingSections(false);
-    }
-  };
-
-  useEffect(() => { fetchSections(); }, []);
-
-  const fetchDesignResult = useCallback(async (sectionNames: string[], forceRefresh = false) => {
-    if (abortRef.current) abortRef.current.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    setLoadingResult(true);
-    setError("");
-    setMaxResult(null);
-    setMemberResult(null);
-
-    try {
-      const fetchOpts = (body: unknown) => ({
-        method: "POST",
-        headers: { "Content-Type": "application/json" } as Record<string, string>,
-        signal: controller.signal,
-        body: JSON.stringify(body),
-      });
-
-      // section → member 순차 호출 (첫 호출이 캐시를 채우므로 동시 호출 시 502 방지)
-      const maxRes = await fetch(`${BACKEND_URL}/api/member/beam-force-max`, fetchOpts({
-        section_names: sectionNames, group_by: "section", force_refresh: forceRefresh,
-      }));
-      if (controller.signal.aborted) return;
-      if (!maxRes.ok) {
-        const errData = await maxRes.json().catch(() => ({}));
-        throw new Error(errData?.detail ?? errData?.error?.message ?? `최대값 조회 HTTP ${maxRes.status}`);
-      }
-      const maxData: BeamForceMaxRow[] = await maxRes.json();
-
-      const memberRes = await fetch(`${BACKEND_URL}/api/member/beam-force-max`, fetchOpts({
-        section_names: sectionNames, group_by: "member", force_refresh: false,
-      }));
-      if (controller.signal.aborted) return;
-      if (!memberRes.ok) {
-        const errData = await memberRes.json().catch(() => ({}));
-        throw new Error(errData?.detail ?? errData?.error?.message ?? `부재별 조회 HTTP ${memberRes.status}`);
-      }
-      const memberData: MemberForceMaxRow[] = await memberRes.json();
-
-      if (controller.signal.aborted) return;
-
-      setMaxResult(maxData);
-      setMemberResult(memberData);
-      setLastFetchedAt(new Date().toLocaleTimeString("ko-KR"));
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return;
-      setError(`설계결과 조회 실패: ${e}`);
-    } finally {
-      if (!controller.signal.aborted) setLoadingResult(false);
-    }
-  }, []);
-
-  // 전체 데이터 탭 클릭 시에만 원시 데이터 조회
-  const fetchRawData = useCallback(async (keys: number[]) => {
-    if (result) return; // 이미 조회됨
-    setLoadingResult(true);
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/midas/post/TABLE`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          Argument: {
-            TABLE_TYPE: "BEAMDESIGNFORCES",
-            UNIT: { FORCE: "KN", DIST: "M" },
-            STYLES: { FORMAT: "Fixed", PLACE: 1 },
-            NODE_ELEMS: { KEYS: keys },
-            PARTS: ["PartI", "Part2/4", "PartJ"],
-            COMPONENTS: ["Memb", "Part", "LComName", "Type", "Fz", "My(-)", "My(+)"],
-          },
-        }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setResult(flattenResponse(data));
-    } catch (e) {
-      setError(`전체 데이터 조회 실패: ${e}`);
-    } finally {
-      setLoadingResult(false);
-    }
-  }, [result]);
-
-  const toggleSection = (id: number) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const selectAll = () => {
-    setSelectedIds(new Set(sections.map((s) => s.id)));
-  };
-
+  // 선택 해제 시 결과도 함께 초기화 (책임 분리: selection 훅은 selection만, 결과 초기화는 fetch 훅의 resetResults)
   const clearAll = () => {
-    setSelectedIds(new Set());
-    setResult(null);
-    setMaxResult(null);
-    setMemberResult(null);
+    clearSelection();
+    resetResults();
   };
-
-  const selectedNames = useMemo(
-    () => selectedSections.map((s) => s.name),
-    [selectedSections],
-  );
 
   const handleFetch = (forceRefresh = false) => {
     if (selectedIds.size === 0) {
@@ -854,7 +339,6 @@ export default function RcBeamCheckPage() {
       return;
     }
     setDropdownOpen(false);
-    setResult(null); // 전체 데이터 캐시 초기화
     fetchDesignResult(selectedNames, forceRefresh);
   };
 
@@ -875,109 +359,6 @@ export default function RcBeamCheckPage() {
     (viewMode === "raw" && result && result.length > 0);
 
   const selectionKey = [...selectedIds].sort().join(",");
-
-  // maxResult 변경 시 저장 데이터와 병합 (서버 우선, localStorage 보조)
-  useEffect(() => {
-    if (!maxResult || maxResult.length === 0) { setRebarSections([]); return; }
-
-    // 서버 저장 데이터와 localStorage draft 병합 (서버 우선)
-    const serverMap = new Map(savedRebarsRef.current.map((s) => [s.section_name, s]));
-    const draft = loadDraftFromLocal();
-    const draftMap = draft ? new Map(draft.map((s) => [s.section_name, s])) : null;
-
-    setRebarSections(
-      maxResult.map((r) => {
-        // 서버 저장값 우선, 없으면 draft, 없으면 기본값
-        const fromServer = serverMap.get(r.SectName);
-        const fromDraft = draftMap?.get(r.SectName);
-        const existing = fromServer ?? fromDraft;
-        if (existing) return { ...existing, B: r.B ?? existing.B, H: r.H ?? existing.H };
-        // 부재력 기반 자동 판정
-        const { rebarType } = autoDetectRebarType(r);
-        const init = initSectionRebars(r.SectName, r.B ?? 400, r.H ?? 700, defaultFck, getFyForDia(25), defaultFyt);
-        return { ...init, rebarType };
-      })
-    );
-    setCheckResults([]);
-  }, [maxResult]);
-
-  // localStorage 자동 저장 (1초 디바운스)
-  useEffect(() => {
-    if (rebarSections.length === 0) return;
-    const timer = setTimeout(() => saveDraftToLocal(rebarSections), 1000);
-    return () => clearTimeout(timer);
-  }, [rebarSections]);
-
-  // 서버에 배근 저장 (기존 저장 데이터와 병합)
-  const handleSaveRebars = async () => {
-    setRebarSaving(true); setRebarSaved(false);
-    // 기존 저장 데이터에서 현재 선택되지 않은 단면 유지 + 현재 단면 덮어쓰기
-    const currentMap = new Map(rebarSections.map((s) => [s.section_name, s]));
-    const merged = [...savedRebarsRef.current.filter((s) => !currentMap.has(s.section_name)), ...rebarSections];
-    const ok = await saveRebarsToServer(merged);
-    if (ok) { setRebarSaved(true); clearDraftLocal(); savedRebarsRef.current = merged; }
-    setRebarSaving(false);
-  };
-
-  // 검토 실행
-  const checkAbortRef = useRef<AbortController | null>(null);
-  const runDesignCheck = useCallback(async () => {
-    if (!maxResult || rebarSections.length === 0) return;
-    if (checkAbortRef.current) checkAbortRef.current.abort();
-    const controller = new AbortController();
-    checkAbortRef.current = controller;
-    setCheckLoading(true);
-    try {
-      // rebarType에 따라 검토용 rebars 변환
-      const adjustedSections = rebarSections.map((sec) => {
-        const rType = sec.rebarType;
-        if (rType === "type3") return sec; // 3단: 그대로
-        if (rType === "type2") {
-          // BOTH: J단(index 2)을 I단(index 0) 철근으로 복사
-          const iRebar = sec.rebars[0];
-          return {
-            ...sec,
-            rebars: sec.rebars.map((r) =>
-              r.position === "J"
-                ? { ...r, top_dia: iRebar.top_dia, top_count: iRebar.top_count, bot_dia: iRebar.bot_dia, bot_count: iRebar.bot_count, stirrup_dia: iRebar.stirrup_dia, stirrup_legs: iRebar.stirrup_legs, stirrup_spacing: iRebar.stirrup_spacing, cover: iRebar.cover }
-                : r
-            ),
-          };
-        }
-        // type1 (ALL): I/C/J 모두 I단 철근으로 통일
-        const iRebar = sec.rebars[0];
-        return {
-          ...sec,
-          rebars: sec.rebars.map((r) => ({
-            ...r, top_dia: iRebar.top_dia, top_count: iRebar.top_count, bot_dia: iRebar.bot_dia, bot_count: iRebar.bot_count, stirrup_dia: iRebar.stirrup_dia, stirrup_legs: iRebar.stirrup_legs, stirrup_spacing: iRebar.stirrup_spacing, cover: iRebar.cover,
-          })),
-        };
-      });
-      const body = { sections: adjustedSections, forces: maxResult };
-      const res = await fetch(`${BACKEND_URL}/api/member/beam-design-check`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      if (controller.signal.aborted) return;
-      if (!res.ok) throw new Error(`서버 오류: ${res.status}`);
-      setCheckResults(await res.json());
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return;
-      setError(String(e));
-    } finally {
-      if (!controller.signal.aborted) setCheckLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maxResult, rebarSections]);
-
-  // 배근/재료 변경 시 자동 검토 (300ms 디바운스)
-  useEffect(() => {
-    if (!maxResult || rebarSections.length === 0) return;
-    const timer = setTimeout(() => { runDesignCheck(); }, 300);
-    return () => clearTimeout(timer);
-  }, [runDesignCheck, maxResult, rebarSections]);
 
   return (
     <div className="p-6 space-y-6">
@@ -1085,7 +466,7 @@ export default function RcBeamCheckPage() {
                 {filteredSections.length > 0 && (
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setSelectedIds(new Set(filteredSections.map((s) => s.id)))}
+                      onClick={selectAllVisible}
                       className="text-[10px] text-blue-400 hover:text-blue-300"
                     >전체 선택</button>
                     <span className="text-gray-600">|</span>
@@ -1160,7 +541,7 @@ export default function RcBeamCheckPage() {
                 <span className="text-xs text-gray-500">마지막 조회: {lastFetchedAt}</span>
               )}
               <button
-                onClick={() => { setResult(null); fetchDesignResult(selectedNames, true); }}
+                onClick={() => fetchDesignResult(selectedNames, true)}
                 disabled={loadingResult || selectedKeys.length === 0}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-gray-700 text-xs text-gray-300 hover:bg-gray-600 transition-colors disabled:opacity-50"
                 title="MIDAS 데이터 새로고침 (캐시 무시)"
