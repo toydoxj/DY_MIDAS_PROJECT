@@ -40,6 +40,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     })();
   };
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { checkAuth(); }, []);
 
   if (state === "loading") {
