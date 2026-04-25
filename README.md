@@ -147,6 +147,8 @@ cd frontend && npm run dev
 - **Load Map**: 층별 평면 + FBLA 다각형 시각화
   - 다각형별 DL/LL/Wu(1.2D+1.6L) 자동 계산 + 다중 하중 popover
   - 등간격 inset 슬라이더(50/100/200/300mm), 휠 줌·팬, 하중명 라벨/색상
+  - **PDF 출력**: 현재 zoom/pan 그대로 A3 가로 + 흰 배경 + 15mm 보더 (jsPDF + html-to-image)
+  - **DXF 출력**: FBLA 영역 + 솔리드 해치(50% 투명) + fbld 별 컬러 레이어 + 한글 텍스트, mm 고정, shrink 슬라이더 반영 (ezdxf)
 - Wind Load, Earth Pressure (예정)
 
 ### 슬래브 경간/하중/배근 자동 분석 (`/member-check/slab-span`)

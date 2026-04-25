@@ -1,9 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Maximize2, Minus, Plus } from "lucide-react";
 import type { LoadMapArea, LoadMapBeam } from "../_lib/types";
 import GridAxesOverlay, { GridAxesBubbles } from "@/components/GridAxesOverlay";
+import { BACKEND_URL } from "@/lib/types";
 
 interface Props {
   beams: LoadMapBeam[];
@@ -260,17 +269,42 @@ function polygonInset(
   return result.length >= 3 ? result : poly;
 }
 
-export default function LoadMapView({
-  beams,
-  areas,
-  highlightFbld,
-  onAreaHover,
-  onAreaClick,
-  minHeight = 360,
-  maxHeight = 900,
-  insetDistance = 0,
-  grid,
-}: Props) {
+export interface LoadMapViewHandle {
+  /** 현재 화면(zoom/pan 포함) SVG 를 PDF 로 저장 (A3 가로). */
+  exportPdf: (storyName?: string) => Promise<void>;
+  /**
+   * FBLA 영역 다각형 + 솔리드 해치 + 텍스트 라벨을 DXF (mm 단위) 로 저장.
+   * shrinkMm 은 프론트 슬라이더와 동일 의미로 백엔드에 전달돼 다각형이 inset 된다.
+   */
+  exportDxf: (storyName?: string, shrinkMm?: number) => Promise<void>;
+}
+
+function _triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // revoke 는 클릭이 처리된 후 비동기로
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+const LoadMapView = forwardRef<LoadMapViewHandle, Props>(function LoadMapView(
+  {
+    beams,
+    areas,
+    highlightFbld,
+    onAreaHover,
+    onAreaClick,
+    minHeight = 360,
+    maxHeight = 900,
+    insetDistance = 0,
+    grid,
+  }: Props,
+  ref,
+) {
   const svgRef = useRef<SVGSVGElement | null>(null);
 
   const bounds = useMemo(() => {
@@ -453,6 +487,184 @@ export default function LoadMapView({
     if (panStateRef.current?.moved) return;
     onAreaClick?.(fbld);
   };
+
+  // ── PDF / DXF Export ──────────────────────────────────────────────────
+  // 외부(page.tsx)에서 ref 로 호출. PDF 는 클라이언트사이드(jspdf+html-to-image),
+  // DXF 는 백엔드 ezdxf 엔드포인트.
+  useImperativeHandle(
+    ref,
+    () => ({
+      exportPdf: async (storyName?: string) => {
+        const svg = svgRef.current;
+        if (!svg) throw new Error("SVG 가 아직 마운트되지 않았습니다");
+
+        // 동적 import — 페이지 첫 로드 부담 줄이기
+        const [{ jsPDF }, { toPng }] = await Promise.all([
+          import("jspdf"),
+          import("html-to-image"),
+        ]);
+
+        // 현재 SVG 의 화면 비율 (zoom/pan 그대로)
+        const rect = svg.getBoundingClientRect();
+        const aspect = rect.width / Math.max(rect.height, 1);
+
+        // 흰 배경 캡처: SVG 의 dark 배경 + 다크 fill 도형 + 라이트/노랑 텍스트를 일시 변환.
+        // - 모든 text 의 fill → #1f2937 (다크) 로 통일 (색상 다양성보다 가독성 우선)
+        // - 다크 fill 의 circle (그리드 버블 등) → #ffffff (외곽선 stroke 는 그대로 유지)
+        const darkFillRe = /^(#0f172a|#0F172A|#1e293b|#1E293B|#0a0f1c|#000000|#000|black)$/;
+        const originalBg = svg.style.background;
+
+        const textEls = Array.from(svg.querySelectorAll<SVGTextElement>("text"));
+        const originalTextFills = textEls.map((t) => t.getAttribute("fill"));
+
+        // 다크 fill 도형 (circle/rect/path) — 같은 selector 로 한 번에
+        const shapeEls = Array.from(
+          svg.querySelectorAll<SVGElement>("circle, rect, path"),
+        ).filter((el) => darkFillRe.test((el.getAttribute("fill") ?? "").trim()));
+        const originalShapeFills = shapeEls.map((el) => el.getAttribute("fill"));
+
+        let dataUrl: string;
+        try {
+          svg.style.background = "#ffffff";
+          for (const t of textEls) t.setAttribute("fill", "#1f2937");
+          for (const el of shapeEls) el.setAttribute("fill", "#ffffff");
+
+          const pixelRatio =
+            typeof window !== "undefined" ? Math.max(window.devicePixelRatio, 2) : 2;
+          dataUrl = await toPng(svg as unknown as HTMLElement, {
+            backgroundColor: "#ffffff",
+            pixelRatio,
+            cacheBust: true,
+          });
+        } finally {
+          svg.style.background = originalBg;
+          textEls.forEach((t, i) => {
+            const f = originalTextFills[i];
+            if (f !== null) t.setAttribute("fill", f);
+            else t.removeAttribute("fill");
+          });
+          shapeEls.forEach((el, i) => {
+            const f = originalShapeFills[i];
+            if (f !== null) el.setAttribute("fill", f);
+            else el.removeAttribute("fill");
+          });
+        }
+
+        // A3 가로 (420×297mm), 여백 15mm + 보더라인
+        const pageW = 420;
+        const pageH = 297;
+        const margin = 15;
+        const availW = pageW - margin * 2;
+        const availH = pageH - margin * 2;
+        let drawW: number;
+        let drawH: number;
+        if (aspect >= availW / availH) {
+          drawW = availW;
+          drawH = drawW / aspect;
+        } else {
+          drawH = availH;
+          drawW = drawH * aspect;
+        }
+        const offX = (pageW - drawW) / 2;
+        const offY = (pageH - drawH) / 2;
+
+        // 헤더 라벨 — Canvas 2D 로 직접 그려 PNG dataURL 생성.
+        // jsPDF 의 helvetica 는 한글 미지원이라 텍스트로 직접 그리면 깨지므로 이미지로 임베드.
+        // hidden DOM + html-to-image 방식보다 안정적 (layout 측정 의존 X, 비동기 X).
+        const headerText = `Floor Load Map - ${storyName ?? "all"}, UNIT : kN/m²`;
+        let headerPng: string | null = null;
+        let headerAspect = 8;
+        try {
+          const fontPx = 40; // 캔버스 픽셀 (PDF 8mm × 5dpi 환산 + 여유)
+          const padX = 24;
+          const padY = 12;
+          const fontFamily =
+            '"Malgun Gothic", "Noto Sans KR", "Apple SD Gothic Neo", "Pretendard", sans-serif';
+          const fontSpec = `700 ${fontPx}px ${fontFamily}`;
+
+          // 1) 텍스트 폭 측정용 임시 캔버스
+          const measure = document.createElement("canvas");
+          const mctx = measure.getContext("2d");
+          if (!mctx) throw new Error("2D context unavailable");
+          mctx.font = fontSpec;
+          const metrics = mctx.measureText(headerText);
+          const textW = Math.max(1, Math.ceil(metrics.width));
+          const ascent = metrics.actualBoundingBoxAscent || fontPx * 0.85;
+          const descent = metrics.actualBoundingBoxDescent || fontPx * 0.25;
+          const textH = Math.max(1, Math.ceil(ascent + descent));
+
+          const pr = Math.max(
+            typeof window !== "undefined" ? window.devicePixelRatio : 1,
+            2,
+          );
+          const cssW = textW + padX * 2;
+          const cssH = textH + padY * 2;
+          const canvas = document.createElement("canvas");
+          canvas.width = cssW * pr;
+          canvas.height = cssH * pr;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("2D context unavailable");
+          ctx.scale(pr, pr);
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, cssW, cssH);
+          ctx.fillStyle = "#1f2937";
+          ctx.font = fontSpec;
+          ctx.textBaseline = "alphabetic";
+          ctx.textAlign = "center";
+          ctx.fillText(headerText, cssW / 2, padY + ascent);
+
+          headerPng = canvas.toDataURL("image/png");
+          headerAspect = cssW / cssH;
+        } catch {
+          // 헤더 그리기 실패 시 무시 (PDF 본문은 정상 출력)
+        }
+
+        const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a3" });
+        // 페이지 흰 배경 (jsPDF 기본은 투명이지만 명시적으로 채워 안전하게)
+        doc.setFillColor(255, 255, 255);
+        doc.rect(0, 0, pageW, pageH, "F");
+        // 이미지 (zoom/pan 그대로 캡처된 SVG)
+        doc.addImage(dataUrl, "PNG", offX, offY, drawW, drawH, undefined, "FAST");
+        // 보더라인 — 여백 15mm 안쪽 사각형
+        doc.setDrawColor(60, 60, 60);
+        doc.setLineWidth(0.4);
+        doc.rect(margin, margin, availW, availH);
+
+        // 헤더: 보더 위쪽 여백 영역, 페이지 상단 중앙
+        if (headerPng) {
+          const headerH = 8;  // mm
+          const headerW = headerH * headerAspect;
+          const headerX = (pageW - headerW) / 2;
+          const headerY = (margin - headerH) / 2;  // 보더 위 여백 중앙
+          doc.addImage(headerPng, "PNG", headerX, headerY, headerW, headerH);
+        }
+
+        const safeStory = (storyName ?? "all").replace(/\s+/g, "-");
+        const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+        doc.save(`load_map_${safeStory}_${stamp}.pdf`);
+      },
+
+      exportDxf: async (storyName?: string, shrinkMm: number = 0) => {
+        const res = await fetch(`${BACKEND_URL}/api/loadcase/load-map/export-dxf`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            story_name: storyName ?? null,
+            shrink_mm: Math.max(0, shrinkMm),
+          }),
+        });
+        if (!res.ok) {
+          const errText = await res.text().catch(() => "");
+          throw new Error(`DXF 생성 실패 (${res.status}): ${errText.slice(0, 200)}`);
+        }
+        const blob = await res.blob();
+        const safeStory = (storyName ?? "all").replace(/\s+/g, "-");
+        const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+        _triggerDownload(blob, `load_map_${safeStory}_${stamp}.dxf`);
+      },
+    }),
+    [],
+  );
 
   if (beams.length === 0 && areas.length === 0) {
     return (
@@ -694,4 +906,6 @@ export default function LoadMapView({
       </div>
     </div>
   );
-}
+});
+
+export default LoadMapView;

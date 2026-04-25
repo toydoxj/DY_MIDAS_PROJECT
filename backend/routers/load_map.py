@@ -3,19 +3,26 @@
 엔드포인트:
     POST /api/loadcase/load-map/analyze        — 선택 층 분석
     POST /api/loadcase/load-map/analyze-all    — 전체 층 자동 분석
+    POST /api/loadcase/load-map/export-dxf     — FBLA 영역 → DXF (mm 고정)
 
 slab_span 라우터의 MIDAS 조회/매칭 헬퍼를 재사용해 중복 구현을 피한다.
+PDF 내보내기는 프론트 클라이언트사이드(jsPDF + html-to-image)에서 처리.
 """
 
 from __future__ import annotations
 
+import io
 import logging
+from datetime import datetime
+from urllib.parse import quote
 
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 
 import MIDAS_API as MIDAS
 
 from exceptions import MidasApiError
+from engines.load_map_dxf import build_load_map_dxf
 from engines.slab_span import (
     build_beam_segments,
     factored_load,
@@ -24,10 +31,12 @@ from engines.slab_span import (
 from models.load_map import (
     LoadMapArea,
     LoadMapBeam,
+    LoadMapDxfExportRequest,
     LoadMapLevel,
     LoadMapRequest,
     LoadMapResponse,
 )
+from routers.project_settings import _get_unit_to_mm_factor
 from routers.slab_span import (
     _fetch_floor_load_areas,
     _fetch_story_list,
@@ -170,6 +179,62 @@ def get_midas_unit() -> dict:
         logger.error("UNIT 조회 실패: %s", e)
         raise MidasApiError("UNIT 조회 실패", cause=str(e))
     return {"raw": raw}
+
+
+@router.post("/loadcase/load-map/export-dxf")
+def export_dxf(req: LoadMapDxfExportRequest) -> StreamingResponse:
+    """FBLA 영역 다각형 + fbld_name 텍스트를 DXF 로 내보내기 (단위: mm 고정).
+
+    story_name 이 지정되면 해당 층 영역만, None 이면 모든 층 영역을 포함.
+    DXF 좌표는 MIDAS 모델의 DIST 단위에 관계없이 항상 mm 로 변환되어 출력된다.
+    """
+    nodes, elems = _load_nodes_and_elems()
+    dead_names, live_names = _load_case_types()
+    areas = _fetch_floor_load_areas(nodes, dead_names, live_names)
+
+    unit_to_mm = _get_unit_to_mm_factor()
+
+    target_z: float | None = None
+    z_tol = 0.5
+    if req.story_name and req.story_name.strip():
+        try:
+            stories = _fetch_story_list()
+        except MidasApiError as e:
+            logger.warning("export-dxf: STOR 조회 실패 — 전체 층으로 진행: %s", e)
+            stories = []
+        target_z = next(
+            (s.level for s in stories
+             if s.name.strip() == req.story_name.strip()),
+            None,
+        )
+        if target_z is None:
+            logger.warning(
+                "export-dxf: 층 '%s' 매칭 실패 — 전체 층으로 진행",
+                req.story_name,
+            )
+        else:
+            # Z 매칭 허용오차도 모델 단위에 비례시켜 mm 모델/m 모델 모두 대응
+            z_tol = max(0.01, abs(target_z) * 1e-4, 0.5 / max(unit_to_mm, 1.0))
+
+    dxf_bytes = build_load_map_dxf(
+        areas,
+        unit_to_mm=unit_to_mm,
+        z_level=target_z,
+        z_tol=z_tol,
+        shrink_mm=max(0.0, float(req.shrink_mm)),
+        hatch_transparency=max(0.0, min(1.0, float(req.hatch_transparency))),
+    )
+
+    safe_story = (req.story_name or "all").strip().replace(" ", "-") or "all"
+    filename = f"load_map_{safe_story}_{datetime.now():%Y%m%d_%H%M}.dxf"
+    encoded = quote(filename)
+    return StreamingResponse(
+        io.BytesIO(dxf_bytes),
+        media_type="application/dxf",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded}",
+        },
+    )
 
 
 @router.get("/loadcase/load-map/debug")

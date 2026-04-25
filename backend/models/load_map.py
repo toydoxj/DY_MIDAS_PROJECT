@@ -45,3 +45,13 @@ class LoadMapResponse(BaseModel):
     level_count: int
     total_area_count: int
     reports: list[LoadMapLevel] = Field(default_factory=list)
+
+
+class LoadMapDxfExportRequest(BaseModel):
+    """FBLA 영역 다각형 + 솔리드 해치 + 텍스트 라벨 DXF 내보내기 요청.
+
+    PDF 는 프론트 클라이언트사이드(jsPDF + html-to-image)에서 처리하므로 백엔드 모델 없음.
+    """
+    story_name: Optional[str] = None       # None 이면 모든 층 통합
+    shrink_mm: float = 0.0                  # 다각형 내부 inset (프론트 shrink 슬라이더와 동일)
+    hatch_transparency: float = 0.5         # 솔리드 해치 투명도 [0..1]

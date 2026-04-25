@@ -53,6 +53,11 @@ a = Analysis(
         'numpy',
         'tqdm',
         'openpyxl',  # backend/routers/floorload.py 에서 lazy import
+        # Load Map DXF 내보내기 (PDF는 프론트 클라이언트사이드)
+        'ezdxf',
+        'ezdxf.enums',
+        'ezdxf.tools',
+        'ezdxf.lldxf',
     ],
     hookspath=[],
     hooksconfig={},

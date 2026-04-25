@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Play, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FileDown, FileText, Loader2, Play, RefreshCw } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import SectionCard from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
@@ -13,7 +13,7 @@ import type {
   LoadMapResponse,
   LoadMapStory,
 } from "./_lib/types";
-import LoadMapView from "./_components/LoadMapView";
+import LoadMapView, { type LoadMapViewHandle } from "./_components/LoadMapView";
 
 const AREA_COLUMNS = [
   { key: "fbld_name", label: "하중명" },
@@ -32,6 +32,8 @@ export default function LoadMapPage() {
   const [hoverFbldByLevel, setHoverFbldByLevel] = useState<Record<number, string | null>>({});
   const [shrinkMm, setShrinkMm] = useState<number>(300);
   const [distUnit, setDistUnit] = useState<string>("M");
+  const [exportingKey, setExportingKey] = useState<string | null>(null);
+  const viewRefs = useRef<Map<string, LoadMapViewHandle | null>>(new Map());
   const [gridSettings, setGridSettings] = useState<{
     angleDeg: number;
     origin: [number, number];
@@ -175,6 +177,31 @@ export default function LoadMapPage() {
       setAnalyzing(false);
     }
   }, [selectedStories]);
+
+  const handleExport = useCallback(
+    async (kind: "pdf" | "dxf", key: string, storyName: string) => {
+      const handle = viewRefs.current.get(key);
+      if (!handle) {
+        setError("해당 층의 뷰가 아직 마운트되지 않았습니다");
+        return;
+      }
+      setExportingKey(`${key}-${kind}`);
+      setError(null);
+      try {
+        if (kind === "pdf") {
+          await handle.exportPdf(storyName);
+        } else {
+          // DXF 도 화면의 shrink 슬라이더 값을 그대로 적용 (mm)
+          await handle.exportDxf(storyName, shrinkMm);
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setExportingKey(null);
+      }
+    },
+    [shrinkMm],
+  );
 
   const summary = useMemo(() => {
     if (!response) return null;
@@ -325,14 +352,46 @@ export default function LoadMapPage() {
 
       {response?.reports.map((r) => {
         const hoverFbld = hoverFbldByLevel[r.z_level] ?? null;
+        const key = `${r.z_level}-${r.story_name}`;
+        const storyLabel = r.story_name || `EL ${r.z_level.toFixed(2)} m`;
+        const pdfBusy = exportingKey === `${key}-pdf`;
+        const dxfBusy = exportingKey === `${key}-dxf`;
         return (
           <SectionCard
-            key={`${r.z_level}-${r.story_name}`}
-            title={`${r.story_name || `EL ${r.z_level.toFixed(2)} m`} — 하중 영역 ${r.load_areas.length}개 · 보 ${r.beams.length}개`}
+            key={key}
+            title={`${storyLabel} — 하중 영역 ${r.load_areas.length}개 · 보 ${r.beams.length}개`}
+            action={
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleExport("pdf", key, r.story_name)}
+                  disabled={pdfBusy || dxfBusy}
+                  title="현재 화면(zoom/pan 그대로) 을 PDF 로 저장"
+                >
+                  {pdfBusy ? <Loader2 className="animate-spin" size={14} /> : <FileText size={14} />}
+                  PDF
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleExport("dxf", key, r.story_name)}
+                  disabled={pdfBusy || dxfBusy}
+                  title="FBLA 영역 다각형을 DXF 로 저장 (mm 단위, 레이어 분리)"
+                >
+                  {dxfBusy ? <Loader2 className="animate-spin" size={14} /> : <FileDown size={14} />}
+                  DXF
+                </Button>
+              </div>
+            }
           >
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               <div className="min-w-0 lg:col-span-2">
                 <LoadMapView
+                  ref={(handle) => {
+                    if (handle) viewRefs.current.set(key, handle);
+                    else viewRefs.current.delete(key);
+                  }}
                   beams={r.beams}
                   areas={r.load_areas}
                   highlightFbld={hoverFbld}
