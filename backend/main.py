@@ -108,6 +108,8 @@ from routers import analysis as analysis_router
 from routers import floorload as floorload_router
 from routers import member as member_router
 from routers import slab_span as slab_span_router
+from routers import load_map as load_map_router
+from routers import project_settings as project_settings_router
 from routers import seismic_cert as seismic_cert_router
 
 app.include_router(auth_router.router, prefix="/api")
@@ -118,6 +120,8 @@ app.include_router(analysis_router.router, prefix="/api")
 app.include_router(floorload_router.router, prefix="/api")
 app.include_router(member_router.router, prefix="/api")
 app.include_router(slab_span_router.router, prefix="/api")
+app.include_router(load_map_router.router, prefix="/api")
+app.include_router(project_settings_router.router, prefix="/api")
 app.include_router(seismic_cert_router.router, prefix="/api")
 # midas 와일드카드 라우터는 반드시 마지막에 등록
 app.include_router(midas_router.router, prefix="/api")

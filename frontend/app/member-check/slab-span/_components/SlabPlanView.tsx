@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Maximize2, Minus, Plus } from "lucide-react";
 import type { BeamSegment, Panel } from "../_lib/types";
+import GridAxesOverlay, { GridAxesBubbles } from "@/components/GridAxesOverlay";
 
 interface Props {
   beams: BeamSegment[];
@@ -12,6 +13,22 @@ interface Props {
   onPanelHover?: (id: string | null) => void;
   /** panel_id → 사용자 지정 슬래브 이름 매핑. 없으면 "(미지정)"으로 표시. */
   nameMap?: Record<string, string>;
+  /** 축렬 오버레이 (Project Setting). offset/origin 은 mm 단위. */
+  grid?: {
+    angleDeg: number;
+    origin: [number, number];
+    xAxes: { label: string; offset: number }[];
+    yAxes: { label: string; offset: number }[];
+    extraGroups?: {
+      name: string;
+      angle_deg: number;
+      origin: [number, number];
+      axes: { label: string; offset: number }[];
+      color: string;
+    }[];
+    /** mm → 모델 단위 변환 계수 (DIST=M 이면 0.001, MM 이면 1). */
+    unitFactor: number;
+  } | null;
   /** 지정 시 고정 높이 사용 (px). 미지정이면 평면 비율에 따라 자동 조정. */
   height?: number;
   /** 자동 높이 모드의 하한 (px). */
@@ -29,6 +46,70 @@ const COLORS = {
   text: "#e5e7eb",
   textSub: "#9ca3af",
 };
+
+/**
+ * 공유 끝점 기반 polyline 체인 빌더. 꺾이는 체인도 하나의 polyline 으로.
+ * LoadMapView 와 동일 로직 — 향후 공용 훅으로 추출 고려.
+ */
+function buildChains(
+  segs: { x1: number; y1: number; x2: number; y2: number }[],
+  tol: number,
+): [number, number][][] {
+  if (segs.length === 0) return [];
+  const snap = (v: number) => Math.round(v / tol) * tol;
+  const keyOf = (x: number, y: number) => `${snap(x)},${snap(y)}`;
+  interface Adj {
+    otherKey: string;
+    other: [number, number];
+    segIdx: number;
+  }
+  const adj = new Map<string, Adj[]>();
+  const coordOf = new Map<string, [number, number]>();
+  segs.forEach((s, i) => {
+    const a = keyOf(s.x1, s.y1);
+    const b = keyOf(s.x2, s.y2);
+    if (!coordOf.has(a)) coordOf.set(a, [s.x1, s.y1]);
+    if (!coordOf.has(b)) coordOf.set(b, [s.x2, s.y2]);
+    if (!adj.has(a)) adj.set(a, []);
+    if (!adj.has(b)) adj.set(b, []);
+    adj.get(a)!.push({ otherKey: b, other: [s.x2, s.y2], segIdx: i });
+    adj.get(b)!.push({ otherKey: a, other: [s.x1, s.y1], segIdx: i });
+  });
+  const visited = new Set<number>();
+  const chains: [number, number][][] = [];
+  const walk = (startKey: string, firstSegIdx: number) => {
+    if (visited.has(firstSegIdx)) return;
+    const startCoord = coordOf.get(startKey)!;
+    const chain: [number, number][] = [startCoord];
+    let curKey = startKey;
+    let curSegIdx = firstSegIdx;
+    while (true) {
+      if (visited.has(curSegIdx)) break;
+      visited.add(curSegIdx);
+      const segMeta = adj.get(curKey)!.find((a) => a.segIdx === curSegIdx)!;
+      const nextKey = segMeta.otherKey;
+      chain.push(segMeta.other);
+      const nextAdj = adj.get(nextKey) || [];
+      if (nextAdj.length !== 2) break;
+      const nxt = nextAdj.find((n) => !visited.has(n.segIdx));
+      if (!nxt) break;
+      curKey = nextKey;
+      curSegIdx = nxt.segIdx;
+    }
+    if (chain.length >= 2) chains.push(chain);
+  };
+  for (const [key, neighbors] of adj.entries()) {
+    if (neighbors.length === 2) continue;
+    for (const nb of neighbors) walk(key, nb.segIdx);
+  }
+  segs.forEach((_, i) => {
+    if (visited.has(i)) return;
+    const s = segs[i];
+    const k = keyOf(s.x1, s.y1);
+    walk(k, i);
+  });
+  return chains;
+}
 
 /** 문자열 → 32bit 해시. djb2 + Murmur 스타일 bit mixing. */
 function hash32(str: string): number {
@@ -81,6 +162,7 @@ export default function SlabPlanView({
   onPanelClick,
   onPanelHover,
   nameMap,
+  grid,
   height,
   minHeight = 320,
   maxHeight = 900,
@@ -319,7 +401,34 @@ export default function SlabPlanView({
         onMouseLeave={endPan}
       >
         <g transform={transform}>
-          {/* 패널 박스 (보보다 아래 레이어) */}
+          {/* 축렬 오버레이 — 보/패널보다 아래 레이어, 점선 파란색 */}
+          {grid && (grid.xAxes.length > 0 || grid.yAxes.length > 0) && (
+            <GridAxesOverlay
+              angleDeg={grid.angleDeg}
+              origin={grid.origin}
+              xAxes={grid.xAxes}
+              yAxes={grid.yAxes}
+              bbox={bounds}
+              strokeW={strokeW}
+              unitFactor={grid.unitFactor}
+            />
+          )}
+          {/* 추가 축렬 그룹 — 각 그룹은 자체 angle/color 로 단일 방향 축렬 */}
+          {grid?.extraGroups?.map((g, i) => (
+            <GridAxesOverlay
+              key={`extra-${i}`}
+              angleDeg={g.angle_deg}
+              origin={g.origin}
+              xAxes={g.axes}
+              yAxes={[]}
+              bbox={bounds}
+              strokeW={strokeW}
+              color={g.color}
+              unitFactor={grid.unitFactor}
+            />
+          ))}
+          {/* 패널 — polygon 렌더 (삼각형/사각형/오각형 모두 지원).
+              polygon 이 비어있으면 AABB 사각형 fallback */}
           {panels.map((p) => {
             const isHi = p.panel_id === highlightPanelId;
             const customName = nameMap?.[p.panel_id]?.trim() ?? "";
@@ -327,8 +436,11 @@ export default function SlabPlanView({
             const nameColors = colorForName(customName);
             const stroke = isHi ? COLORS.selectedStroke : nameColors.stroke;
             const fill = isHi ? COLORS.selectedFill : nameColors.fill;
-            // 미지정 패널: 점선 테두리로 "미입력" 상태를 한눈에 표시
             const dashLen = Math.max(strokeW * 4, Math.min(p.lx, p.ly) * 0.04);
+            const pts =
+              p.polygon && p.polygon.length >= 3
+                ? p.polygon.map(([x, y]) => `${x},${y}`).join(" ")
+                : `${p.x_min},${p.y_min} ${p.x_max},${p.y_min} ${p.x_max},${p.y_max} ${p.x_min},${p.y_max}`;
             return (
               <g
                 key={p.panel_id}
@@ -340,11 +452,8 @@ export default function SlabPlanView({
                 onMouseEnter={() => onPanelHover?.(p.panel_id)}
                 onMouseLeave={() => onPanelHover?.(null)}
               >
-                <rect
-                  x={p.x_min}
-                  y={p.y_min}
-                  width={p.lx}
-                  height={p.ly}
+                <polygon
+                  points={pts}
                   fill={fill}
                   stroke={stroke}
                   strokeWidth={isHi ? strokeW * 2.2 : strokeW * 1.2}
@@ -357,27 +466,125 @@ export default function SlabPlanView({
             );
           })}
 
-          {/* 보 라인 */}
-          {beams.map((b, i) => (
-            <line
-              key={`${b.elem_id}-${i}`}
-              x1={b.x1}
-              y1={b.y1}
-              x2={b.x2}
-              y2={b.y2}
-              stroke={COLORS.beam}
-              strokeWidth={strokeW * 1.6}
-              strokeLinecap="round"
-              pointerEvents="none"
-            />
-          ))}
+          {/* OMBB 오버레이 — 선택된 패널만 주황색 점선 사각형 */}
+          {(() => {
+            const selPanel = panels.find((p) => p.panel_id === highlightPanelId);
+            if (!selPanel || !selPanel.ombb_vertices || selPanel.ombb_vertices.length < 4) {
+              return null;
+            }
+            const ombbPts = selPanel.ombb_vertices
+              .map(([x, y]) => `${x},${y}`)
+              .join(" ");
+            return (
+              <polygon
+                points={ombbPts}
+                fill="none"
+                stroke="#f59e0b"
+                strokeWidth={strokeW * 1.3}
+                strokeDasharray={`${strokeW * 3} ${strokeW * 2}`}
+                pointerEvents="none"
+              />
+            );
+          })()}
+
+          {/* 보 라인 — SKEW 는 공유 끝점 polyline 으로 묶어 꺾임 자연스럽게 */}
+          {(() => {
+            const axisBeams = beams.filter((b) => b.direction !== "SKEW");
+            const skewBeams = beams.filter((b) => b.direction === "SKEW");
+            const chainTol = Math.max(strokeW * 0.5, 1e-3);
+            const skewChains = buildChains(skewBeams, chainTol);
+            return (
+              <>
+                {skewChains.map((chain, i) => (
+                  <polyline
+                    key={`skew-chain-${i}`}
+                    points={chain.map(([x, y]) => `${x},${y}`).join(" ")}
+                    fill="none"
+                    stroke={COLORS.beam}
+                    strokeWidth={strokeW * 1.6}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    pointerEvents="none"
+                  />
+                ))}
+                {axisBeams.map((b, i) => (
+                  <line
+                    key={`${b.elem_id}-${i}`}
+                    x1={b.x1}
+                    y1={b.y1}
+                    x2={b.x2}
+                    y2={b.y2}
+                    stroke={COLORS.beam}
+                    strokeWidth={strokeW * 1.6}
+                    strokeLinecap="round"
+                    pointerEvents="none"
+                  />
+                ))}
+              </>
+            );
+          })()}
         </g>
 
-        {/* 라벨 레이어: 이름 / 경간(굵게 강조) / 하중명 / 하중값 — 4줄 */}
+        {/* 축렬 버블 — transform 밖에서 Ty 수동 반전으로 텍스트 똑바로 */}
+        {grid && (grid.xAxes.length > 0 || grid.yAxes.length > 0) && (
+          <GridAxesBubbles
+            angleDeg={grid.angleDeg}
+            origin={grid.origin}
+            xAxes={grid.xAxes}
+            yAxes={grid.yAxes}
+            bbox={bounds}
+            strokeW={strokeW}
+            Ty={Ty}
+            unitFactor={grid.unitFactor}
+          />
+        )}
+        {grid?.extraGroups?.map((g, i) => (
+          <GridAxesBubbles
+            key={`extra-bubble-${i}`}
+            angleDeg={g.angle_deg}
+            origin={g.origin}
+            xAxes={g.axes}
+            yAxes={[]}
+            bbox={bounds}
+            strokeW={strokeW}
+            Ty={Ty}
+            color={g.color}
+            unitFactor={grid?.unitFactor ?? 1}
+          />
+        ))}
+
+        {/* 라벨 레이어: 이름 / 경간(굵게 강조) / 하중명 / 하중값 — 4줄
+            polygon centroid 기반으로 삼각형/오각형에서도 중앙 배치 */}
         <g pointerEvents="none">
           {panels.map((p) => {
-            const cx = (p.x_min + p.x_max) / 2;
-            const cy = Ty - (p.y_min + p.y_max) / 2;
+            let wcx: number, wcy: number;
+            if (p.polygon && p.polygon.length >= 3) {
+              // Shoelace centroid
+              let a2 = 0;
+              let sx = 0;
+              let sy = 0;
+              const n = p.polygon.length;
+              for (let i = 0; i < n; i++) {
+                const [x1, y1] = p.polygon[i];
+                const [x2, y2] = p.polygon[(i + 1) % n];
+                const cross = x1 * y2 - x2 * y1;
+                a2 += cross;
+                sx += (x1 + x2) * cross;
+                sy += (y1 + y2) * cross;
+              }
+              if (Math.abs(a2) > 1e-9) {
+                wcx = sx / (3 * a2);
+                wcy = sy / (3 * a2);
+              } else {
+                wcx = p.polygon.reduce((a, pt) => a + pt[0], 0) / n;
+                wcy = p.polygon.reduce((a, pt) => a + pt[1], 0) / n;
+              }
+            } else {
+              wcx = (p.x_min + p.x_max) / 2;
+              wcy = (p.y_min + p.y_max) / 2;
+            }
+            const cx = wcx;
+            const cy = Ty - wcy;
             const customName = nameMap?.[p.panel_id]?.trim() ?? "";
             const isUnnamed = customName.length === 0;
             const nameLabel = isUnnamed ? "(미지정)" : customName;

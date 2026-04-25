@@ -4,12 +4,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutDashboard, Search, Weight, ClipboardCheck, FileText, Users, ChevronLeft, ChevronRight, LogOut, User } from "lucide-react";
+import { LayoutDashboard, Search, Weight, ClipboardCheck, FileText, Users, ChevronLeft, ChevronRight, LogOut, User, Settings2 } from "lucide-react";
 import ConnectionStatus from "./ConnectionStatus";
 import { getUser, clearAuth } from "@/lib/auth";
 
 const navItems = [
   { href: "/", label: "대시보드", icon: LayoutDashboard },
+  { href: "/project-settings", label: "프로젝트 설정", icon: Settings2 },
   { href: "/loadcase", label: "하중정보", icon: Weight },
   { href: "/member-check", label: "부재검토", icon: ClipboardCheck },
   { href: "/documents", label: "문서 작성", icon: FileText },

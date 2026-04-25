@@ -8,7 +8,7 @@ export interface Story {
 
 export interface BeamSegment {
   elem_id: number;
-  direction: "X" | "Y";
+  direction: "X" | "Y" | "SKEW";
   x1: number;
   y1: number;
   x2: number;
@@ -42,6 +42,10 @@ export interface Panel {
   beam_right: number;
   beam_bottom: number;
   beam_top: number;
+  polygon?: [number, number][];
+  orientation_deg?: number;
+  ombb_vertices?: [number, number][];
+  vertex_count?: number;
   floor_load_name?: string | null;
   floor_load_dl?: number | null;
   floor_load_ll?: number | null;

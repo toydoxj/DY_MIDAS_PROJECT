@@ -151,7 +151,16 @@ def _load_nodes_and_elems(
 
 
 def _segment_xy(s) -> tuple[float, float, float, float]:
-    """BeamSegment → 시각화용 (x1, y1, x2, y2) 좌표."""
+    """BeamSegment → 시각화용 (x1, y1, x2, y2) 좌표.
+
+    SKEW 세그먼트는 원본 좌표(s.x1 등) 그대로 반환.
+    X/Y 세그먼트도 가능하면 저장된 x1~y2 사용, 없으면 axis 로 복원.
+    """
+    if s.direction == "SKEW":
+        return (s.x1, s.y1, s.x2, s.y2)
+    # 저장된 원본 좌표가 있으면 우선 사용
+    if any((s.x1, s.y1, s.x2, s.y2)):
+        return (s.x1, s.y1, s.x2, s.y2)
     if s.direction == "X":
         return (s.axis_min, s.cross_pos, s.axis_max, s.cross_pos)
     return (s.cross_pos, s.axis_min, s.cross_pos, s.axis_max)
@@ -227,6 +236,60 @@ def _classify_dl_ll(
     return dl, ll
 
 
+_FORCE_TO_KN: dict[str, float] = {
+    "N": 1e-3,
+    "KN": 1.0,
+    "KGF": 0.00980665,
+    "TONF": 9.80665,
+    "LBF": 0.00444822,
+    "KIPS": 4.44822,
+}
+_DIST_TO_M: dict[str, float] = {
+    "MM": 1e-3,
+    "CM": 1e-2,
+    "M": 1.0,
+    "IN": 0.0254,
+    "FT": 0.3048,
+}
+
+
+def _get_load_unit_factor() -> float:
+    """현재 MIDAS 단위로 저장된 FLOOR_LOAD 값을 kN/m² 로 변환하는 계수.
+
+    FLOOR_LOAD 의 차원은 [FORCE]/[DIST]². 예:
+      - FORCE=KN, DIST=M → 계수 1.0 (그대로 kN/m²)
+      - FORCE=N,  DIST=M → 계수 0.001 (N/m² → kN/m²)  ※ 하지만 실제 기록 값도 작아짐
+      - FORCE=N,  DIST=MM → 계수 1000 (N/mm² = MPa → kN/m²)
+    실패 시 1.0 반환 (기존 동작 유지).
+    """
+    try:
+        raw = MIDAS.MidasAPI("GET", "/db/UNIT")
+    except Exception as e:
+        logger.warning("UNIT 조회 실패 (단위 변환 계수=1.0 사용): %s", e)
+        return 1.0
+
+    unit = _unwrap(raw, "UNIT") if isinstance(raw, dict) else {}
+    if not isinstance(unit, dict) or not unit:
+        return 1.0
+
+    # 중첩 dict 가능성 ({"1": {FORCE,DIST,...}})
+    candidate: dict = unit
+    if all(isinstance(v, dict) for v in unit.values()):
+        candidate = next(iter(unit.values()), {})
+
+    force = str(candidate.get("FORCE", "KN")).upper()
+    dist = str(candidate.get("DIST", "M")).upper()
+
+    force_factor = _FORCE_TO_KN.get(force, 1.0)
+    dist_factor = _DIST_TO_M.get(dist, 1.0)
+    factor = force_factor / (dist_factor ** 2)
+    logger.info(
+        "load unit factor: FORCE=%s (→%g kN), DIST=%s (→%g m) ⇒ factor=%g",
+        force, force_factor, dist, dist_factor, factor,
+    )
+    return factor
+
+
 def _load_case_types() -> tuple[set[str], set[str]]:
     """loadCaseDB 에서 Dead/Live 이름 집합 구성."""
     dead: set[str] = set()
@@ -255,7 +318,11 @@ def _fetch_floor_load_areas(
     dead_names: set[str],
     live_names: set[str],
 ) -> list:
-    """/db/FBLA + /db/FBLD 조회 → FloorLoadArea 리스트."""
+    """/db/FBLA + /db/FBLD 조회 → FloorLoadArea 리스트.
+
+    MIDAS 단위(FORCE/DIST) 에 따라 FLOOR_LOAD 값을 **kN/m² 로 정규화**하여
+    저장한다. DL/LL 값은 단위 시스템과 무관하게 kN/m² 로 일관된다.
+    """
     from engines.slab_span import FloorLoadArea, Node
 
     try:
@@ -270,6 +337,8 @@ def _fetch_floor_load_areas(
         logger.warning("FBLD 조회 실패 (Floor Load 매칭 건너뜀): %s", e)
         return []
 
+    unit_factor = _get_load_unit_factor()
+
     # FBLD NAME → (DL, LL) 매핑 (이중 래핑 해제)
     name_to_loads: dict[str, tuple[float, float]] = {}
     id_to_name: dict[str, str] = {}
@@ -282,7 +351,8 @@ def _fetch_floor_load_areas(
             continue
         items = v.get("ITEM", []) or []
         dl, ll = _classify_dl_ll(items, dead_names, live_names)
-        name_to_loads[name] = (dl, ll)
+        # MIDAS 단위 → kN/m² 로 정규화
+        name_to_loads[name] = (dl * unit_factor, ll * unit_factor)
         id_to_name[str(fid)] = name
 
     # FBLA 처리 (이중 래핑 해제)
@@ -474,6 +544,10 @@ def _run_analysis(req: SlabSpanAnalyzeRequest) -> SlabSpanAnalyzeResponse:
                 beam_right=p.beam_right,
                 beam_bottom=p.beam_bottom,
                 beam_top=p.beam_top,
+                polygon=[(float(x), float(y)) for (x, y) in p.polygon],
+                orientation_deg=round(p.orientation_deg, 2),
+                ombb_vertices=[(float(x), float(y)) for (x, y) in p.ombb_vertices],
+                vertex_count=p.vertex_count,
                 floor_load_name=primary.fbld_name if primary else None,
                 floor_load_dl=round(primary.dl, 3) if primary else None,
                 floor_load_ll=round(primary.ll, 3) if primary else None,
@@ -729,6 +803,21 @@ def delete_snapshot(name: str) -> dict:
     del snaps[name]
     _write_snapshots(snaps)
     return {"status": "deleted", "name": name}
+
+
+# ──────────────────────────────────────────────────────────────
+# MIDAS 캐시 무효화 — 모델 파일 전환 시 사용
+# ──────────────────────────────────────────────────────────────
+
+@router.post("/midas/refresh-cache")
+def refresh_midas_cache() -> dict:
+    """MIDAS 모델 파일을 바꾼 뒤 기존 노드/엘레먼트/하중 캐시를 강제로 비운다.
+
+    이후 ensure_loaded() 호출 시 새 파일 데이터가 조회된다.
+    """
+    cleared = MIDAS.clear_all_caches()
+    logger.info("MIDAS caches cleared: %s", cleared)
+    return {"status": "ok", "cleared": cleared}
 
 
 @router.get("/member/slab-span/debug/fbla")

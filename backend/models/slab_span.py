@@ -57,6 +57,11 @@ class PanelOut(BaseModel):
     beam_right: int
     beam_bottom: int
     beam_top: int
+    # face 탐색 + OMBB 기반 확장 필드
+    polygon: list[tuple[float, float]] = Field(default_factory=list)
+    orientation_deg: float = 0.0
+    ombb_vertices: list[tuple[float, float]] = Field(default_factory=list)
+    vertex_count: int = 4
     # Floor Load 매칭 결과 (primary = Wu 최대, 매칭 없으면 null)
     floor_load_name: Optional[str] = None
     floor_load_dl: Optional[float] = None        # kN/m²
@@ -69,7 +74,7 @@ class PanelOut(BaseModel):
 
 class BeamSegmentOut(BaseModel):
     elem_id: int
-    direction: Literal["X", "Y"]
+    direction: Literal["X", "Y", "SKEW"]
     x1: float
     y1: float
     x2: float

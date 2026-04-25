@@ -29,17 +29,22 @@ Task_MIDAS/
 │   │   ├── auth.py, common.py, project.py, settings.py
 │   │   ├── loadcase.py, floorload.py, analysis.py
 │   │   ├── member.py, seismic_cert.py
-│   │   └── slab_span.py         # 슬래브 경간/패널/하중/배근 분석
+│   │   ├── slab_span.py         # 슬래브 경간/패널/하중/배근 분석
+│   │   ├── load_map.py          # 층별 Load Map 시각화 응답
+│   │   └── project_settings.py  # 그리드/축렬 설정 (자동 탐지)
 │   ├── engines/
 │   │   ├── kds_rc_beam.py      # RC보 KDS 설계 검토
-│   │   └── slab_span.py         # 슬래브 패널 탐색 + Floor Load 매칭
-│   └── routers/                # auth, settings, project, loadcase, analysis,
-│                                # floorload, member, slab_span, seismic_cert, midas
+│   │   └── slab_span.py         # 슬래브 패널 탐색(face/OMBB) + 회전 그리드 + Floor Load 매칭
+│   └── routers/                # auth, settings, project, loadcase, analysis, floorload,
+│                                # member, slab_span, load_map, project_settings,
+│                                # seismic_cert, midas
 │
 ├── frontend/                   # Next.js 프론트엔드
 │   ├── app/
 │   │   ├── page.tsx            # 대시보드
+│   │   ├── project-settings/   # 프로젝트 설정 (그리드 축렬, 회전 그룹, 기준점)
 │   │   ├── loadcase/           # 하중정보 (Static, Floor, Seismic)
+│   │   │   └── load-map/       # 층별 Load Map (FBLA 다각형 + Wu=1.2D+1.6L)
 │   │   ├── member-check/       # 부재검토
 │   │   │   ├── rc-beam/        # RC보 설계 검토
 │   │   │   │   ├── page.tsx    # 통합 테이블 (부재력+배근+DCR)
@@ -55,6 +60,7 @@ Task_MIDAS/
 │   │   └── settings/           # 설정
 │   ├── components/
 │   │   ├── ui/                 # 공통 UI (Button, Select, SectionCard 등)
+│   │   ├── GridAxesOverlay.tsx # 축렬 SVG 오버레이 (Slab/LoadMap 공용)
 │   │   └── dashboard/          # 대시보드 섹션 컴포넌트
 │   └── lib/                    # 공통 타입, 유틸
 │
@@ -138,11 +144,28 @@ cd frontend && npm run dev
 
 ### 하중정보
 - Static Load Case / Floor Load / Seismic Load
+- **Load Map**: 층별 평면 + FBLA 다각형 시각화
+  - 다각형별 DL/LL/Wu(1.2D+1.6L) 자동 계산 + 다중 하중 popover
+  - 등간격 inset 슬라이더(50/100/200/300mm), 휠 줌·팬, 하중명 라벨/색상
 - Wind Load, Earth Pressure (예정)
+
+### 슬래브 경간/하중/배근 자동 분석 (`/member-check/slab-span`)
+- 평면 그래프 face detection + OMBB 로 비사각형/회전 패널 인식
+- 사선 보(SKEW) merge + polyline chain 으로 끊김 없는 평면 시각화
+- 분류(S) 단위 두께/TYPE(A~E)/X1~X5/Y1~Y5 배근 저장(JSON)
+- 스냅샷 save/load — 분석 + 패널명 + 분류 + 배근 통합 보관
+- "모델 다시 읽기" 버튼: MIDAS 파일 변경 시 노드/요소 캐시 초기화
+
+### 프로젝트 설정 (`/project-settings`)
+- 그리드 축렬 자동 탐지 — 길이 가중 히스토그램 + 직교쌍 + 적응 클러스터링
+- X/Y 축렬 + 임의 회전 그룹(extra_groups) 추가, 음수 offset, mm 통일
+- 라벨 포맷(prefix `X1/Y1` vs simple `1/A`), 기준점(origin) mm 입력
+- `GridAxesOverlay` 로 Slab Span/Load Map 양쪽에 오버레이
 
 ### 기타
 - 탐색기: MIDAS API 엔드포인트 직접 테스트
 - 부재별 정리 / 전체 데이터 뷰
+- [ROADMAP.md](./ROADMAP.md) — 페이즈 기반 기능 로드맵
 
 ## 환경 설정
 
@@ -191,6 +214,7 @@ GitHub Release 업로드 시에는 공백을 하이픈으로 변경: `MIDAS-Dash
 ## 관련 문서
 
 - [BACKLOG.md](./BACKLOG.md) — 보류 중인 운영/보안 개선 항목과 승격 트리거
+- [ROADMAP.md](./ROADMAP.md) — 슬래브/Load Map/그리드 자동 탐지 등 페이즈 기반 로드맵
 
 ## 라이선스
 

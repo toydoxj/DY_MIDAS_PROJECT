@@ -24,15 +24,21 @@ from engines.slab_span import (
     FloorLoadArea,
     Node,
     SlabPanel,
+    _convex_hull,
+    _oriented_min_bbox,
+    _polygon_area,
     analyze_slab_spans,
     build_beam_segments,
     classify_direction,
     detect_floor_levels,
+    detect_principal_axes,
     find_panels_at_level,
+    find_panels_by_faces,
     match_panel_to_loads,
     merge_collinear_beams,
     point_in_polygon,
 )
+import math
 
 
 # ──────────────────────────────────────────────────────────────
@@ -519,6 +525,100 @@ def test_factored_load_formula():
     assert abs(factored_load(a) - (1.2 * 4.9 + 1.6 * 5.0)) < 1e-9
 
 
+def test_build_beam_segments_includes_skew_by_default():
+    """사선 보(45도)는 direction='SKEW'로 포함되어야 한다."""
+    nodes = {
+        1: Node(1, 0.0, 0.0, 0.0),
+        2: Node(2, 5.0, 5.0, 0.0),   # 45도
+        3: Node(3, 0.0, 0.0, 0.0),
+        4: Node(4, 5.0, 0.0, 0.0),   # X방향
+    }
+    elems = [
+        {"id": 10, "type": "BEAM", "node_i": 1, "node_j": 2},  # SKEW
+        {"id": 11, "type": "BEAM", "node_i": 3, "node_j": 4},  # X
+    ]
+    segs = build_beam_segments(nodes, elems)
+    dirs = sorted(s.direction for s in segs)
+    assert dirs == ["SKEW", "X"]
+    # SKEW 세그먼트의 원본 좌표가 채워져 있어야 함
+    skew = next(s for s in segs if s.direction == "SKEW")
+    assert (skew.x1, skew.y1, skew.x2, skew.y2) == (0.0, 0.0, 5.0, 5.0)
+
+
+def test_build_beam_segments_can_exclude_skew():
+    nodes = {
+        1: Node(1, 0.0, 0.0, 0.0),
+        2: Node(2, 5.0, 5.0, 0.0),
+    }
+    elems = [{"id": 10, "type": "BEAM", "node_i": 1, "node_j": 2}]
+    segs = build_beam_segments(nodes, elems, include_skew=False)
+    assert segs == []
+
+
+def test_merge_collinear_skew_beams():
+    """같은 직선 위의 사선 보 2개가 merge 후 1개로 합쳐져야 한다.
+
+    현장 사례: MIDAS 가 중간 노드에서 사선 보를 2개 엘레먼트로 쪼개 저장하면
+    SVG에서 미세한 틈이 생겨 끊어져 보임. merge_collinear_beams 가 해결.
+    """
+    nodes = {
+        1: Node(1, 0.0, 0.0, 0.0),
+        2: Node(2, 3.0, 3.0, 0.0),  # 중간점
+        3: Node(3, 5.0, 5.0, 0.0),
+    }
+    elems = [
+        {"id": 10, "type": "BEAM", "node_i": 1, "node_j": 2},
+        {"id": 11, "type": "BEAM", "node_i": 2, "node_j": 3},
+    ]
+    segs = build_beam_segments(nodes, elems)
+    skew_before = [s for s in segs if s.direction == "SKEW"]
+    assert len(skew_before) == 2
+
+    merged = merge_collinear_beams(segs)
+    skew_after = [s for s in merged if s.direction == "SKEW"]
+    assert len(skew_after) == 1, f"병합 실패: {len(skew_after)} 개"
+    # 병합된 세그먼트의 끝점이 (0,0) ~ (5,5) 에 정확히 일치 (원본 좌표 보존)
+    s = skew_after[0]
+    endpoints = sorted([(s.x1, s.y1), (s.x2, s.y2)])
+    assert abs(endpoints[0][0] - 0.0) < 1e-9
+    assert abs(endpoints[0][1] - 0.0) < 1e-9
+    assert abs(endpoints[1][0] - 5.0) < 1e-9
+    assert abs(endpoints[1][1] - 5.0) < 1e-9
+
+
+def test_merge_different_line_skews_stay_separate():
+    """서로 다른 직선 위의 사선 보는 병합되지 않아야 한다."""
+    nodes = {
+        1: Node(1, 0.0, 0.0, 0.0),
+        2: Node(2, 3.0, 3.0, 0.0),
+        3: Node(3, 0.0, 5.0, 0.0),
+        4: Node(4, 3.0, 2.0, 0.0),  # 다른 직선
+    }
+    elems = [
+        {"id": 10, "type": "BEAM", "node_i": 1, "node_j": 2},
+        {"id": 11, "type": "BEAM", "node_i": 3, "node_j": 4},
+    ]
+    segs = build_beam_segments(nodes, elems)
+    merged = merge_collinear_beams(segs)
+    skew_after = [s for s in merged if s.direction == "SKEW"]
+    assert len(skew_after) == 2
+
+
+def test_find_panels_ignores_skew_beams(grid_3x3):
+    """사선 보가 추가되어도 패널 탐색 결과는 영향 없음."""
+    nodes, elems = grid_3x3
+    # 아무 곳에 사선 보 하나 추가
+    max_id = max(e["id"] for e in elems) + 1
+    nodes[9999] = Node(9999, 100.0, 100.0, 3.5)
+    nodes[9998] = Node(9998, 110.0, 105.0, 3.5)
+    elems.append({"id": max_id, "type": "BEAM", "node_i": 9999, "node_j": 9998})
+    segs = build_beam_segments(nodes, elems)
+    assert any(s.direction == "SKEW" for s in segs)
+    panels = find_panels_at_level(segs, z_level=3.5)
+    # 기존 9개 패널 그대로
+    assert len(panels) == 9
+
+
 def test_classify_dl_ll_exact_dl_not_misclassified_as_ll():
     """'DL' LCNAME 이 LL 로 오분류되면 안 됨 (startswith('L') 버그 회귀 테스트)."""
     from routers.slab_span import _classify_dl_ll
@@ -554,6 +654,248 @@ def test_unwrap_double_and_single_nested():
     assert _unwrap({}, "FBLA") == {}
     # None/잘못된 타입
     assert _unwrap({"FBLA": None}, "FBLA") == {}
+
+
+def test_convex_hull_basic():
+    pts = [(0, 0), (5, 0), (5, 3), (0, 3), (2, 1)]  # 내부 점 (2,1)
+    hull = _convex_hull(pts)
+    assert len(hull) == 4  # 내부 점 제외
+
+
+def test_ombb_axis_aligned_rectangle():
+    pts = [(0.0, 0.0), (6.0, 0.0), (6.0, 4.0), (0.0, 4.0)]
+    w, h, angle, verts = _oriented_min_bbox(pts)
+    assert abs(w - 4.0) < 1e-6
+    assert abs(h - 6.0) < 1e-6
+    assert len(verts) == 4
+
+
+def test_ombb_rotated_square():
+    # 실제 6x4 패널, 30도 회전
+    theta = math.radians(30.0)
+    c, s = math.cos(theta), math.sin(theta)
+    def rot(x, y):
+        return (c * x - s * y, s * x + c * y)
+    pts = [rot(0, 0), rot(6, 0), rot(6, 4), rot(0, 4)]
+    w, h, angle, verts = _oriented_min_bbox(pts)
+    assert abs(w - 4.0) < 1e-3
+    assert abs(h - 6.0) < 1e-3
+    # 회전각이 30 또는 -60 근처 (long 축 기준)
+    assert min(abs(angle - 30.0), abs(angle + 60.0), abs(angle - 120.0), abs(angle + 150.0)) < 1.0
+
+
+def test_ombb_triangle():
+    # 직각삼각형 (0,0), (6,0), (0,4)
+    pts = [(0.0, 0.0), (6.0, 0.0), (0.0, 4.0)]
+    w, h, angle, verts = _oriented_min_bbox(pts)
+    # 직각삼각형은 OMBB가 두 직각변 크기 = 6x4
+    assert abs(max(w, h) - 6.0) < 1e-3
+    assert abs(min(w, h) - 4.0) < 1e-3
+
+
+def test_polygon_area_shoelace():
+    # 6x4 사각형
+    pts = [(0, 0), (6, 0), (6, 4), (0, 4)]
+    assert abs(_polygon_area(pts) - 24.0) < 1e-9
+    # 직각삼각형
+    tri = [(0, 0), (6, 0), (0, 4)]
+    assert abs(_polygon_area(tri) - 12.0) < 1e-9
+
+
+def test_face_detection_triangular_panel():
+    """3변 보로 둘러싸인 삼각형 영역 → 삼각형 패널 1개."""
+    nodes = {
+        1: Node(1, 0.0, 0.0, 0.0),
+        2: Node(2, 6.0, 0.0, 0.0),
+        3: Node(3, 0.0, 4.0, 0.0),
+    }
+    elems = [
+        {"id": 1, "type": "BEAM", "node_i": 1, "node_j": 2},
+        {"id": 2, "type": "BEAM", "node_i": 2, "node_j": 3},  # 사선
+        {"id": 3, "type": "BEAM", "node_i": 3, "node_j": 1},
+    ]
+    segs = build_beam_segments(nodes, elems)
+    panels = find_panels_by_faces(segs, z_level=0.0)
+    assert len(panels) == 1
+    p = panels[0]
+    assert p.vertex_count == 3
+    assert abs(p.area - 12.0) < 1e-6
+
+
+def test_face_detection_rotated_square():
+    """30도 회전된 사각형 패널 — 기존 grid 방식은 검출 불가, face 방식은 1개."""
+    theta = math.radians(30.0)
+    c, s = math.cos(theta), math.sin(theta)
+    def rot(x, y):
+        return (c * x - s * y, s * x + c * y)
+    coords = [rot(0, 0), rot(6, 0), rot(6, 4), rot(0, 4)]
+    nodes = {
+        i + 1: Node(i + 1, x, y, 0.0)
+        for i, (x, y) in enumerate(coords)
+    }
+    elems = [
+        {"id": 1, "type": "BEAM", "node_i": 1, "node_j": 2},
+        {"id": 2, "type": "BEAM", "node_i": 2, "node_j": 3},
+        {"id": 3, "type": "BEAM", "node_i": 3, "node_j": 4},
+        {"id": 4, "type": "BEAM", "node_i": 4, "node_j": 1},
+    ]
+    segs = build_beam_segments(nodes, elems)
+    panels = find_panels_by_faces(segs, z_level=0.0)
+    assert len(panels) == 1
+    p = panels[0]
+    assert p.vertex_count == 4
+    # OMBB 가 실제 경간 정확히 복원
+    assert abs(p.short_span - 4.0) < 1e-3
+    assert abs(p.long_span - 6.0) < 1e-3
+
+
+def test_face_detection_pentagonal_panel():
+    """5변 보로 둘러싸인 오각형 → 오각형 패널 1개."""
+    coords = [(0, 0), (6, 0), (8, 3), (4, 6), (-1, 3)]
+    nodes = {
+        i + 1: Node(i + 1, x, y, 0.0)
+        for i, (x, y) in enumerate(coords)
+    }
+    elems = [
+        {"id": i + 1, "type": "BEAM", "node_i": i + 1, "node_j": (i + 1) % 5 + 1}
+        for i in range(5)
+    ]
+    segs = build_beam_segments(nodes, elems)
+    panels = find_panels_by_faces(segs, z_level=0.0)
+    assert len(panels) == 1
+    assert panels[0].vertex_count == 5
+
+
+def test_merge_axis_beam_preserves_original_tilted_coords():
+    """skew_tol_deg 이내 기울어진 보가 X 로 분류되어도 원본 좌표 보존.
+
+    현장 사례: 4.12도 기울기 (Δx=6.6, Δy=0.475) 가 classify_direction(tol=5°)
+    에서 X 로 분류 → 이전에는 _axis_seg 가 y 를 cross_pos(평균)로 수평화하여
+    렌더 시 수평선으로 나타남 → SVG 에서 인접 보와 틈 발생.
+    merge_collinear_beams 가 양 끝 세그먼트의 원본 좌표를 보존해야 함.
+    """
+    nodes = {
+        1: Node(1, 0.0, 0.0, 0.0),
+        2: Node(2, 6.6, 0.475, 0.0),   # 4.12도 기울기
+    }
+    elems = [{"id": 10, "type": "BEAM", "node_i": 1, "node_j": 2}]
+    segs = build_beam_segments(nodes, elems)
+    # skew_tol_deg=5 (기본) 에서 X 로 분류되어야 함
+    assert len(segs) == 1
+    assert segs[0].direction == "X"
+
+    merged = merge_collinear_beams(segs)
+    assert len(merged) == 1
+    m = merged[0]
+    # 병합 후 원본 좌표 보존 확인 — 수평화되지 않아야
+    endpoints = sorted([(m.x1, m.y1), (m.x2, m.y2)])
+    assert abs(endpoints[0][0] - 0.0) < 1e-9
+    assert abs(endpoints[0][1] - 0.0) < 1e-9, (
+        f"원본 y1=0 이 수평화되어 {endpoints[0][1]} 로 변형됨"
+    )
+    assert abs(endpoints[1][0] - 6.6) < 1e-9
+    assert abs(endpoints[1][1] - 0.475) < 1e-9, (
+        f"원본 y2=0.475 가 수평화되어 {endpoints[1][1]} 로 변형됨"
+    )
+
+
+def test_analyze_with_grid_method_preserves_legacy():
+    """기존 테스트는 method='grid' 로도 동일 결과."""
+    x_coords = [0.0, 6.0, 12.0, 18.0]
+    y_coords = [0.0, 5.0, 10.0, 15.0]
+    nodes = {}
+    nid = 1
+    node_at = {}
+    for y in y_coords:
+        for x in x_coords:
+            nodes[nid] = Node(id=nid, x=x, y=y, z=3.5)
+            node_at[(x, y)] = nid
+            nid += 1
+    elems = []
+    eid = 1
+    for y in y_coords:
+        for i in range(len(x_coords) - 1):
+            elems.append({"id": eid, "type": "BEAM",
+                          "node_i": node_at[(x_coords[i], y)],
+                          "node_j": node_at[(x_coords[i + 1], y)]})
+            eid += 1
+    for x in x_coords:
+        for j in range(len(y_coords) - 1):
+            elems.append({"id": eid, "type": "BEAM",
+                          "node_i": node_at[(x, y_coords[j])],
+                          "node_j": node_at[(x, y_coords[j + 1])]})
+            eid += 1
+    reports = analyze_slab_spans(nodes, elems, method="grid")
+    assert reports[0].panel_count == 9
+
+
+def _make_rotated_grid(angle_deg: float, xs: list[float], ys: list[float]):
+    """회전된 직교 그리드 BeamSegment 생성 (테스트용)."""
+    import math as _m
+    from engines.slab_span import BeamSegment
+    rad = _m.radians(angle_deg)
+    c, s = _m.cos(rad), _m.sin(rad)
+    def rot(x, y):
+        return (c * x - s * y, s * x + c * y)
+    # X 방향 보 (각 y 라인)
+    segs: list[BeamSegment] = []
+    eid = 1
+    for y in ys:
+        x1, y1 = rot(xs[0], y)
+        x2, y2 = rot(xs[-1], y)
+        segs.append(BeamSegment(
+            elem_id=eid, direction="SKEW", z_level=0.0,
+            x1=x1, y1=y1, x2=x2, y2=y2,
+        ))
+        eid += 1
+    # Y 방향 보 (각 x 라인)
+    for x in xs:
+        x1, y1 = rot(x, ys[0])
+        x2, y2 = rot(x, ys[-1])
+        segs.append(BeamSegment(
+            elem_id=eid, direction="SKEW", z_level=0.0,
+            x1=x1, y1=y1, x2=x2, y2=y2,
+        ))
+        eid += 1
+    return segs
+
+
+def test_detect_axes_axis_aligned():
+    """축정렬 그리드 (0도) — 주축 0도, X/Y 축렬 offset 정상."""
+    segs = _make_rotated_grid(0.0, [0.0, 6.0, 12.0], [0.0, 5.0, 10.0])
+    res = detect_principal_axes(segs, pos_tol=0.5)
+    assert abs(res["angle_deg"]) < 1.0
+    assert len(res["x_offsets"]) == 3
+    assert len(res["y_offsets"]) == 3
+
+
+def test_detect_axes_rotated_30deg():
+    """30° 회전 그리드 — 주축 30도, 축렬 3개씩."""
+    segs = _make_rotated_grid(30.0, [0.0, 6.0, 12.0], [0.0, 5.0, 10.0])
+    res = detect_principal_axes(segs, pos_tol=0.5)
+    # 주축 각도 30 근처 (bin 폭 1도)
+    assert abs(abs(res["angle_deg"]) - 30.0) < 2.0 or \
+           abs(abs(res["angle_deg"]) - 60.0) < 2.0  # 90도 뒤집힘 허용
+    assert len(res["x_offsets"]) == 3
+    assert len(res["y_offsets"]) == 3
+
+
+def test_detect_axes_rotated_45deg_orthogonal_pair():
+    """45° 회전 — 직교 쌍 최적화가 단일 max bin 방식보다 안정."""
+    segs = _make_rotated_grid(45.0, [0.0, 6.0, 12.0], [0.0, 5.0, 10.0])
+    res = detect_principal_axes(segs, pos_tol=0.5)
+    # 주축 각도 45 또는 -45 (직교는 어느 쪽이든 OK)
+    deg = res["angle_deg"]
+    assert abs(abs(deg) - 45.0) < 2.0
+    assert len(res["x_offsets"]) == 3
+    assert len(res["y_offsets"]) == 3
+
+
+def test_detect_axes_empty_returns_defaults():
+    res = detect_principal_axes([], pos_tol=0.5)
+    assert res["angle_deg"] == 0.0
+    assert res["x_offsets"] == []
+    assert res["y_offsets"] == []
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Popover } from "radix-ui";
-import { Loader2, Play, Info, Save, FolderOpen, Trash2 } from "lucide-react";
+import { Loader2, Play, Info, Save, FolderOpen, Trash2, RefreshCw } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import SectionCard from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
@@ -150,6 +150,54 @@ export default function SlabSpanPage() {
   const [hoverPanelByLevel, setHoverPanelByLevel] = useState<Record<number, string | null>>({});
   const [selectedPanelByLevel, setSelectedPanelByLevel] = useState<Record<number, string | null>>({});
   const [nameMap, setNameMap] = useState<Record<string, string>>({});
+  const [gridSettings, setGridSettings] = useState<{
+    angleDeg: number;
+    origin: [number, number];
+    xAxes: { label: string; offset: number }[];
+    yAxes: { label: string; offset: number }[];
+    extraGroups?: {
+      name: string;
+      angle_deg: number;
+      origin: [number, number];
+      axes: { label: string; offset: number }[];
+      color: string;
+    }[];
+    unitFactor: number;
+  } | null>(null);
+
+  // Project Settings 의 축렬 정보 + MIDAS DIST 단위 함께 로드
+  useEffect(() => {
+    const MM_TO: Record<string, number> = {
+      MM: 1, CM: 0.1, M: 0.001, IN: 0.0393701, FT: 0.00328084,
+    };
+    Promise.all([
+      fetch(`${BACKEND_URL}/api/project-settings/grid`).then((r) => (r.ok ? r.json() : null)),
+      fetch(`${BACKEND_URL}/api/loadcase/load-map/unit`).then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([gridData, unitData]) => {
+        if (!gridData) return;
+        let dist = "M";
+        const raw = unitData?.raw ?? {};
+        const u = raw.UNIT ?? raw;
+        let inner = u;
+        if (inner && typeof inner === "object" && !("DIST" in inner)) {
+          const first = Object.values(inner)[0];
+          if (first && typeof first === "object") inner = first;
+        }
+        if (inner?.DIST) dist = String(inner.DIST).toUpperCase();
+        const unitFactor = MM_TO[dist] ?? 0.001;
+
+        setGridSettings({
+          angleDeg: gridData.angle_deg ?? 0,
+          origin: gridData.origin ?? [0, 0],
+          xAxes: gridData.x_axes ?? [],
+          yAxes: gridData.y_axes ?? [],
+          extraGroups: gridData.extra_groups ?? [],
+          unitFactor,
+        });
+      })
+      .catch(() => {});
+  }, []);
   const nameMapLoadedRef = useRef(false);
 
   // 저장된 슬래브 이름 매핑 초기 로드
@@ -358,6 +406,27 @@ export default function SlabSpanPage() {
     }
   }, []);
 
+  const refreshCache = useCallback(async () => {
+    setLoadingStories(true);
+    setError(null);
+    try {
+      const refresh = await fetch(`${BACKEND_URL}/api/midas/refresh-cache`, {
+        method: "POST",
+      });
+      if (!refresh.ok) throw new Error(`캐시 무효화 실패 (${refresh.status})`);
+      const res = await fetch(`${BACKEND_URL}/api/member/slab-span/stories`);
+      if (!res.ok) throw new Error(`층 목록 조회 실패 (${res.status})`);
+      const data: Story[] = await res.json();
+      setStories(data);
+      setSelectedStories(new Set(data.map((s) => s.name)));
+      setResponse(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingStories(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadStories();
   }, [loadStories]);
@@ -444,6 +513,16 @@ export default function SlabSpanPage() {
             <Button size="sm" variant="outline" onClick={loadStories} disabled={loadingStories}>
               {loadingStories && <Loader2 className="animate-spin" size={14} />}
               새로고침
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={refreshCache}
+              disabled={loadingStories}
+              title="MIDAS 모델 파일을 바꾼 경우 캐시를 비우고 다시 읽기"
+            >
+              <RefreshCw size={14} />
+              모델 다시 읽기
             </Button>
             <Button size="sm" onClick={runAnalyze} disabled={analyzing || selectedStories.size === 0}>
               {analyzing ? <Loader2 className="animate-spin" size={14} /> : <Play size={14} />}
@@ -612,6 +691,7 @@ export default function SlabSpanPage() {
             setHoverByLevel={setHoverPanelByLevel}
             updateSlabName={updateSlabName}
             thkByName={thkByName}
+            grid={gridSettings}
           />
         );
       })}
@@ -642,6 +722,20 @@ interface LevelSectionProps {
   >;
   updateSlabName: (panelId: string, name: string) => void;
   thkByName: Record<string, number>;
+  grid: {
+    angleDeg: number;
+    origin: [number, number];
+    xAxes: { label: string; offset: number }[];
+    yAxes: { label: string; offset: number }[];
+    extraGroups?: {
+      name: string;
+      angle_deg: number;
+      origin: [number, number];
+      axes: { label: string; offset: number }[];
+      color: string;
+    }[];
+    unitFactor: number;
+  } | null;
 }
 
 function LevelSection({
@@ -653,6 +747,7 @@ function LevelSection({
   setHoverByLevel,
   updateSlabName,
   thkByName,
+  grid,
 }: LevelSectionProps) {
   const leftColRef = useRef<HTMLDivElement | null>(null);
   const [leftHeight, setLeftHeight] = useState<number | null>(null);
@@ -780,6 +875,7 @@ function LevelSection({
             panels={r.panels}
             highlightPanelId={displayedHiId}
             nameMap={nameMap}
+            grid={grid}
             onPanelClick={handlePanelClick}
             onPanelHover={onHoverPanel}
           />

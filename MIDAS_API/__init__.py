@@ -31,3 +31,30 @@ __author__ = "Jeong, Jihun"
 __copyright__ = "Copyright 2026 Dongyang Consulting Engineering Co., Ltd."
 __description__ = "MIDAS-API is a Python library for the MIDAS GEN NX API."
 
+
+def clear_all_caches() -> list[str]:
+    """모든 classmethod 기반 DB 래퍼의 `_data` 캐시를 초기화.
+
+    MIDAS에서 **다른 모델 파일로 전환**한 뒤 stale 데이터를 피하려 할 때 사용.
+    beamForceDB 의 2단 캐시(_df_cache)도 함께 비운다.
+
+    반환: 클리어된 DB 클래스 이름 리스트.
+    """
+    cleared: list[str] = []
+    for db in (
+        projectDB, loadCaseDB, selfWeightDB, loadToMassDB, structureTypeDB,
+        floorLoadDB, floorLoadAssignDB, sectionDB, elementDB, nodeDB,
+    ):
+        try:
+            db._data = {}
+            cleared.append(db.__name__)
+        except Exception:
+            pass
+    # beamForceDB 는 자체 clear_cache 사용
+    try:
+        beamForceDB.clear_cache()
+        cleared.append("beamForceDB")
+    except Exception:
+        pass
+    return cleared
+
