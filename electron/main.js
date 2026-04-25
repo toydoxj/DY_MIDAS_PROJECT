@@ -171,12 +171,53 @@ function setupAutoUpdater() {
 
   let progressWin = null;
 
+  // GitHub API 가 release notes 를 HTML 로 주는데 dialog.showMessageBox 는
+  // plain text 만 렌더하므로 태그/마크다운 기호 제거 + 엔티티 디코딩.
+  const stripMarkup = (text) => {
+    if (!text) return "";
+    return String(text)
+      // HTML 블록 요소를 줄바꿈으로 (가독성 보존)
+      .replace(/<\/?(h[1-6]|p|div|li|br|hr|tr)[^>]*>/gi, "\n")
+      .replace(/<li[^>]*>/gi, "\n• ")
+      // 나머지 모든 HTML 태그 제거
+      .replace(/<[^>]+>/g, "")
+      // markdown 기호 제거
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/\*(.+?)\*/g, "$1")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/\[(.+?)\]\(.+?\)/g, "$1")
+      // HTML 엔티티
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      // 빈 줄 압축 + 트림
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  };
+
+  // 너무 긴 노트는 dialog 가 거대해지므로 일부만
+  const truncate = (text, maxLines = 25, maxChars = 1500) => {
+    const lines = text.split("\n").slice(0, maxLines);
+    let out = lines.join("\n");
+    if (out.length > maxChars) out = out.slice(0, maxChars) + "…";
+    if (text.split("\n").length > maxLines || text.length > maxChars) {
+      out += "\n\n(전체 변경사항은 GitHub Release 페이지에서 확인)";
+    }
+    return out;
+  };
+
   autoUpdater.on("update-available", (info) => {
-    const releaseNotes = typeof info.releaseNotes === "string"
+    const raw = typeof info.releaseNotes === "string"
       ? info.releaseNotes
       : Array.isArray(info.releaseNotes)
         ? info.releaseNotes.map((n) => n.note || n).join("\n")
         : "";
+    const releaseNotes = truncate(stripMarkup(raw));
 
     const message = `새 버전 v${info.version}이 있습니다.\n\n${releaseNotes ? "변경사항:\n" + releaseNotes + "\n\n" : ""}다운로드하시겠습니까?`;
 
