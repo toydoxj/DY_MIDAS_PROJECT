@@ -64,17 +64,52 @@ Task_MIDAS/
 │   │   └── dashboard/          # 대시보드 섹션 컴포넌트
 │   └── lib/                    # 공통 타입, 유틸
 │
-├── .claude/
-│   ├── agents/                 # AI 에이전트 정의
-│   │   └── beam-design-reviewer.md  # RC보 설계 검토 전문 에이전트
-│   └── skills/                 # 스킬 (규칙/참조 데이터)
-│       ├── seismic.md          # 지진하중 검토 규칙 (KDS 41 17 00)
-│       └── member-naming.md    # 부재명 명명 규칙
+├── .claude/                       # AI 자산 (Hybrid 분류축: 역할 × 도메인)
+│   ├── registry.yaml              # 자산 인덱스 (id/type/path/status/owner/depends_on)
+│   ├── agents/
+│   │   ├── reviewers/             # 검토 에이전트 (도메인별)
+│   │   │   ├── rc-beam.md         # RC 보 — KDS 14 20 / 17 10 (frontmatter name=beam-design-reviewer)
+│   │   │   └── rc-slab.md         # RC 슬래브 — KDS 14 20 30/50/70/22
+│   │   ├── authors/               # 산출물 작성 에이전트
+│   │   │   ├── seismic-cert.md    # 내진확인서 hwpx 자동 작성
+│   │   │   └── design-report.md   # PDF/DXF/Excel 보고서·도면
+│   │   └── _shared/               # 공통 매뉴얼 (보일러플레이트 추출)
+│   │       ├── agent-memory-howto.md
+│   │       └── output-contract.md
+│   ├── skills/
+│   │   ├── domains/               # KDS 도메인 지식
+│   │   │   ├── kds-rc-slab.md
+│   │   │   └── kds-seismic-load.md  # KDS 41 17 00:2022
+│   │   ├── midas-api/             # MIDAS REST API 레퍼런스
+│   │   │   ├── index.md           # 5 카테고리 인덱스
+│   │   │   ├── db-{node,elem,sect,stld,stor,fbla}.md  # 자주 쓰는 6개
+│   │   │   └── schema-eigenvalue.md
+│   │   └── conventions/
+│   │       └── member-naming.md
+│   ├── rules/
+│   │   └── kds_code.md            # backend/engines/**/*.py 작성 규칙
+│   ├── commands/
+│   │   └── midas-pipeline/        # /midas-pipeline:<name> 슬래시 커맨드
+│   │       ├── validate-config.md → convert-api.md → run-workflow.md
+│   │       └── sort-data.md → export-results.md
+│   └── agent-memory/              # 에이전트별 영속 메모리
 │
-├── electron/                   # Electron 데스크톱 앱 패키징
-├── test_beam_force.py          # 보 부재력 추출 테스트 스크립트
-└── .env                        # API URL/KEY 설정
+├── docs/api_specs/                # MCP 도구 명세 JSON (참조용, 실제 MCP 서버 아님)
+├── scripts/
+│   └── claude_assets_lint.py     # registry.yaml + frontmatter 검증
+│
+├── electron/                      # Electron 데스크톱 앱 패키징
+├── test_beam_force.py             # 보 부재력 추출 테스트 스크립트
+└── .env                           # API URL/KEY 설정
 ```
+
+### .claude/ 자산 검증
+
+```bash
+.venv/Scripts/python scripts/claude_assets_lint.py
+```
+
+종료 코드 0 = 모든 자산의 frontmatter 표준(name/description/status/last_reviewed/owner) + registry.yaml path 실재 + depends_on 참조 정합성 통과.
 
 ## 빠른 시작
 

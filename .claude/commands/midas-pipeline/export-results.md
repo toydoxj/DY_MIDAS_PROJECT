@@ -1,3 +1,12 @@
+---
+name: export-results
+description: sort-data 결과를 지정 포맷으로 저장하고 산출물 경로를 일관되게 관리한다. midas-pipeline 5단계.
+status: stable
+last_reviewed: 2026-04-25
+owner: toydoxj
+depends_on: [sort-data]
+---
+
 # export-results
 
 ## 목적
@@ -54,8 +63,8 @@
 
 ## 관련 문서
 
-- `.claude/commands/sort-data.md`
-- `.claude/commands/validate-config.md`
+- `.claude/commands/midas-pipeline/sort-data.md`
+- `.claude/commands/midas-pipeline/validate-config.md`
 
 ## 마지막 검증
 

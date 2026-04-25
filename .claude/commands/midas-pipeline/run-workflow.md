@@ -1,3 +1,12 @@
+---
+name: run-workflow
+description: MIDAS 자동화 파이프라인의 표준 실행 순서와 단계 간 데이터 계약을 정의한다. midas-pipeline 3단계 (오케스트레이터).
+status: stable
+last_reviewed: 2026-04-25
+owner: toydoxj
+depends_on: [convert-api]
+---
+
 # run-workflow
 
 ## 목적
@@ -37,10 +46,10 @@ MIDAS 자동화 파이프라인의 표준 실행 순서와 단계 간 데이터 
 
 ## 관련 문서
 
-- `.claude/commands/validate-config.md`
-- `.claude/commands/convert-api.md`
-- `.claude/commands/sort-data.md`
-- `.claude/commands/export-results.md`
+- `.claude/commands/midas-pipeline/validate-config.md`
+- `.claude/commands/midas-pipeline/convert-api.md`
+- `.claude/commands/midas-pipeline/sort-data.md`
+- `.claude/commands/midas-pipeline/export-results.md`
 
 ## 마지막 검증
 

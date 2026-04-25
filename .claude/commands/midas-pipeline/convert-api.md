@@ -1,3 +1,12 @@
+---
+name: convert-api
+description: dyForm 데이터를 MIDAS GEN NX REST API 호출용 JSON 구조로 변환한다. midas-pipeline 2단계.
+status: stable
+last_reviewed: 2026-04-25
+owner: toydoxj
+depends_on: [validate-config]
+---
+
 # convert-api
 
 ## 목적
@@ -51,8 +60,8 @@
 
 ## 관련 문서
 
-- `.claude/commands/validate-config.md`
-- `.claude/commands/sort-data.md`
+- `.claude/commands/midas-pipeline/validate-config.md`
+- `.claude/commands/midas-pipeline/sort-data.md`
 
 ## 마지막 검증
 

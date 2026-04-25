@@ -68,11 +68,20 @@ response = MIDAS.MidasAPI("GET", "/db/STOR")
 ## 문서 진입 순서
 
 1. 전체 가이드: `CLAUDE.md`
-2. 자동화 명령 체계: `.claude/commands/*.md`
-3. 도메인/규칙 스킬: `.claude/skills/*.md` (지진하중, 부재명, API 스키마 등)
+2. 자동화 명령 체계: `.claude/commands/midas-pipeline/*.md` (validate-config → convert-api → run-workflow → sort-data → export-results)
+3. 도메인/규칙 스킬:
+   - 도메인 지식: `.claude/skills/domains/*.md` (지진하중 등)
+   - MIDAS API 레퍼런스: `.claude/skills/midas-api/*.md` (index 허브 + 엔드포인트별)
+   - 명명 규약: `.claude/skills/conventions/*.md` (부재명 등)
 4. 프로젝트 룰: `.claude/rules/*.md` (예: `kds_code.md`)
-5. AI 에이전트 정의: `.claude/agents/*.md` (RC보 설계 검토 에이전트 등)
-6. 프론트엔드 작업 시 추가 규칙: `frontend/AGENTS.md`
+5. AI 에이전트 정의:
+   - 검토 에이전트: `.claude/agents/reviewers/*.md` (RC보 등)
+   - 산출물 작성 에이전트: `.claude/agents/authors/*.md` (내진확인서/도면보고서 등)
+   - 공통 매뉴얼: `.claude/agents/_shared/*.md` (메모리 사용법, 출력 계약)
+6. 자산 인덱스/거버넌스: `.claude/registry.yaml` + `scripts/claude_assets_lint.py`
+7. MCP 도구 명세 (참조용): `docs/api_specs/*.json`
+8. 프론트엔드 작업 시 추가 규칙: `frontend/AGENTS.md`
+9. 자산 재구성 노트: `.claude/RESTRUCTURE_NOTES.md`
 
 ## 웹 대시보드
 

@@ -1,3 +1,11 @@
+---
+name: validate-config
+description: config.yaml 의 formConfig/dyForm 구조를 사전 검증해 변환 및 API 호출 실패를 방지한다. midas-pipeline 1단계.
+status: stable
+last_reviewed: 2026-04-25
+owner: toydoxj
+---
+
 # validate-config
 
 ## 목적
@@ -40,8 +48,8 @@
 
 ## 관련 문서
 
-- `.claude/commands/convert-api.md`
-- `.claude/commands/export-results.md`
+- `.claude/commands/midas-pipeline/convert-api.md`
+- `.claude/commands/midas-pipeline/export-results.md`
 
 ## 마지막 검증
 

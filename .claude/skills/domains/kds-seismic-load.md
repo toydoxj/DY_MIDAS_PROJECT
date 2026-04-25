@@ -1,7 +1,9 @@
 ---
 name: seismic-review
-description: KDS 기준 지진하중 적정성 검토 체크리스트. API 엔드포인트 목록은 midas_api_json 스킬을 참조.
-last_reviewed: 2026-04-13
+description: KDS 기준 지진하중 적정성 검토 체크리스트. API 엔드포인트 목록은 midas-api 스킬을 참조.
+status: stable
+last_reviewed: 2026-04-25
+owner: toydoxj
 source: KDS 41 17 00:2022
 ---
 
@@ -10,7 +12,7 @@ source: KDS 41 17 00:2022
 ## 사용 범위
 
 - 사용: 설계응답스펙트럼, 내진등급, 시스템계수(R/Omega0/Cd), 등가정적지진하중 검토
-- 제외: MIDAS API 엔드포인트 목록 검색 (-> `midas_api_json.md`)
+- 제외: MIDAS API 엔드포인트 목록 검색 (-> `.claude/skills/midas-api/index.md`)
 
 ## 코드 규칙
 

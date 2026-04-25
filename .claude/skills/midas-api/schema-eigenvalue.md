@@ -1,7 +1,9 @@
 ---
 name: eigenvalue-schema
 description: /post/TABLE 고유치 결과 조회 요청 스키마 예시. TABLE_TYPE, UNIT, STYLES, MODES 설정 시 참조.
-last_reviewed: 2026-04-13
+status: stable
+last_reviewed: 2026-04-25
+owner: toydoxj
 source: https://support.midasuser.com/hc/ko/articles/33016922742937
 ---
 

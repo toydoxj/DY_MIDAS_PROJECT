@@ -1,0 +1,217 @@
+# .claude/ 자산 인덱스
+#
+# 모든 agent / skill / rule / command 의 단일 진실 원천(SSOT).
+# 변경 시 scripts/claude_assets_lint.py 통과 확인.
+#
+# 스키마:
+#   id            — 자산 고유 ID (frontmatter 의 name 과 일치 우선)
+#   type          — agent | skill | rule | command | shared
+#   path          — 저장소 루트 기준 상대 경로
+#   status        — stable | experimental | deprecated
+#   owner         — 책임자 (GitHub username)
+#   last_reviewed — YYYY-MM-DD
+#   depends_on    — 다른 자산 ID 목록 (선택)
+#   notes         — 자유 메모 (선택)
+
+schema_version: 1
+last_updated: 2026-04-25
+
+assets:
+  # ─────────────────────────────────────────────
+  # Agents — Reviewers (도메인별 검토)
+  # ─────────────────────────────────────────────
+  - id: beam-design-reviewer
+    type: agent
+    path: .claude/agents/reviewers/rc-beam.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+    depends_on: [agent-memory-howto, output-contract]
+    notes: frontmatter name 은 하위 호환을 위해 'beam-design-reviewer' 유지(파일명 rc-beam.md). 호출 시 name 사용.
+
+  - id: rc-slab-reviewer
+    type: agent
+    path: .claude/agents/reviewers/rc-slab.md
+    status: experimental
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+    depends_on: [agent-memory-howto, output-contract, kds-rc-slab, db-fbla, db-elem, db-stor, db-sect]
+
+  # ─────────────────────────────────────────────
+  # Agents — Authors (산출물 작성)
+  # ─────────────────────────────────────────────
+  - id: seismic-cert-author
+    type: agent
+    path: .claude/agents/authors/seismic-cert.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+    depends_on: [agent-memory-howto, output-contract, seismic-review, db-stld, db-stor, db-elem]
+    notes: hwpx 양식 변경 시 last_reviewed 갱신 + 일시 experimental 표시 필수.
+
+  - id: design-report-author
+    type: agent
+    path: .claude/agents/authors/design-report.md
+    status: experimental
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+    depends_on: [agent-memory-howto, output-contract]
+    notes: cairosvg 금지(메모리 project_pdf_dxf_export.md). PDF=클라이언트 jspdf, DXF=백엔드 ezdxf, Excel=백엔드 openpyxl.
+
+  # ─────────────────────────────────────────────
+  # Agents — Shared (공통 매뉴얼)
+  # ─────────────────────────────────────────────
+  - id: agent-memory-howto
+    type: shared
+    path: .claude/agents/_shared/agent-memory-howto.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+
+  - id: output-contract
+    type: shared
+    path: .claude/agents/_shared/output-contract.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+
+  # ─────────────────────────────────────────────
+  # Skills — Domains (도메인 지식)
+  # ─────────────────────────────────────────────
+  - id: seismic-review
+    type: skill
+    path: .claude/skills/domains/kds-seismic-load.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+
+  - id: kds-rc-slab
+    type: skill
+    path: .claude/skills/domains/kds-rc-slab.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+
+  # ─────────────────────────────────────────────
+  # Skills — MIDAS API (엔드포인트 레퍼런스)
+  # ─────────────────────────────────────────────
+  - id: midas-api-json
+    type: skill
+    path: .claude/skills/midas-api/index.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+    depends_on: [db-node, db-elem, db-sect, db-stld, db-stor, db-fbla, eigenvalue-schema]
+
+  - id: db-node
+    type: skill
+    path: .claude/skills/midas-api/db-node.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+
+  - id: db-elem
+    type: skill
+    path: .claude/skills/midas-api/db-elem.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+    depends_on: [db-node, db-sect]
+
+  - id: db-sect
+    type: skill
+    path: .claude/skills/midas-api/db-sect.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+
+  - id: db-stld
+    type: skill
+    path: .claude/skills/midas-api/db-stld.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+
+  - id: db-stor
+    type: skill
+    path: .claude/skills/midas-api/db-stor.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+
+  - id: db-fbla
+    type: skill
+    path: .claude/skills/midas-api/db-fbla.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+
+  - id: eigenvalue-schema
+    type: skill
+    path: .claude/skills/midas-api/schema-eigenvalue.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+
+  # ─────────────────────────────────────────────
+  # Skills — Conventions (사내 규약)
+  # ─────────────────────────────────────────────
+  - id: member-naming
+    type: skill
+    path: .claude/skills/conventions/member-naming.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+
+  # ─────────────────────────────────────────────
+  # Rules
+  # ─────────────────────────────────────────────
+  - id: kds-code
+    type: rule
+    path: .claude/rules/kds_code.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+    notes: backend/engines/**/*.py 적용. 코드 작성 규칙. 도메인 지식은 skills/domains/kds-* 별도.
+
+  # ─────────────────────────────────────────────
+  # Commands — midas-pipeline 그룹
+  # ─────────────────────────────────────────────
+  - id: validate-config
+    type: command
+    path: .claude/commands/midas-pipeline/validate-config.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+
+  - id: convert-api
+    type: command
+    path: .claude/commands/midas-pipeline/convert-api.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+    depends_on: [validate-config]
+
+  - id: run-workflow
+    type: command
+    path: .claude/commands/midas-pipeline/run-workflow.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+    depends_on: [convert-api]
+
+  - id: sort-data
+    type: command
+    path: .claude/commands/midas-pipeline/sort-data.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+    depends_on: [run-workflow]
+
+  - id: export-results
+    type: command
+    path: .claude/commands/midas-pipeline/export-results.md
+    status: stable
+    owner: toydoxj
+    last_reviewed: 2026-04-25
+    depends_on: [sort-data]

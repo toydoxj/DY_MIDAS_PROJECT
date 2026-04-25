@@ -1,7 +1,9 @@
 ---
 name: member-naming
 description: 구조 부재명 명명 규칙. "부재명", "부재 이름", "명명", "네이밍", "부재 규칙", "naming" 등이 나오면 참조할 것.
-last_reviewed: 2026-04-13
+status: stable
+last_reviewed: 2026-04-25
+owner: toydoxj
 ---
 
 # 기본사항
