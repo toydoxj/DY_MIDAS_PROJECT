@@ -2,19 +2,18 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { login, register } from "@/lib/auth";
-import { AUTH_URL } from "@/lib/types";
+import { login, requestJoin } from "@/lib/auth";
 
 interface Props {
-  isSetup: boolean;
   onSuccess: () => void;
 }
 
-export default function LoginForm({ isSetup, onSuccess }: Props) {
-  const [mode, setMode] = useState<"login" | "setup" | "request">(isSetup ? "setup" : "login");
+export default function LoginForm({ onSuccess }: Props) {
+  const [mode, setMode] = useState<"login" | "request">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,20 +24,11 @@ export default function LoginForm({ isSetup, onSuccess }: Props) {
     setSuccess("");
     setLoading(true);
     try {
-      if (mode === "setup") {
-        await register(username, password, name);
-        onSuccess();
-      } else if (mode === "request") {
-        const res = await fetch(`${AUTH_URL}/api/auth/request`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password, name }),
-        });
-        const d = await res.json();
-        if (!res.ok) throw new Error(d.detail || "신청 실패");
+      if (mode === "request") {
+        const d = await requestJoin(username, password, name, email);
         setSuccess(d.message || "가입 신청이 완료되었습니다.");
         setMode("login");
-        setUsername(""); setPassword(""); setName("");
+        setUsername(""); setPassword(""); setName(""); setEmail("");
       } else {
         await login(username, password);
         onSuccess();
@@ -63,14 +53,20 @@ export default function LoginForm({ isSetup, onSuccess }: Props) {
 
         <form onSubmit={handleSubmit} className="bg-gray-800 rounded-xl border border-gray-700 p-6 space-y-4">
           <h2 className="text-sm font-semibold text-gray-300 text-center">
-            {mode === "setup" ? "초기 관리자 계정 생성" : mode === "request" ? "가입 신청" : "로그인"}
+            {mode === "request" ? "가입 신청" : "로그인"}
           </h2>
 
-          {(mode === "setup" || mode === "request") && (
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">이름</label>
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="홍길동" required />
-            </div>
+          {mode === "request" && (
+            <>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">이름</label>
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="홍길동" required />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">이메일 (직원 명부 매칭)</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="name@dyce.kr" required />
+              </div>
+            </>
           )}
 
           <div>
@@ -88,7 +84,7 @@ export default function LoginForm({ isSetup, onSuccess }: Props) {
 
           <button type="submit" disabled={loading}
             className="w-full py-2.5 text-sm font-medium rounded-lg bg-[#669900] text-white hover:bg-[#5a8700] disabled:opacity-50 transition">
-            {loading ? "처리 중..." : mode === "setup" ? "관리자 계정 생성" : mode === "request" ? "가입 신청" : "로그인"}
+            {loading ? "처리 중..." : mode === "request" ? "가입 신청" : "로그인"}
           </button>
 
           {mode === "login" && (

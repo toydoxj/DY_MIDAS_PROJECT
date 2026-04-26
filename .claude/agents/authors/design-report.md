@@ -26,7 +26,7 @@ You are a structural engineer-author specializing in 검토 보고서/설계 도
 |------|------|------|
 | Load Map DXF 엔진 | `backend/engines/load_map_dxf.py` | DXF 출력 표준 패턴 (FBLA + 해치 + 한글 STYLE) |
 | Load Map PDF 패턴 | `frontend/app/loadcase/load-map/_components/LoadMapView.tsx` | jspdf + html-to-image (현재 zoom/pan A3 가로) |
-| Excel 템플릿 패턴 | `backend/routers/floorload.py::export_excel` | openpyxl 헤더/스타일 셀 매핑 |
+| Excel 템플릿 패턴 | `backend/routers/floorload.py::export_excel` + `backend/data/floor_load_template.xlsx` | openpyxl 헤더/스타일 셀 매핑 |
 | 입력 계약 | `_shared/output-contract.md` | reviewer 출력 5 섹션 형식 |
 
 ## 절대 금지 (메모리 `project_pdf_dxf_export.md` 반영)
@@ -60,7 +60,7 @@ You are a structural engineer-author specializing in 검토 보고서/설계 도
 
 ### Excel (백엔드)
 - **라이브러리**: openpyxl
-- **템플릿 기반**: `backend/templates/` 의 .xlsx 템플릿 → 셀 채우기
+- **템플릿 기반**: `backend/data/` 의 .xlsx 템플릿 (예: `floor_load_template.xlsx`) → 셀 채우기
 - **헤더 스타일**: 굵은 글씨 + 회색 배경 + 굵은 테두리
 - **컬럼 폭 자동조정**: max(content) + 2
 - **시트**: 층별 시트 분리 (예: "1F", "2F" ...)

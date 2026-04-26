@@ -18,15 +18,14 @@ Task_MIDAS/
 │
 ├── backend/                    # FastAPI 백엔드
 │   ├── main.py
-│   ├── db.py                   # SQLAlchemy 엔진/세션 초기화
-│   ├── auth_middleware.py       # JWT 인증 미들웨어
+│   ├── auth_middleware.py       # JWT 검증만 — 사용자 정보는 api.dyce.kr 위임 (SSO)
 │   ├── exceptions.py            # MidasError 예외 계층
 │   ├── work_dir.py              # 작업 디렉토리 관리
 │   ├── engines/
 │   │   ├── kds_rc_beam.py      # KDS 41 30 00 RC보 설계 검토 엔진
 │   │   └── seismic_cert_hwpx.py # 내진확인서 hwpx 생성 엔진
 │   ├── models/                 # Pydantic 데이터 모델
-│   │   ├── auth.py, common.py, project.py, settings.py
+│   │   ├── common.py, project.py, settings.py
 │   │   ├── loadcase.py, floorload.py, analysis.py
 │   │   ├── member.py, seismic_cert.py
 │   │   ├── slab_span.py         # 슬래브 경간/패널/하중/배근 분석
@@ -35,9 +34,9 @@ Task_MIDAS/
 │   ├── engines/
 │   │   ├── kds_rc_beam.py      # RC보 KDS 설계 검토
 │   │   └── slab_span.py         # 슬래브 패널 탐색(face/OMBB) + 회전 그리드 + Floor Load 매칭
-│   └── routers/                # auth, settings, project, loadcase, analysis, floorload,
-│                                # member, slab_span, load_map, project_settings,
-│                                # seismic_cert, midas
+│   └── routers/                # auth(thin proxy → api.dyce.kr), settings, project, loadcase,
+│                                # analysis, floorload, member, slab_span, load_map,
+│                                # project_settings, seismic_cert, midas
 │
 ├── frontend/                   # Next.js 프론트엔드
 │   ├── app/

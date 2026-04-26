@@ -2,10 +2,10 @@ fastapi
 uvicorn
 python-dotenv
 requests
+httpx
 pandas
 colorama
 openpyxl
-sqlalchemy
 python-jose[cryptography]
 midas-gen
 ezdxf>=1.3.0
