@@ -1,3 +1,12 @@
+---
+name: kds-code
+description: 건축구조기준(KDS) 기반 계산 로직을 코드에서 일관되게 유지하고 재사용 가능한 엔진 모듈로 분리하기 위한 작성 규칙. backend/engines/**/*.py 적용.
+status: stable
+last_reviewed: 2026-04-25
+owner: toydoxj
+applies_to: backend/engines/**/*.py
+---
+
 # KDS Code Rule
 
 ## 목적

@@ -63,3 +63,25 @@ class MidasNotFoundError(MidasError):
 
     def __init__(self, message: str = "리소스를 찾을 수 없습니다"):
         super().__init__(message)
+
+
+class MidasAuthExpiredError(MidasError):
+    """MIDAS GEN 세션 미연결 — 401(키 무효) 또는 404(세션/지역 불일치).
+
+    구분:
+        401: MAPI-Key 자체가 무효 (오타/잘못된 값)
+        404: MIDAS GEN의 Apps > Connect가 끊겼거나 Base URL의 지역 서버가
+             GEN과 다름 (예: 한국 GEN 키를 글로벌 URL로 호출)
+    """
+
+    error_code = "AUTH_EXPIRED"
+    status_code = 401
+
+    def __init__(
+        self,
+        message: str = (
+            "MIDAS GEN 세션을 찾지 못했습니다. [설정] 페이지에서 "
+            "MAPI-Key를 갱신하거나 [지역 자동 감지]를 시도하세요."
+        ),
+    ):
+        super().__init__(message)

@@ -8,11 +8,14 @@ declare const google: any; // eslint-disable-line @typescript-eslint/no-explicit
 
 export default function MapSection({ address }: { address: string }) {
   const mapRef = useRef<HTMLDivElement>(null);
+  // Google Maps 타입 정의(@types/google.maps) 미도입 — BACKLOG 참조
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   const mapInstance = useRef<any>(null);
   const geocoder = useRef<any>(null);
   const markerInner = useRef<any>(null);
   const markerOuter = useRef<any>(null);
   const overlayRef = useRef<any>(null);
+  /* eslint-enable @typescript-eslint/no-explicit-any */
   const [opacity, setOpacity] = useState(0.95);
   const [searching, setSearching] = useState(false);
   const [result, setResult] = useState<{ addr: string; lat: number; lng: number } | null>(null);
@@ -59,6 +62,7 @@ export default function MapSection({ address }: { address: string }) {
   const searchAddress = useCallback((addr: string) => {
     if (!addr.trim() || !geocoder.current || !mapInstance.current) return;
     setSearching(true); setError(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     geocoder.current.geocode({ address: addr, region: "KR" }, (results: any[], status: string) => {
       setSearching(false);
       if (status !== "OK" || !results?.length) { setError("주소를 찾을 수 없습니다."); setResult(null); return; }

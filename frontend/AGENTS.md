@@ -7,4 +7,4 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## Project Doc Link
 
 - 프론트엔드 작업 전 `../CLAUDE.md`의 "문서 진입 순서"를 먼저 확인한다.
-- 전체 자동화 흐름은 `.claude/commands/run-workflow.md`를 기준으로 한다.
+- 전체 자동화 흐름은 `.claude/commands/midas-pipeline/run-workflow.md`를 기준으로 한다 (호출: `/midas-pipeline:run-workflow`).

@@ -4,17 +4,17 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutDashboard, Search, Weight, ClipboardCheck, FileText, Users, ChevronLeft, ChevronRight, LogOut, User } from "lucide-react";
+import { LayoutDashboard, Search, Weight, ClipboardCheck, FileText, ChevronLeft, ChevronRight, LogOut, User, Settings2 } from "lucide-react";
 import ConnectionStatus from "./ConnectionStatus";
 import { getUser, clearAuth } from "@/lib/auth";
 
 const navItems = [
   { href: "/", label: "대시보드", icon: LayoutDashboard },
+  { href: "/project-settings", label: "프로젝트 설정", icon: Settings2 },
   { href: "/loadcase", label: "하중정보", icon: Weight },
   { href: "/member-check", label: "부재검토", icon: ClipboardCheck },
   { href: "/documents", label: "문서 작성", icon: FileText },
   { href: "/explorer", label: "탐색기", icon: Search },
-  { href: "/admin", label: "사용자 관리", icon: Users, adminOnly: true },
 ] as const;
 
 export default function Sidebar() {
@@ -46,7 +46,7 @@ export default function Sidebar() {
 
         {/* 네비게이션 */}
         <nav className="flex-1 p-2 space-y-1">
-          {navItems.filter((item) => !("adminOnly" in item && item.adminOnly) || getUser()?.role === "admin").map(({ href, label, icon: Icon }) => {
+          {navItems.map(({ href, label, icon: Icon }) => {
             const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
             return (
               <Link

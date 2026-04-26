@@ -44,6 +44,37 @@ export interface BeamForceMaxRowForCheck {
   [key: string]: unknown;
 }
 
+/** 부재력 최대값 (단면별 그룹) — page → fetch 훅 → 컴포넌트 공용 */
+export interface BeamForceMaxRow {
+  SectName: string;
+  B: number | null;
+  H: number | null;
+  D: number | null;
+  My_neg_I_LC: string; My_neg_I: number;
+  My_pos_I_LC: string; My_pos_I: number;
+  Fz_I_LC: string; Fz_I: number;
+  My_neg_C_LC: string; My_neg_C: number;
+  My_pos_C_LC: string; My_pos_C: number;
+  Fz_C_LC: string; Fz_C: number;
+  My_neg_J_LC: string; My_neg_J: number;
+  My_pos_J_LC: string; My_pos_J: number;
+  Fz_J_LC: string; Fz_J: number;
+}
+
+/** 부재별 그룹 결과 */
+export interface MemberForceMaxRow {
+  Memb: number;
+  My_neg_I_LC: string; My_neg_I: number;
+  My_pos_I_LC: string; My_pos_I: number;
+  Fz_I_LC: string; Fz_I: number;
+  My_neg_C_LC: string; My_neg_C: number;
+  My_pos_C_LC: string; My_pos_C: number;
+  Fz_C_LC: string; Fz_C: number;
+  My_neg_J_LC: string; My_neg_J: number;
+  My_pos_J_LC: string; My_pos_J: number;
+  Fz_J_LC: string; Fz_J: number;
+}
+
 /** 검토 결과 (위치별) */
 export interface PositionCheckResult {
   section_name: string;

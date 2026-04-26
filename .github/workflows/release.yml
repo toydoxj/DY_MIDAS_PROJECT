@@ -30,11 +30,22 @@ jobs:
           pip install -r backend/requirements.txt
           pip install pyinstaller
 
+      - name: Frontend install (reproducible)
+        working-directory: frontend
+        run: npm ci
+
+      # 릴리스 직전 품질 게이트 — 깨진 빌드를 릴리스에 올리지 않는다.
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Type-check frontend
+        working-directory: frontend
+        run: npm run type-check
+
       - name: Build frontend (static export)
         working-directory: frontend
-        run: |
-          npm install
-          npm run build
+        run: npm run build
 
       - name: Build backend (PyInstaller)
         working-directory: backend
@@ -45,7 +56,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npm install
+          npm ci
           npm run build
 
       - name: Publish release

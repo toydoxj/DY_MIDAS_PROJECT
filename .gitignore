@@ -63,6 +63,7 @@ electron/dist/
 # Runtime / local state
 dashboard.db
 work_dir.json
+midas_settings.json
 .mcp.json
 shrimp-rules.md
 shrimp_data/

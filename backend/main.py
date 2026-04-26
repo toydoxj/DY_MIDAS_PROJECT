@@ -62,6 +62,11 @@ base_url: str = os.environ.get("MIDAS_BASE_URL", "")
 api_key: str = os.environ.get("MIDAS_API_KEY", "")
 google_api_key: str = os.environ.get("GOOGLE_API_KEY", "")
 
+# MIDAS 설정 우선순위:
+#   1) midas_settings.json (settings.py 의 _load_saved_settings()가 SSOT)
+#   2) .env 환경변수 (아래 — 파일이 없을 때만 사용되는 부트스트랩)
+# settings.py가 라우터 import 시점에 _load_saved_settings()를 호출해 (1)을 적용하면
+# 아래 (2)의 적용분이 자연스럽게 덮어쓰여진다 (.env가 fallback 역할).
 if base_url:
     MIDAS.MIDAS_API_BASEURL(base_url)
 if api_key:
@@ -69,7 +74,7 @@ if api_key:
 
 from exceptions import MidasError
 
-app = FastAPI(title="MIDAS GEN NX Dashboard API", version="1.0.8")
+app = FastAPI(title="MIDAS GEN NX Dashboard API", version="1.1.1")
 
 
 @app.exception_handler(MidasError)
@@ -100,6 +105,9 @@ from routers import loadcase as loadcase_router
 from routers import analysis as analysis_router
 from routers import floorload as floorload_router
 from routers import member as member_router
+from routers import slab_span as slab_span_router
+from routers import load_map as load_map_router
+from routers import project_settings as project_settings_router
 from routers import seismic_cert as seismic_cert_router
 
 app.include_router(auth_router.router, prefix="/api")
@@ -109,6 +117,9 @@ app.include_router(loadcase_router.router, prefix="/api")
 app.include_router(analysis_router.router, prefix="/api")
 app.include_router(floorload_router.router, prefix="/api")
 app.include_router(member_router.router, prefix="/api")
+app.include_router(slab_span_router.router, prefix="/api")
+app.include_router(load_map_router.router, prefix="/api")
+app.include_router(project_settings_router.router, prefix="/api")
 app.include_router(seismic_cert_router.router, prefix="/api")
 # midas 와일드카드 라우터는 반드시 마지막에 등록
 app.include_router(midas_router.router, prefix="/api")

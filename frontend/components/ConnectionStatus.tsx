@@ -24,6 +24,7 @@ export default function ConnectionStatus() {
     }
   };
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { check(); }, []);
 
   const config: Record<Status, { dot: string; label: string }> = {
