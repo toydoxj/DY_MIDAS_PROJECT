@@ -1,13 +1,16 @@
 import { AUTH_URL } from "./types";
 
-const TOKEN_KEY = "midas_auth_token";
-const USER_KEY = "midas_auth_user";
+// 동양구조 업무관리(task.dyce.kr)와 키 통일 — SSO 호환
+const TOKEN_KEY = "dy_auth_token";
+const USER_KEY = "dy_auth_user";
 
 export interface AuthUser {
   id: number;
   username: string;
   name: string;
+  email?: string; // 동양구조 응답에 추가됨
   role: string;
+  status?: string;
   midas_url: string;
   work_dir: string;
   has_midas_key: boolean;
@@ -74,18 +77,23 @@ export async function login(username: string, password: string): Promise<{ token
   return { token: d.access_token, user: d.user };
 }
 
-/** 최초 관리자 등록 */
-export async function register(username: string, password: string, name: string): Promise<{ token: string; user: AuthUser }> {
-  const res = await fetch(`${AUTH_URL}/api/auth/register`, {
+/** 가입 신청 (동양구조 백엔드의 /api/auth/request로 위임).
+ * 자동 승인은 task.dyce.kr 직원 명부에 이메일이 등록되어 있을 때.
+ */
+export async function requestJoin(
+  username: string,
+  password: string,
+  name: string,
+  email: string,
+): Promise<{ status: string; message: string }> {
+  const res = await fetch(`${AUTH_URL}/api/auth/request`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password, name }),
+    body: JSON.stringify({ username, password, name, email }),
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.detail || `등록 실패 (${res.status})`);
+    throw new Error(d.detail || `가입 신청 실패 (${res.status})`);
   }
-  const d = await res.json();
-  saveAuth(d.access_token, d.user);
-  return { token: d.access_token, user: d.user };
+  return res.json();
 }
