@@ -10,6 +10,33 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.2.0",
+    date: "2026-04-27",
+    changes: [
+      "SSO 통합: 인증을 동양구조 업무관리(api.dyce.kr)에 위임 — task.dyce.kr 가입 계정으로 로그인",
+      "초기 관리자 계정 생성 / 사용자 관리 페이지 제거 — task.dyce.kr/admin/users 로 이관",
+      "가입 신청 시 이메일 입력 추가 (직원 명부 자동 매칭)",
+      "localStorage 토큰 키 통일 (midas_* → dy_*)",
+      ".claude 자산 재구성 (역할 × 도메인 분류 + registry.yaml + lint 도구)",
+    ],
+  },
+  {
+    version: "1.1.1",
+    date: "2026-04-25",
+    changes: [
+      "자동 업데이트 알림에서 HTML 태그가 그대로 노출되던 문제 수정",
+    ],
+  },
+  {
+    version: "1.1.0",
+    date: "2026-04-25",
+    changes: [
+      "Load Map PDF/DXF 내보내기 (jspdf + html-to-image / ezdxf)",
+      "슬래브 경간/하중/배근 자동 분석 (/member-check/slab-span)",
+      "Project Settings — 그리드/축렬 자동 탐지 + 회전 그룹",
+    ],
+  },
+  {
     version: "1.0.12",
     date: "2026-04-21",
     changes: [

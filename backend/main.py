@@ -74,7 +74,7 @@ if api_key:
 
 from exceptions import MidasError
 
-app = FastAPI(title="MIDAS GEN NX Dashboard API", version="1.1.1")
+app = FastAPI(title="MIDAS GEN NX Dashboard API", version="1.2.0")
 
 
 @app.exception_handler(MidasError)
