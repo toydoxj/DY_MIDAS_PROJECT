@@ -82,7 +82,8 @@ export const BACKEND_URL = (() => {
   }
   return process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 })();
-export const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL ?? "http://3.24.217.252:8000";
+// SSO: 인증/사용자 관리는 동양구조 업무관리 백엔드(api.dyce.kr)에 위임
+export const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL ?? "https://api.dyce.kr";
 
 declare global {
   interface Window {
