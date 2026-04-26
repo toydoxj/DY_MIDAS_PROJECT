@@ -1,10 +1,15 @@
 """인증 라우터 — 자체 발급 X. 모두 동양구조 업무관리(api.dyce.kr)에 위임.
 
-남은 엔드포인트:
-- GET /api/auth/me — 현재 사용자 정보 (CurrentUser dataclass 그대로 반환)
-- PUT /api/auth/me — 우리 자격 + MIDAS 자격 변경 (api.dyce.kr 로 forward)
+엔드포인트 모두 thin proxy (frontend → 본 sidecar → api.dyce.kr).
+Electron 환경의 외부 도메인 CORS 차단을 회피하기 위해 모든 요청을 sidecar 경유.
 
-발급/관리(register/login/users 등)는 task.dyce.kr/login 또는 task.dyce.kr/admin/users 에서.
+- POST /api/auth/login — 로그인
+- POST /api/auth/request — 가입 신청
+- GET  /api/auth/me — 현재 사용자 정보 (CurrentUser dataclass 그대로 반환)
+- PUT  /api/auth/me — 우리 자격 + MIDAS 자격 변경
+- GET  /api/auth/status — 초기화 여부 확인
+
+사용자 관리(승인/거절/role 변경)는 task.dyce.kr/admin/users 에서.
 """
 
 import os
@@ -22,6 +27,18 @@ _AUTH_API = os.environ.get("AUTH_API_URL", "https://api.dyce.kr").rstrip("/")
 router = APIRouter(prefix="/auth")
 
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class JoinRequest(BaseModel):
+    username: str
+    password: str
+    name: str
+    email: str
+
+
 class UserUpdateRequest(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
@@ -29,6 +46,39 @@ class UserUpdateRequest(BaseModel):
     midas_url: Optional[str] = None
     midas_key: Optional[str] = None
     work_dir: Optional[str] = None
+
+
+def _forward_post(path: str, payload: dict) -> dict:
+    """동양구조 백엔드로 POST forward + 에러 매핑."""
+    try:
+        with httpx.Client(timeout=10) as http:
+            r = http.post(
+                f"{_AUTH_API}{path}",
+                headers={"Content-Type": "application/json"},
+                json=payload,
+            )
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=503, detail=f"인증 서버 통신 실패: {exc}") from exc
+    if not r.is_success:
+        try:
+            d = r.json()
+            detail = d.get("detail") or d.get("message") or r.text
+        except Exception:
+            detail = r.text
+        raise HTTPException(status_code=r.status_code, detail=detail)
+    return r.json()
+
+
+@router.post("/login")
+def login(body: LoginRequest) -> dict:
+    """로그인 — task 백엔드로 forward."""
+    return _forward_post("/api/auth/login", body.model_dump())
+
+
+@router.post("/request")
+def request_join(body: JoinRequest) -> dict:
+    """가입 신청 — task 백엔드로 forward."""
+    return _forward_post("/api/auth/request", body.model_dump())
 
 
 def _user_to_info(user: CurrentUser) -> dict:

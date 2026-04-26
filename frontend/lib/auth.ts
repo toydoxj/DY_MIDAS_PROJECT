@@ -1,4 +1,4 @@
-import { AUTH_URL } from "./types";
+import { BACKEND_URL } from "./types";
 
 // 동양구조 업무관리(task.dyce.kr)와 키 통일 — SSO 호환
 const TOKEN_KEY = "dy_auth_token";
@@ -57,13 +57,13 @@ export async function authFetch(url: string, init?: RequestInit): Promise<Respon
 
 /** 인증 상태 확인 (DB에 사용자가 있는지) */
 export async function checkAuthStatus(): Promise<{ initialized: boolean }> {
-  const res = await fetch(`${AUTH_URL}/api/auth/status`);
+  const res = await fetch(`${BACKEND_URL}/api/auth/status`);
   return res.json();
 }
 
 /** 로그인 */
 export async function login(username: string, password: string): Promise<{ token: string; user: AuthUser }> {
-  const res = await fetch(`${AUTH_URL}/api/auth/login`, {
+  const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
@@ -86,7 +86,7 @@ export async function requestJoin(
   name: string,
   email: string,
 ): Promise<{ status: string; message: string }> {
-  const res = await fetch(`${AUTH_URL}/api/auth/request`, {
+  const res = await fetch(`${BACKEND_URL}/api/auth/request`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password, name, email }),

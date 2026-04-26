@@ -10,6 +10,14 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.2.1",
+    date: "2026-04-27",
+    changes: [
+      "로그인 'Failed to fetch' 수정 — 인증 호출을 sidecar(thin proxy) 경유로 우회 (Electron origin CORS 차단 회피)",
+      "backend/routers/auth.py: /login + /request 엔드포인트 추가 (api.dyce.kr 로 forward)",
+    ],
+  },
+  {
     version: "1.2.0",
     date: "2026-04-27",
     changes: [
