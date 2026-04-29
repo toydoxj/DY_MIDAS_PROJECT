@@ -10,6 +10,16 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.3.0",
+    date: "2026-04-29",
+    changes: [
+      "NAVER WORKS SSO 통합 — 사내 NAVER WORKS 계정으로 단일 로그인 (task.dyce.kr SSO 공유)",
+      "Electron BrowserWindow OAuth — main process가 모달 창으로 OAuth dance 처리, callback fragment IPC 가로채기",
+      "관리자 → 사용자 현황 페이지 — 본 앱 자체 access log(SQLite) + 사용자별 마지막 접속 / 누적 접속 / 최근 이력",
+      "ID/비밀번호 + 가입신청 폼 제거 — NAVER WORKS 단일 인증으로 일원화",
+    ],
+  },
+  {
     version: "1.2.1",
     date: "2026-04-27",
     changes: [

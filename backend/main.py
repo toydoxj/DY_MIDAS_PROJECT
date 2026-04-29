@@ -74,7 +74,7 @@ if api_key:
 
 from exceptions import MidasError
 
-app = FastAPI(title="MIDAS GEN NX Dashboard API", version="1.2.1")
+app = FastAPI(title="MIDAS GEN NX Dashboard API", version="1.3.0")
 
 
 @app.exception_handler(MidasError)
@@ -109,8 +109,10 @@ from routers import slab_span as slab_span_router
 from routers import load_map as load_map_router
 from routers import project_settings as project_settings_router
 from routers import seismic_cert as seismic_cert_router
+from routers import admin as admin_router
 
 app.include_router(auth_router.router, prefix="/api")
+app.include_router(admin_router.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
 app.include_router(project_router.router, prefix="/api")
 app.include_router(loadcase_router.router, prefix="/api")

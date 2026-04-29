@@ -91,6 +91,13 @@ declare global {
       isElectron: boolean;
       browseFolder: (currentPath: string) => Promise<string | null>;
       getVersion: () => Promise<string>;
+      // NAVER WORKS SSO — main process가 BrowserWindow로 OAuth dance를 진행하고
+      // callback fragment의 raw token(base64url-json)을 그대로 반환.
+      // 사용자 취소 / 오류 시 reject.
+      ssoWorksLogin?: (options?: {
+        next?: string;
+        front?: string;
+      }) => Promise<string>;
     };
   }
 }

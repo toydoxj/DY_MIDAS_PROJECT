@@ -87,9 +87,19 @@ async function startBackend() {
     logStream.write(`[launcher] BACKEND_PORT=${backendPort}\n\n`);
   } catch (_) {}
 
+  // 자체 access log 등 sidecar 데이터 — packaged resources는 read-only일 수 있으므로
+  // 항상 OS user data 디렉토리에 둔다.
+  const backendDataDir = app.getPath("userData");
+  try { fs.mkdirSync(backendDataDir, { recursive: true }); } catch (_) {}
+
   backendExitInfo = null;
   backendProcess = spawn(backendExe, [], {
-    env: { ...process.env, BACKEND_PORT: String(backendPort), PYTHONIOENCODING: "utf-8" },
+    env: {
+      ...process.env,
+      BACKEND_PORT: String(backendPort),
+      BACKEND_DATA_DIR: backendDataDir,
+      PYTHONIOENCODING: "utf-8",
+    },
     cwd: backendCwd,
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -298,6 +308,129 @@ ipcMain.handle("browse-folder", async (_event, currentPath) => {
   });
   if (result.canceled || !result.filePaths.length) return null;
   return result.filePaths[0];
+});
+
+// NAVER WORKS SSO — task 백엔드(api.dyce.kr)가 처리하는 OAuth dance를
+// 임베디드 BrowserWindow로 진행하고 callback fragment의 token을 가로챈다.
+//
+// 흐름:
+//   ssoWin.loadURL(api.dyce.kr/api/auth/works/login?front=...&next=...)
+//     → 302 NAVER WORKS authorize → 사용자 인증
+//     → NAVER → api.dyce.kr/api/auth/works/callback
+//     → api.dyce.kr가 https://<front>/auth/works/callback#token=<base64url-json> 으로 302
+//     → BrowserWindow 페이지가 실제로 로드되기 전에 will-redirect/will-navigate 등에서
+//       URL을 가로채 token 추출 후 윈도우 close.
+//
+// Electron BrowserWindow가 `/auth/works/callback#token=...` URL 패턴을 가로채므로
+// redirect 대상 도메인은 무관 — task 백엔드가 default(task.dyce.kr)로 보내도 OK.
+// 따라서 `front` query는 명시될 때만 전송 — Task_DY 가이드 §2.2 미적용 환경과도 호환.
+ipcMain.handle("sso-works-login", async (_event, options = {}) => {
+  const authBase = (process.env.AUTH_API_URL || "https://api.dyce.kr").replace(/\/+$/, "");
+  const explicitFront = options.front || process.env.SSO_FRONT_ORIGIN || "";
+  const next = options.next || "/";
+  const params = new URLSearchParams({ next });
+  if (explicitFront) params.set("front", explicitFront);
+  const startUrl = `${authBase}/api/auth/works/login?${params.toString()}`;
+  const isDev = !app.isPackaged;
+  const log = (...args) => console.log("[sso]", ...args);
+  log("start", { startUrl, isDev });
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const parentAlive = mainWindow && !mainWindow.isDestroyed();
+    const ssoWin = new BrowserWindow({
+      // mainWindow가 살아있을 때만 parent 지정. parent가 없으면 modal 동작 X.
+      ...(parentAlive ? { parent: mainWindow, modal: true } : {}),
+      width: 480,
+      height: 720,
+      show: true,
+      alwaysOnTop: true,
+      autoHideMenuBar: true,
+      backgroundColor: "#1a1a2e",
+      title: "NAVER WORKS 로그인",
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    });
+    ssoWin.setMenuBarVisibility(false);
+    ssoWin.center();
+    ssoWin.focus();
+    if (isDev) {
+      try { ssoWin.webContents.openDevTools({ mode: "detach" }); } catch (_) {}
+    }
+
+    const finishOk = (token) => {
+      if (settled) return;
+      settled = true;
+      try { if (!ssoWin.isDestroyed()) ssoWin.close(); } catch (_) {}
+      resolve(token);
+    };
+    const finishErr = (err) => {
+      if (settled) return;
+      settled = true;
+      try { if (!ssoWin.isDestroyed()) ssoWin.close(); } catch (_) {}
+      reject(err);
+    };
+
+    const tryConsume = (rawUrl, ev) => {
+      if (!rawUrl || settled) return false;
+      log("nav", rawUrl);
+      let u;
+      try { u = new URL(rawUrl); } catch { return false; }
+      if (!u.pathname.endsWith("/auth/works/callback")) return false;
+
+      const errParam = u.searchParams.get("error");
+      const fragment = (u.hash && u.hash.startsWith("#")) ? u.hash.slice(1) : "";
+      const hashToken = fragment ? new URLSearchParams(fragment).get("token") : null;
+
+      // task 백엔드(api.dyce.kr) 자체의 callback 처리(?code=&state=)는
+      // fragment redirect를 발행하기 전 단계 — 가로채지 말고 통과시켜야 한다.
+      // 가로채기는 frontend 도메인의 fragment(`#token=...`) 또는 ?error= 도착 시에만.
+      if (!errParam && !hashToken) {
+        log("callback passthrough (waiting for fragment)");
+        return false;
+      }
+
+      log("callback hit", { hasFragment: !!fragment, errorParam: errParam });
+      if (ev && typeof ev.preventDefault === "function") {
+        try { ev.preventDefault(); } catch (_) {}
+      }
+      try { if (!ssoWin.isDestroyed()) ssoWin.hide(); } catch (_) {}
+      if (errParam) {
+        finishErr(new Error(decodeURIComponent(errParam)));
+        return true;
+      }
+      // fragment 전체(`token=<JWT>&user=<base64-json>&next=<path>`)를 frontend로 전달.
+      // frontend의 decodeWorksToken이 3개 파라미터를 모두 파싱한다.
+      finishOk(fragment);
+      return true;
+    };
+
+    const wc = ssoWin.webContents;
+    // 동일 URL이 여러 이벤트로 들어와도 settled 가드로 중복 방지.
+    wc.on("will-redirect", (e, url) => tryConsume(url, e));
+    wc.on("did-redirect-navigation", (e, url) => tryConsume(url, e));
+    wc.on("will-navigate", (e, url) => tryConsume(url, e));
+    wc.on("did-navigate", (e, url) => tryConsume(url, e));
+    wc.on("did-navigate-in-page", (e, url) => tryConsume(url, e));
+    // 실제 페이지 로드가 실패해도(미배포 도메인 등) 이미 fragment를 잡았으면 무시.
+    wc.on("did-fail-load", (_e, code, desc, validatedURL) => {
+      log("did-fail-load", { code, desc, validatedURL });
+      if (!settled) tryConsume(validatedURL, null);
+    });
+
+    ssoWin.on("closed", () => {
+      log("ssoWin closed", { settled });
+      if (!settled) finishErr(new Error("로그인이 취소되었습니다"));
+    });
+
+    ssoWin.loadURL(startUrl).then(() => log("loadURL ok")).catch((err) => {
+      log("loadURL err", err && err.message);
+      finishErr(err);
+    });
+  });
 });
 
 // 앱 생명주기

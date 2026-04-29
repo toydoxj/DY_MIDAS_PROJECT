@@ -1,46 +1,73 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import { login, requestJoin } from "@/lib/auth";
+import {
+  decodeWorksToken,
+  saveAuth,
+  trackLogin,
+  worksLoginUrl,
+} from "@/lib/auth";
 
 interface Props {
   onSuccess: () => void;
 }
 
+// Electron 환경에서는 window.location.origin이 app://-라 hard navigate redirect는
+// 불가하지만, main process의 BrowserWindow IPC(ssoWorksLogin)를 통해 SSO 가능.
+function isElectronEnv(): boolean {
+  if (typeof window === "undefined") return false;
+  if (window.electronAPI?.isElectron) return true;
+  const origin = window.location.origin || "";
+  return !origin.startsWith("http://") && !origin.startsWith("https://");
+}
+
 export default function LoginForm({ onSuccess }: Props) {
-  const [mode, setMode] = useState<"login" | "request">("login");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // 진입 시 NAVER WORKS SSO 자동 redirect (브라우저 한정).
+  // - ?error=... 또는 ?manual=1 query 있으면 redirect 차단 (무한 루프 방지)
+  // - Electron은 BrowserWindow IPC 방식 (사용자 클릭 트리거)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("error") || sp.get("manual")) {
+      const e = sp.get("error");
+      if (e) setError(decodeURIComponent(e));
+      return;
+    }
+    if (isElectronEnv()) return;
+    window.location.replace(worksLoginUrl("/"));
+  }, []);
+
+  // Electron NAVER WORKS SSO — main process가 BrowserWindow로 OAuth 처리 후
+  // raw fragment를 IPC로 반환. 디코딩 → saveAuth → onSuccess.
+  const handleElectronWorksLogin = async () => {
+    if (!window.electronAPI?.ssoWorksLogin) {
+      setError("이 빌드는 SSO를 지원하지 않습니다. 앱을 최신 버전으로 업데이트하세요.");
+      return;
+    }
     setError("");
-    setSuccess("");
     setLoading(true);
     try {
-      if (mode === "request") {
-        const d = await requestJoin(username, password, name, email);
-        setSuccess(d.message || "가입 신청이 완료되었습니다.");
-        setMode("login");
-        setUsername(""); setPassword(""); setName(""); setEmail("");
-      } else {
-        await login(username, password);
-        onSuccess();
+      const rawFragment = await window.electronAPI.ssoWorksLogin({ next: "/" });
+      const result = decodeWorksToken(rawFragment);
+      if (!result) {
+        setError("인증 토큰을 해석할 수 없습니다.");
+        return;
       }
+      saveAuth(result.token, result.user);
+      trackLogin();
+      onSuccess();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "오류가 발생했습니다");
+      const msg = err instanceof Error ? err.message : "로그인 실패";
+      // 사용자가 창을 닫은 경우는 조용히 처리
+      if (msg !== "로그인이 취소되었습니다") setError(msg);
     } finally {
       setLoading(false);
     }
   };
-
-  const inputCls = "w-full px-3 py-2 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-[#669900]/40 focus:border-[#669900] outline-none";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900">
@@ -51,55 +78,39 @@ export default function LoginForm({ onSuccess }: Props) {
           <p className="text-xs text-gray-500 mt-1">(주)동양구조</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-gray-800 rounded-xl border border-gray-700 p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-gray-300 text-center">
-            {mode === "request" ? "가입 신청" : "로그인"}
-          </h2>
-
-          {mode === "request" && (
-            <>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">이름</label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="홍길동" required />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">이메일 (직원 명부 매칭)</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="name@dyce.kr" required />
-              </div>
-            </>
-          )}
-
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">아이디</label>
-            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className={inputCls} placeholder="사용자 ID" required autoFocus />
-          </div>
-
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">비밀번호</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={inputCls} placeholder="비밀번호" required />
-          </div>
-
-          {error && <p className="text-xs text-red-400 text-center">{error}</p>}
-          {success && <p className="text-xs text-green-400 text-center">{success}</p>}
-
-          <button type="submit" disabled={loading}
-            className="w-full py-2.5 text-sm font-medium rounded-lg bg-[#669900] text-white hover:bg-[#5a8700] disabled:opacity-50 transition">
-            {loading ? "처리 중..." : mode === "request" ? "가입 신청" : "로그인"}
-          </button>
-
-          {mode === "login" && (
-            <button type="button" onClick={() => { setMode("request"); setError(""); setSuccess(""); }}
-              className="w-full py-2 text-xs text-gray-400 hover:text-gray-200 transition">
-              계정이 없으신가요? <span className="underline">가입 신청</span>
+        <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 space-y-3">
+          {isElectronEnv() ? (
+            <button
+              type="button"
+              onClick={handleElectronWorksLogin}
+              disabled={loading}
+              className="block w-full text-center py-2.5 text-sm font-medium rounded-lg bg-[#00C73C] text-white hover:bg-[#00b035] disabled:opacity-50 transition"
+            >
+              {loading ? "로그인 창 처리 중..." : "NAVER WORKS로 로그인"}
             </button>
+          ) : (
+            <a
+              href={
+                typeof window !== "undefined"
+                  ? worksLoginUrl("/")
+                  : "/api/auth/works/login"
+              }
+              className="block w-full text-center py-2.5 text-sm font-medium rounded-lg bg-[#00C73C] text-white hover:bg-[#00b035] transition"
+            >
+              NAVER WORKS로 로그인
+            </a>
           )}
-          {mode === "request" && (
-            <button type="button" onClick={() => { setMode("login"); setError(""); setSuccess(""); }}
-              className="w-full py-2 text-xs text-gray-400 hover:text-gray-200 transition">
-              이미 계정이 있으신가요? <span className="underline">로그인</span>
-            </button>
-          )}
-        </form>
+          <p className="text-[11px] text-gray-500 text-center">
+            사내 NAVER WORKS 계정으로 로그인합니다.
+          </p>
+          {error && <p className="text-xs text-red-400 text-center pt-2">{error}</p>}
+        </div>
+        <noscript>
+          <p className="text-xs text-gray-400 text-center mt-3">
+            JavaScript가 꺼져 있습니다. 위의 NAVER WORKS 로그인 버튼을 직접
+            누르세요.
+          </p>
+        </noscript>
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutDashboard, Search, Weight, ClipboardCheck, FileText, ChevronLeft, ChevronRight, LogOut, User, Settings2 } from "lucide-react";
+import { LayoutDashboard, Search, Weight, ClipboardCheck, FileText, ChevronLeft, ChevronRight, LogOut, User, Settings2, ShieldCheck } from "lucide-react";
 import ConnectionStatus from "./ConnectionStatus";
 import { getUser, clearAuth } from "@/lib/auth";
 
@@ -17,14 +17,24 @@ const navItems = [
   { href: "/explorer", label: "탐색기", icon: Search },
 ] as const;
 
+const adminItems = [
+  { href: "/admin", label: "사용자 현황", icon: ShieldCheck },
+] as const;
+
 export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const main = document.getElementById("main-content");
     if (main) main.style.marginLeft = collapsed ? "4rem" : "16rem";
   }, [collapsed]);
+
+  // role을 client-side에서 판정 (getUser는 localStorage 의존이라 SSR에서 미동작)
+  useEffect(() => {
+    setIsAdmin(getUser()?.role === "admin");
+  }, []);
 
   return (
     <>
@@ -66,6 +76,35 @@ export default function Sidebar() {
               </Link>
             );
           })}
+          {isAdmin && (
+            <>
+              {!collapsed && (
+                <p className="text-[10px] uppercase tracking-wider text-gray-600 px-3 pt-3 pb-1">
+                  관리자
+                </p>
+              )}
+              {adminItems.map(({ href, label, icon: Icon }) => {
+                const active = pathname.startsWith(href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    title={collapsed ? label : undefined}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
+                      collapsed ? "justify-center px-0" : ""
+                    } ${
+                      active
+                        ? "bg-[#669900]/20 text-[#8cbf2d] border border-[#669900]/30"
+                        : "text-gray-400 hover:bg-white/5 hover:text-gray-200 border border-transparent"
+                    }`}
+                  >
+                    <Icon size={18} className="flex-shrink-0" />
+                    {!collapsed && label}
+                  </Link>
+                );
+              })}
+            </>
+          )}
         </nav>
 
         {/* 하단 */}

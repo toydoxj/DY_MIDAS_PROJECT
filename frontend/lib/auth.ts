@@ -1,8 +1,11 @@
-import { BACKEND_URL } from "./types";
+import { AUTH_URL, BACKEND_URL } from "./types";
 
 // 동양구조 업무관리(task.dyce.kr)와 키 통일 — SSO 호환
 const TOKEN_KEY = "dy_auth_token";
 const USER_KEY = "dy_auth_user";
+
+// NAVER WORKS SSO — task SSO 공유(시나리오 A) 기준 직접 redirect 대상
+const TASK_AUTH_BASE = AUTH_URL; // 보통 https://api.dyce.kr
 
 export interface AuthUser {
   id: number;
@@ -61,39 +64,103 @@ export async function checkAuthStatus(): Promise<{ initialized: boolean }> {
   return res.json();
 }
 
-/** 로그인 */
-export async function login(username: string, password: string): Promise<{ token: string; user: AuthUser }> {
-  const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.detail || `로그인 실패 (${res.status})`);
-  }
-  const d = await res.json();
-  saveAuth(d.access_token, d.user);
-  return { token: d.access_token, user: d.user };
+/** NAVER WORKS SSO 진입 URL.
+ * - 브라우저 hard navigate 전용 (window.location.replace).
+ * - task 백엔드(api.dyce.kr)가 state에 origin 포함 후 NAVER WORKS authorize로 302.
+ * - Electron(app:// origin) 환경에서는 redirect 대상이 유효하지 않아 사용 불가.
+ */
+export function worksLoginUrl(next: string = "/"): string {
+  const selfOrigin =
+    typeof window !== "undefined" ? window.location.origin : "";
+  const qs = new URLSearchParams({ next, front: selfOrigin }).toString();
+  return `${TASK_AUTH_BASE}/api/auth/works/login?${qs}`;
 }
 
-/** 가입 신청 (동양구조 백엔드의 /api/auth/request로 위임).
- * 자동 승인은 task.dyce.kr 직원 명부에 이메일이 등록되어 있을 때.
- */
-export async function requestJoin(
-  username: string,
-  password: string,
-  name: string,
-  email: string,
-): Promise<{ status: string; message: string }> {
-  const res = await fetch(`${BACKEND_URL}/api/auth/request`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password, name, email }),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.detail || `가입 신청 실패 (${res.status})`);
-  }
-  return res.json();
+export interface WorksCallbackResult {
+  token: string;
+  user: AuthUser;
+  next: string;
 }
+
+/** SSO callback fragment를 파싱.
+ * - 입력: 전체 fragment 문자열 (앞 `#` 포함/미포함 모두 허용).
+ * - task 백엔드 실제 스키마: `token=<JWT>&user=<base64-json>&next=<path>`
+ *   - token: JWT 자체(점 포함). 디코딩하지 않고 그대로 access token으로 사용.
+ *   - user: base64(url-safe 가능) → UTF-8 JSON of AuthUser.
+ *   - next: 로그인 후 이동 경로 (기본 "/").
+ * - 실패 시 null.
+ */
+export function decodeWorksToken(rawFragment: string): WorksCallbackResult | null {
+  if (!rawFragment) return null;
+  try {
+    const stripped = rawFragment.startsWith("#") ? rawFragment.slice(1) : rawFragment;
+    const params = new URLSearchParams(stripped);
+    const token = params.get("token");
+    const userRaw = params.get("user");
+    const next = params.get("next") || "/";
+    if (!token || !userRaw) return null;
+
+    // user: base64(url-safe 허용) → UTF-8 JSON
+    const b64 = userRaw.replace(/-/g, "+").replace(/_/g, "/");
+    const pad = b64.length % 4 ? "=".repeat(4 - (b64.length % 4)) : "";
+    const decoded = atob(b64 + pad);
+    const bytes = Uint8Array.from(decoded, (c) => c.charCodeAt(0));
+    const json = new TextDecoder("utf-8").decode(bytes);
+    const user = JSON.parse(json) as AuthUser;
+    if (!user || typeof user.id !== "number") return null;
+
+    return { token, user, next };
+  } catch {
+    return null;
+  }
+}
+
+/** SSO callback의 fragment 전체를 decodeWorksToken으로 위임.
+ * - 성공 시 history.replaceState로 fragment 제거.
+ * - 실패/누락 시 null 반환.
+ */
+export function consumeCallbackFragment(): WorksCallbackResult | null {
+  if (typeof window === "undefined") return null;
+  const hash = window.location.hash || "";
+  if (!hash.startsWith("#")) return null;
+  const result = decodeWorksToken(hash);
+  if (!result) return null;
+  try {
+    const cleanUrl = `${window.location.pathname}${window.location.search}`;
+    window.history.replaceState(null, "", cleanUrl);
+  } catch {
+    /* ignore */
+  }
+  return result;
+}
+
+/** 본 앱 자체 access log에 로그인 이벤트 기록 — 로그인 성공 직후 호출.
+ * - 인증 서버(task.dyce.kr)와 별개로 이 sidecar의 SQLite에 적재.
+ * - JWT의 sid가 UNIQUE 키 → 같은 세션 재요청은 백엔드가 무시.
+ * - 실패해도 로그인 흐름은 막지 않는다(silent).
+ * - authFetch(401시 자동 clearAuth+redirect) 대신 raw fetch — 추적 실패가
+ *   방금 성공한 SSO 세션을 날려서 로그인 화면으로 튕기는 사고를 방지.
+ */
+export async function trackLogin(appVersion?: string): Promise<void> {
+  try {
+    let version = appVersion || "";
+    if (!version && typeof window !== "undefined") {
+      try {
+        version = (await window.electronAPI?.getVersion?.()) || "";
+      } catch { /* ignore */ }
+    }
+    const token = getToken();
+    if (!token) return;
+    await fetch(`${BACKEND_URL}/api/admin/track-login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ app_version: version }),
+    });
+  } catch {
+    /* ignore — 추적 실패가 로그인 성공을 막지 않게 */
+  }
+}
+

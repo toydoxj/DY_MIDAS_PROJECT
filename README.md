@@ -18,7 +18,8 @@ Task_MIDAS/
 │
 ├── backend/                    # FastAPI 백엔드
 │   ├── main.py
-│   ├── auth_middleware.py       # JWT 검증만 — 사용자 정보는 api.dyce.kr 위임 (SSO)
+│   ├── auth_middleware.py       # JWT 검증만 — 사용자 정보는 api.dyce.kr 위임 (NAVER WORKS SSO)
+│   ├── access_log.py            # 본 앱 자체 access log (SQLite, BACKEND_DATA_DIR)
 │   ├── exceptions.py            # MidasError 예외 계층
 │   ├── work_dir.py              # 작업 디렉토리 관리
 │   ├── engines/
@@ -34,9 +35,9 @@ Task_MIDAS/
 │   ├── engines/
 │   │   ├── kds_rc_beam.py      # RC보 KDS 설계 검토
 │   │   └── slab_span.py         # 슬래브 패널 탐색(face/OMBB) + 회전 그리드 + Floor Load 매칭
-│   └── routers/                # auth(thin proxy → api.dyce.kr), settings, project, loadcase,
-│                                # analysis, floorload, member, slab_span, load_map,
-│                                # project_settings, seismic_cert, midas
+│   └── routers/                # auth(thin proxy → api.dyce.kr), admin(access log),
+│                                # settings, project, loadcase, analysis, floorload, member,
+│                                # slab_span, load_map, project_settings, seismic_cert, midas
 │
 ├── frontend/                   # Next.js 프론트엔드
 │   ├── app/
