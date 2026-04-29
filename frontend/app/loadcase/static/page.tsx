@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, Plus, Trash2 } from "lucide-react";
+import { Save, Plus, Trash2, ListPlus } from "lucide-react";
 import { BACKEND_URL } from "@/lib/types";
 import PageHeader from "@/components/ui/PageHeader";
 import SectionCard from "@/components/ui/SectionCard";
@@ -12,8 +12,10 @@ import { SavedBadge, ErrorText } from "@/components/ui/StatusMessage";
 const TYPE_MAP: Record<string, string> = {
   D: "Dead Load",
   L: "Live Load",
+  LR: "Roof Live Load",
   W: "Wind Load",
   WA: "Wind Load (Across)",
+  ES: "Earthquake (Static)",
   EH: "Earth Pressure",
 };
 const TYPE_OPTIONS = Object.entries(TYPE_MAP);
@@ -24,6 +26,77 @@ interface LoadCaseRow {
   TYPE: string;
   DESC: string;
 }
+
+interface PresetCase {
+  NAME: string;
+  TYPE: string;
+  DESC: string;
+}
+
+// docs/Setting_Static_Load_Case.md 의 Type 1~4 프리셋.
+// MIDAS Gen Static Load Case Type 코드:
+//  D=Dead, L=Live, LR=Roof Live, W=Wind, ES=Earthquake(Static), EH=Earth Pressure
+const PRESETS: Record<string, { label: string; cases: PresetCase[] }> = {
+  type1: {
+    label: "Type 1 — 기본",
+    cases: [
+      { NAME: "DL", TYPE: "D", DESC: "Dead Load" },
+      { NAME: "LL", TYPE: "L", DESC: "Live Load" },
+      { NAME: "Lr", TYPE: "LR", DESC: "Roof Live Load" },
+      { NAME: "Wx", TYPE: "W", DESC: "Wind Load X direction" },
+      { NAME: "Wy", TYPE: "W", DESC: "Wind Load Y direction" },
+    ],
+  },
+  type2: {
+    label: "Type 2 — 기본 (등가정적법)",
+    cases: [
+      { NAME: "DL", TYPE: "D", DESC: "Dead Load" },
+      { NAME: "LL", TYPE: "L", DESC: "Live Load" },
+      { NAME: "Lr", TYPE: "LR", DESC: "Roof Live Load" },
+      { NAME: "Wx", TYPE: "W", DESC: "Wind Load X direction" },
+      { NAME: "Wy", TYPE: "W", DESC: "Wind Load Y direction" },
+      { NAME: "Ex", TYPE: "ES", DESC: "Seismic Load X direction" },
+      { NAME: "Ey", TYPE: "ES", DESC: "Seismic Load Y direction" },
+    ],
+  },
+  type3: {
+    label: "Type 3 — 기본 (지하내진포함)",
+    cases: [
+      { NAME: "DL", TYPE: "D", DESC: "Dead Load" },
+      { NAME: "LL", TYPE: "L", DESC: "Live Load" },
+      { NAME: "Lr", TYPE: "LR", DESC: "Roof Live Load" },
+      { NAME: "Wx", TYPE: "W", DESC: "Wind Load X direction" },
+      { NAME: "Wy", TYPE: "W", DESC: "Wind Load Y direction" },
+      { NAME: "EHx+", TYPE: "EH", DESC: "Horizontal Earth Pressure X+ Direction" },
+      { NAME: "EHx-", TYPE: "EH", DESC: "Horizontal Earth Pressure X- Direction" },
+      { NAME: "EHy+", TYPE: "EH", DESC: "Horizontal Earth Pressure Y+ Direction" },
+      { NAME: "EHy-", TYPE: "EH", DESC: "Horizontal Earth Pressure Y- Direction" },
+      { NAME: "EEPx+", TYPE: "ES", DESC: "Earthquake Earth Pressure X+ Direction" },
+      { NAME: "EEPx-", TYPE: "ES", DESC: "Earthquake Earth Pressure X- Direction" },
+      { NAME: "EEPy+", TYPE: "ES", DESC: "Earthquake Earth Pressure Y+ Direction" },
+      { NAME: "EEPy-", TYPE: "ES", DESC: "Earthquake Earth Pressure Y- Direction" },
+    ],
+  },
+  type4: {
+    label: "Type 4 — 경량 쉘터 (등가정적법)",
+    cases: [
+      { NAME: "DL", TYPE: "D", DESC: "Dead Load" },
+      { NAME: "LL", TYPE: "L", DESC: "Live Load" },
+      { NAME: "Lr", TYPE: "LR", DESC: "Roof Live Load" },
+      { NAME: "Wx+1", TYPE: "W", DESC: "Wind Load X direction" },
+      { NAME: "Wx+2", TYPE: "W", DESC: "Wind Load X direction" },
+      { NAME: "Wx-1", TYPE: "W", DESC: "Wind Load X direction" },
+      { NAME: "Wx-2", TYPE: "W", DESC: "Wind Load X direction" },
+      { NAME: "Wy+1", TYPE: "W", DESC: "Wind Load Y direction" },
+      { NAME: "Wy+2", TYPE: "W", DESC: "Wind Load Y direction" },
+      { NAME: "Wy-1", TYPE: "W", DESC: "Wind Load Y direction" },
+      { NAME: "Wy-2", TYPE: "W", DESC: "Wind Load Y direction" },
+      { NAME: "Wy", TYPE: "W", DESC: "Wind Load Y direction" },
+      { NAME: "Ex", TYPE: "ES", DESC: "Seismic Load X direction" },
+      { NAME: "Ey", TYPE: "ES", DESC: "Seismic Load Y direction" },
+    ],
+  },
+};
 
 interface SPLCRow {
   id: string;
@@ -88,9 +161,65 @@ export default function LoadCasePage() {
     finally { setSaving(false); }
   };
 
+  // 프리셋 불러오기 — 기존 케이스 있으면 confirm 후 교체 + 즉시 MIDAS PUT.
+  const applyPreset = async (presetKey: string) => {
+    const preset = PRESETS[presetKey];
+    if (!preset) return;
+    if (rows.length > 0) {
+      const ok = window.confirm(
+        `기존 Static Load Case ${rows.length}개가 있습니다.\n[${preset.label}](${preset.cases.length}개)으로 교체하시겠습니까?`,
+      );
+      if (!ok) return;
+    }
+    const newRows: LoadCaseRow[] = preset.cases.map((c, i) => ({
+      id: String(i + 1),
+      NAME: c.NAME,
+      TYPE: c.TYPE,
+      DESC: c.DESC,
+    }));
+    setRows(newRows);
+    setSaving(true); setSaved(false); setError(null);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/loadcase`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newRows),
+      });
+      if (!res.ok) throw new Error(`프리셋 적용 실패: ${res.status}`);
+      setSaved(true);
+      // MIDAS가 normalize한 실제 응답으로 다시 동기화
+      await fetchData();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const headerAction = (
     <>
       {saved && <SavedBadge label="업데이트됨" />}
+      <div className="relative inline-flex items-center">
+        <ListPlus size={13} className="absolute left-2 text-gray-400 pointer-events-none" />
+        <select
+          value=""
+          disabled={saving || loading}
+          onChange={(e) => {
+            const k = e.target.value;
+            e.currentTarget.value = "";
+            if (k) void applyPreset(k);
+          }}
+          className="appearance-none bg-gray-700 border border-gray-600 rounded pl-7 pr-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+          title="프리셋(docs/Setting_Static_Load_Case.md) 불러오기"
+        >
+          <option value="">프리셋 불러오기...</option>
+          {Object.entries(PRESETS).map(([k, p]) => (
+            <option key={k} value={k}>
+              {p.label} ({p.cases.length}개)
+            </option>
+          ))}
+        </select>
+      </div>
       <RefreshButton onClick={fetchData} loading={loading} />
       <Button
         size="xs"

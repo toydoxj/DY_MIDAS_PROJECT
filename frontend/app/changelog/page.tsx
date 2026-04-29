@@ -10,6 +10,16 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.4.0",
+    date: "2026-04-30",
+    changes: [
+      "Static Load Case 프리셋 불러오기 — Type 1~4 (기본 / 등가정적법 / 지하내진포함 / 경량쉘터) 한 번에 적용",
+      "기존 케이스가 있으면 교체 확인 dialog 후 진행, 없으면 즉시 적용",
+      "프리셋 정의: docs/Setting_Static_Load_Case.md 참조",
+      "TYPE_MAP 확장: LR(Roof Live), ES(Earthquake Static) 추가",
+    ],
+  },
+  {
     version: "1.3.4",
     date: "2026-04-29",
     changes: [
