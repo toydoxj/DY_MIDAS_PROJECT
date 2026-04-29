@@ -149,6 +149,8 @@ export default function SlabSpanPage() {
   const [error, setError] = useState<string | null>(null);
   const [hoverPanelByLevel, setHoverPanelByLevel] = useState<Record<number, string | null>>({});
   const [selectedPanelByLevel, setSelectedPanelByLevel] = useState<Record<number, string | null>>({});
+  // Shift 클릭으로 누적되는 다중 선택 (일괄 분류 입력 대상)
+  const [multiSelectByLevel, setMultiSelectByLevel] = useState<Record<number, Set<string>>>({});
   const [nameMap, setNameMap] = useState<Record<string, string>>({});
   const [gridSettings, setGridSettings] = useState<{
     angleDeg: number;
@@ -236,6 +238,22 @@ export default function SlabSpanPage() {
       return next;
     });
   }, []);
+
+  // 여러 패널에 동일한 분류명을 한 번에 적용 (Shift 다중 선택 → 일괄 입력)
+  const updateSlabNamesBulk = useCallback(
+    (panelIds: string[], name: string) => {
+      setNameMap((prev) => {
+        const next = { ...prev };
+        const trimmed = name.trim();
+        for (const id of panelIds) {
+          if (trimmed) next[id] = trimmed;
+          else delete next[id];
+        }
+        return next;
+      });
+    },
+    [],
+  );
 
   // ── 슬래브 배근표 (분류 단위) ──
   const [sections, setSections] = useState<SlabSectionItem[]>([]);
@@ -680,6 +698,7 @@ export default function SlabSpanPage() {
         const selectedId = selectedPanelByLevel[r.z_level] ?? null;
         const hoverId = hoverPanelByLevel[r.z_level] ?? null;
         const displayedHiId = selectedId ?? hoverId;
+        const multiIds = multiSelectByLevel[r.z_level] ?? new Set<string>();
         return (
           <LevelSection
             key={`${r.z_level}-${r.story_name}`}
@@ -687,9 +706,12 @@ export default function SlabSpanPage() {
             nameMap={nameMap}
             selectedId={selectedId}
             displayedHiId={displayedHiId}
+            multiSelectedIds={multiIds}
             setSelectedByLevel={setSelectedPanelByLevel}
             setHoverByLevel={setHoverPanelByLevel}
+            setMultiSelectByLevel={setMultiSelectByLevel}
             updateSlabName={updateSlabName}
+            updateSlabNamesBulk={updateSlabNamesBulk}
             thkByName={thkByName}
             grid={gridSettings}
           />
@@ -714,13 +736,18 @@ interface LevelSectionProps {
   nameMap: Record<string, string>;
   selectedId: string | null;
   displayedHiId: string | null;
+  multiSelectedIds: Set<string>;
   setSelectedByLevel: React.Dispatch<
     React.SetStateAction<Record<number, string | null>>
   >;
   setHoverByLevel: React.Dispatch<
     React.SetStateAction<Record<number, string | null>>
   >;
+  setMultiSelectByLevel: React.Dispatch<
+    React.SetStateAction<Record<number, Set<string>>>
+  >;
   updateSlabName: (panelId: string, name: string) => void;
+  updateSlabNamesBulk: (panelIds: string[], name: string) => void;
   thkByName: Record<string, number>;
   grid: {
     angleDeg: number;
@@ -743,9 +770,12 @@ function LevelSection({
   nameMap,
   selectedId,
   displayedHiId,
+  multiSelectedIds,
   setSelectedByLevel,
   setHoverByLevel,
+  setMultiSelectByLevel,
   updateSlabName,
+  updateSlabNamesBulk,
   thkByName,
   grid,
 }: LevelSectionProps) {
@@ -788,6 +818,24 @@ function LevelSection({
     },
     [setSelectedByLevel, zLevel],
   );
+
+  // Shift 클릭으로 다중 선택 set에 토글 추가/제거
+  const onToggleMulti = useCallback(
+    (id: string) => {
+      setMultiSelectByLevel((prev) => {
+        const cur = prev[zLevel] ?? new Set<string>();
+        const next = new Set(cur);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return { ...prev, [zLevel]: next };
+      });
+    },
+    [setMultiSelectByLevel, zLevel],
+  );
+
+  const clearMulti = useCallback(() => {
+    setMultiSelectByLevel((prev) => ({ ...prev, [zLevel]: new Set<string>() }));
+  }, [setMultiSelectByLevel, zLevel]);
 
   const onHoverPanel = useCallback(
     (id: string | null) => {
@@ -841,9 +889,13 @@ function LevelSection({
     [onTogglePanel],
   );
 
-  // 패널 클릭: 선택 토글 + 새로 선택된 경우 이름 입력 input 에 자동 포커스
+  // 패널 클릭: 일반 클릭 = 단일 선택 토글, Shift 클릭 = 다중 선택 토글.
   const handlePanelClick = useCallback(
-    (id: string) => {
+    (id: string, ev: { shiftKey: boolean }) => {
+      if (ev.shiftKey) {
+        onToggleMulti(id);
+        return;
+      }
       const wasSelected = selectedIdRef.current === id;
       onTogglePanel(id);
       if (!wasSelected) {
@@ -856,8 +908,17 @@ function LevelSection({
         }, 30);
       }
     },
-    [onTogglePanel],
+    [onTogglePanel, onToggleMulti],
   );
+
+  // 일괄 입력 박스용 state + 적용 핸들러
+  const [bulkValue, setBulkValue] = useState("");
+  const applyBulk = useCallback(() => {
+    if (multiSelectedIds.size === 0) return;
+    updateSlabNamesBulk(Array.from(multiSelectedIds), bulkValue);
+    setBulkValue("");
+    clearMulti();
+  }, [bulkValue, multiSelectedIds, updateSlabNamesBulk, clearMulti]);
 
   // 테이블 바디 최대 높이 = 이미지 영역 높이. 검색 입력(~40px) + 하단 카운트(~24px)
   // + 여백 정도를 빼서 실제 테이블 박스가 이미지와 얼추 같은 높이가 되도록.
@@ -870,10 +931,55 @@ function LevelSection({
     >
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div ref={leftColRef} className="min-w-0 lg:col-span-2">
+          {/* 다중 선택 일괄 입력 박스 — 선택 1개 이상일 때만 표시 */}
+          {multiSelectedIds.size > 0 && (
+            <div className="mb-2 flex items-center gap-2 rounded-lg border border-purple-500/40 bg-purple-500/10 px-3 py-2">
+              <span className="text-xs font-semibold text-purple-300 whitespace-nowrap">
+                선택 {multiSelectedIds.size}개
+              </span>
+              <input
+                type="text"
+                value={bulkValue}
+                onChange={(e) => setBulkValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applyBulk();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    clearMulti();
+                    setBulkValue("");
+                  }
+                }}
+                placeholder="분류명 입력 후 Enter (예: S1) — 빈 값 적용 시 분류 해제"
+                autoFocus
+                className="flex-1 min-w-0 rounded border border-purple-500/40 bg-gray-900 px-2 py-1 text-sm text-white placeholder-gray-500 focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400/40"
+              />
+              <button
+                type="button"
+                onClick={applyBulk}
+                className="rounded bg-purple-600 px-3 py-1 text-xs font-medium text-white hover:bg-purple-500 transition"
+              >
+                일괄 적용
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  clearMulti();
+                  setBulkValue("");
+                }}
+                className="rounded border border-gray-600 px-2 py-1 text-xs text-gray-300 hover:bg-gray-700 transition"
+                title="다중 선택 해제 (Esc)"
+              >
+                해제
+              </button>
+            </div>
+          )}
           <SlabPlanView
             beams={r.beams}
             panels={r.panels}
             highlightPanelId={displayedHiId}
+            multiSelectedIds={multiSelectedIds}
             nameMap={nameMap}
             grid={grid}
             onPanelClick={handlePanelClick}
@@ -903,7 +1009,7 @@ function LevelSection({
               분류 미지정
             </span>
             <span className="ml-3 text-gray-600">
-              · 휠: 확대/축소 · 드래그: 이동 · 패널 클릭: 분류 입력
+              · 휠: 확대/축소 · 드래그: 이동 · 클릭: 단일 선택 · Shift+클릭: 다중 선택 + 일괄 입력
             </span>
           </p>
         </div>

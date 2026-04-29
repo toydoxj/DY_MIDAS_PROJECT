@@ -9,7 +9,10 @@ interface Props {
   beams: BeamSegment[];
   panels: Panel[];
   highlightPanelId?: string | null;
-  onPanelClick?: (id: string) => void;
+  /** Shift 클릭으로 누적된 다중 선택 패널 ID 집합 (일괄 분류 입력용). */
+  multiSelectedIds?: ReadonlySet<string>;
+  /** 클릭 시 shiftKey 여부도 함께 전달 — 부모가 단일/다중 선택 분기. */
+  onPanelClick?: (id: string, ev: { shiftKey: boolean }) => void;
   onPanelHover?: (id: string | null) => void;
   /** panel_id → 사용자 지정 슬래브 이름 매핑. 없으면 "(미지정)"으로 표시. */
   nameMap?: Record<string, string>;
@@ -42,6 +45,9 @@ const COLORS = {
   unnamedStroke: "#6b7280",
   selectedFill: "rgba(245,158,11,0.32)",
   selectedStroke: "#f59e0b",
+  // Shift 클릭으로 다중 선택된 패널 — 보라색 (단일 선택과 구분)
+  multiFill: "rgba(168,85,247,0.30)",
+  multiStroke: "#a855f7",
   beam: "#9ca3af",
   text: "#e5e7eb",
   textSub: "#9ca3af",
@@ -159,6 +165,7 @@ export default function SlabPlanView({
   beams,
   panels,
   highlightPanelId,
+  multiSelectedIds,
   onPanelClick,
   onPanelHover,
   nameMap,
@@ -339,9 +346,9 @@ export default function SlabPlanView({
   }, []);
 
   // 패널 클릭 — 드래그로 인한 의도치 않은 클릭은 무시
-  const handlePanelClick = (id: string) => {
+  const handlePanelClick = (id: string, ev: React.MouseEvent) => {
     if (panStateRef.current?.moved) return;
-    onPanelClick?.(id);
+    onPanelClick?.(id, { shiftKey: ev.shiftKey });
   };
 
   const zoomAtCenter = (factor: number) => {
@@ -431,11 +438,21 @@ export default function SlabPlanView({
               polygon 이 비어있으면 AABB 사각형 fallback */}
           {panels.map((p) => {
             const isHi = p.panel_id === highlightPanelId;
+            const isMulti = multiSelectedIds?.has(p.panel_id) ?? false;
             const customName = nameMap?.[p.panel_id]?.trim() ?? "";
             const isUnnamed = customName.length === 0;
             const nameColors = colorForName(customName);
-            const stroke = isHi ? COLORS.selectedStroke : nameColors.stroke;
-            const fill = isHi ? COLORS.selectedFill : nameColors.fill;
+            // 우선순위: 단일 hover/select(주황) > 다중(보라) > 분류 색상
+            const stroke = isHi
+              ? COLORS.selectedStroke
+              : isMulti
+              ? COLORS.multiStroke
+              : nameColors.stroke;
+            const fill = isHi
+              ? COLORS.selectedFill
+              : isMulti
+              ? COLORS.multiFill
+              : nameColors.fill;
             const dashLen = Math.max(strokeW * 4, Math.min(p.lx, p.ly) * 0.04);
             const pts =
               p.polygon && p.polygon.length >= 3
@@ -447,7 +464,7 @@ export default function SlabPlanView({
                 style={{ cursor: onPanelClick ? "pointer" : "default" }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  handlePanelClick(p.panel_id);
+                  handlePanelClick(p.panel_id, e);
                 }}
                 onMouseEnter={() => onPanelHover?.(p.panel_id)}
                 onMouseLeave={() => onPanelHover?.(null)}
@@ -456,7 +473,7 @@ export default function SlabPlanView({
                   points={pts}
                   fill={fill}
                   stroke={stroke}
-                  strokeWidth={isHi ? strokeW * 2.2 : strokeW * 1.2}
+                  strokeWidth={isHi || isMulti ? strokeW * 2.2 : strokeW * 1.2}
                   strokeDasharray={
                     isUnnamed && !isHi ? `${dashLen} ${dashLen * 0.6}` : undefined
                   }

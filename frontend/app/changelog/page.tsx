@@ -10,6 +10,14 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.3.2",
+    date: "2026-04-29",
+    changes: [
+      "슬래브 경간 검토 — 평면뷰에서 Shift+클릭으로 패널 다중 선택 + 분류명 일괄 입력 (Enter / Esc 지원)",
+      "대시보드 — 패널존 효과 (Panel Zone Effects) 카드 추가 (활성화 ON/OFF + Factor 값, 새로고침 + 원본 JSON 펼침)",
+    ],
+  },
+  {
     version: "1.3.1",
     date: "2026-04-29",
     changes: [
