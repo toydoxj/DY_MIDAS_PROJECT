@@ -18,7 +18,7 @@ Task_MIDAS/
 │
 ├── backend/                    # FastAPI 백엔드
 │   ├── main.py
-│   ├── auth_middleware.py       # JWT 검증만 — 사용자 정보는 api.dyce.kr 위임 (NAVER WORKS SSO)
+│   ├── auth_middleware.py       # 토큰 검증/사용자 정보 모두 api.dyce.kr 위임 (secret 불필요)
 │   ├── access_log.py            # 본 앱 자체 access log (SQLite, BACKEND_DATA_DIR)
 │   ├── exceptions.py            # MidasError 예외 계층
 │   ├── work_dir.py              # 작업 디렉토리 관리

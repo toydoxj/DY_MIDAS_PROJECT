@@ -15,14 +15,13 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError
 from pydantic import BaseModel
 
 import access_log
 from auth_middleware import (
     CurrentUser,
-    decode_token,
     get_current_user,
+    peek_unverified_claims,
     require_admin,
 )
 
@@ -35,14 +34,15 @@ class TrackLoginRequest(BaseModel):
 
 
 def _extract_sid(cred: Optional[HTTPAuthorizationCredentials]) -> Optional[str]:
+    """JWT 페이로드에서 sid를 unverified로 추출 (검증은 이미 task /me가 통과시킨 상태).
+
+    sid가 없거나 디코드 실패 시 None — UNIQUE 인덱스의 partial 조건으로 NULL 허용.
+    """
     if not cred:
         return None
-    try:
-        payload = decode_token(cred.credentials)
-        sid = payload.get("sid")
-        return str(sid) if sid else None
-    except JWTError:
-        return None
+    claims = peek_unverified_claims(cred.credentials)
+    sid = claims.get("sid") if isinstance(claims, dict) else None
+    return str(sid) if sid else None
 
 
 def _client_ip(request: Request) -> str:

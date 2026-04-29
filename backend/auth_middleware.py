@@ -1,7 +1,7 @@
-"""인증 미들웨어 — 동양구조 업무관리(api.dyce.kr)에 인증을 위임한다.
+"""인증 미들웨어 — 동양구조 업무관리(api.dyce.kr)에 인증을 완전 위임한다.
 
-- JWT 검증은 자체적으로 수행 (JWT_SECRET 공유)
-- 사용자 정보(name/role/midas_url 등)는 https://api.dyce.kr/api/auth/me로 fetch
+- JWT 검증을 sidecar에서 수행하지 않는다 → 사용자 PC에 JWT_SECRET 배포 불필요.
+- token 문자열은 task /api/auth/me 로 forward, task가 secret 검증 + user 정보 반환.
 - midas_key는 별도 endpoint /api/auth/me/midas 로만 fetch (보안)
 - 자체 user 테이블/SQLite 없음 (가입/관리 모두 task.dyce.kr 측에서)
 """
@@ -13,11 +13,8 @@ from typing import Optional
 import httpx
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
+from jose import jwt
 
-# 동양구조 업무관리와 공유. 양쪽 환경변수가 일치해야 토큰 호환.
-_SECRET_KEY = os.environ.get("JWT_SECRET", "")
-_ALGORITHM = "HS256"
 # 인증/사용자 정보 발급 서버 (운영=task.dyce.kr 백엔드)
 _AUTH_API = os.environ.get("AUTH_API_URL", "https://api.dyce.kr").rstrip("/")
 
@@ -39,27 +36,27 @@ class CurrentUser:
     work_dir: str
 
 
-def decode_token(token: str) -> dict:
-    return jwt.decode(token, _SECRET_KEY, algorithms=[_ALGORITHM])
+def peek_unverified_claims(token: str) -> dict:
+    """검증 없이 JWT payload만 base64 decode — sid/sub 등 식별자 추출용.
+
+    실제 인증 검증(서명/만료)은 task /api/auth/me 위임이 담당하므로 secret 불필요.
+    invalid token이면 task 호출 단계에서 401로 거절된다.
+    """
+    try:
+        return jwt.get_unverified_claims(token)
+    except Exception:
+        return {}
 
 
 def _validate_token(cred: Optional[HTTPAuthorizationCredentials]) -> str:
-    """토큰 자체 검증 → 원본 JWT string 반환 (이후 우리 API에 forward)."""
+    """헤더 존재만 확인 → 원본 JWT string을 task로 forward.
+
+    실제 토큰 검증(서명/만료/sub)은 task /api/auth/me 가 담당.
+    """
     if cred is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="로그인이 필요합니다"
         )
-    try:
-        payload = decode_token(cred.credentials)
-        if not payload.get("sub"):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="유효하지 않은 토큰"
-            )
-    except JWTError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="토큰이 만료되었거나 유효하지 않습니다",
-        ) from exc
     return cred.credentials
 
 

@@ -10,6 +10,15 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.3.1",
+    date: "2026-04-29",
+    changes: [
+      "JWT 검증을 task.dyce.kr 백엔드에 완전 위임 — sidecar에 JWT_SECRET 환경변수 불필요",
+      "사용자 PC에 secret을 배포할 필요 없이 설치 후 즉시 사용 가능",
+      "관리자 → 사용자 현황 페이지의 401 오류 수정",
+    ],
+  },
+  {
     version: "1.3.0",
     date: "2026-04-29",
     changes: [
