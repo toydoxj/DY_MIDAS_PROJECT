@@ -22,6 +22,20 @@ export default function SelfWeightSection() {
   const [pzApplying, setPzApplying] = useState(false);
   const [pzSaved, setPzSaved] = useState(false);
   const [pzError, setPzError] = useState<string>("");
+  const [pzShowRaw, setPzShowRaw] = useState(false);
+  const [pzFactorKey, setPzFactorKey] = useState<string>("offs_factor");
+  const [pzRootData, setPzRootData] = useState<unknown>(null);
+
+  // offs_factor 우선순위 + 대소문자 무시 폴백.
+  const FACTOR_KEY_CANDIDATES = [
+    "offs_factor",
+    "OFFS_FACTOR",
+    "offsFactor",
+    "Offs_Factor",
+    "OFFSET_FACTOR",
+    "FACTOR",
+    "factor",
+  ];
 
   const loadPanelZone = useCallback(async () => {
     setPzError("");
@@ -29,12 +43,13 @@ export default function SelfWeightSection() {
       const res = await authFetch(`${BACKEND_URL}/api/midas/db/PZEF`);
       if (!res.ok) {
         if (res.status === 404) {
-          setPzRaw(null); setPzInput("");
+          setPzRaw(null); setPzInput(""); setPzRootData(null);
           return;
         }
         throw new Error(`패널존 조회 실패 (${res.status})`);
       }
       const data = await res.json();
+      setPzRootData(data);
       const root = data && typeof data === "object" && "PZEF" in data
         ? (data as Record<string, unknown>).PZEF : data;
       if (!root || typeof root !== "object") {
@@ -47,8 +62,34 @@ export default function SelfWeightSection() {
         ? (map[firstKey] as Record<string, unknown>) : null;
       if (firstKey) setPzId(firstKey);
       setPzRaw(first);
-      const v = first && typeof first.offs_factor === "number" ? (first.offs_factor as number) : 0;
-      setPzInput(String(v));
+
+      // offs_factor 추출 — (1) 우선순위 키 (2) 대소문자 무시 매칭 (3) 단일 number fallback
+      let foundKey = "offs_factor";
+      let value: number | null = null;
+      if (first) {
+        for (const k of FACTOR_KEY_CANDIDATES) {
+          if (typeof first[k] === "number") { foundKey = k; value = first[k] as number; break; }
+        }
+        if (value == null) {
+          const lcMap = Object.fromEntries(
+            Object.entries(first).map(([k, v]) => [k.toLowerCase(), { k, v }]),
+          );
+          for (const c of FACTOR_KEY_CANDIDATES) {
+            const hit = lcMap[c.toLowerCase()];
+            if (hit && typeof hit.v === "number") {
+              foundKey = hit.k; value = hit.v as number; break;
+            }
+          }
+        }
+        if (value == null) {
+          const numEntries = Object.entries(first).filter(([, v]) => typeof v === "number");
+          if (numEntries.length === 1) {
+            foundKey = numEntries[0][0]; value = numEntries[0][1] as number;
+          }
+        }
+      }
+      setPzFactorKey(foundKey);
+      setPzInput(value != null ? String(value) : "");
     } catch (e) {
       setPzError(e instanceof Error ? e.message : String(e));
     }
@@ -74,21 +115,24 @@ export default function SelfWeightSection() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // 활성 자동 판정: offs_factor==0 → ON, 0<x<=1 → OFF, 그 외 → 범위 외
+  // 활성 자동 판정: offs_factor==0 → OFF, 0<x<=1 → ON, 그 외 → 범위 외
   const pzNumber = parseFloat(pzInput);
   const pzEnabled =
     Number.isFinite(pzNumber) && pzNumber === 0
-      ? true
-      : Number.isFinite(pzNumber) && pzNumber > 0 && pzNumber <= 1.0
       ? false
+      : Number.isFinite(pzNumber) && pzNumber > 0 && pzNumber <= 1.0
+      ? true
       : null;
   const pzInputValid =
     Number.isFinite(pzNumber) && pzNumber >= 0 && pzNumber <= 1.0;
+  const pzCurrentValue =
+    pzRaw && typeof pzRaw[pzFactorKey] === "number"
+      ? (pzRaw[pzFactorKey] as number)
+      : null;
   const pzDirty =
-    pzRaw != null &&
-    typeof pzRaw.offs_factor === "number" &&
+    pzCurrentValue != null &&
     Number.isFinite(pzNumber) &&
-    pzNumber !== (pzRaw.offs_factor as number);
+    pzNumber !== pzCurrentValue;
 
   const applyPanelZone = useCallback(async () => {
     if (!pzInputValid) {
@@ -99,10 +143,10 @@ export default function SelfWeightSection() {
     setPzError("");
     setPzSaved(false);
     try {
-      // MIDAS API 표준 PUT 패턴: { Assign: { "<id>": { ...기존필드, offs_factor } } }
+      // MIDAS API 표준 PUT 패턴: { Assign: { "<id>": { ...기존필드, <factorKey>: 값 } } }
       const merged: Record<string, unknown> = {
         ...(pzRaw ?? {}),
-        offs_factor: pzNumber,
+        [pzFactorKey]: pzNumber,
       };
       const body = { Assign: { [pzId]: merged } };
       const res = await authFetch(`${BACKEND_URL}/api/midas/db/PZEF`, {
@@ -119,7 +163,7 @@ export default function SelfWeightSection() {
     } finally {
       setPzApplying(false);
     }
-  }, [pzId, pzInputValid, pzNumber, pzRaw, loadPanelZone]);
+  }, [pzId, pzFactorKey, pzInputValid, pzNumber, pzRaw, loadPanelZone]);
 
   return (
     <SectionCard>
@@ -195,7 +239,9 @@ export default function SelfWeightSection() {
             placeholder="0.0 ~ 1.0"
             className="w-24 rounded-md bg-gray-800/60 border border-gray-600/50 px-2 py-1 text-xs text-white focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400/40"
           />
-          <span className="text-[10px] text-gray-500">offs_factor</span>
+          <span className="text-[10px] text-gray-500" title={`응답 키: ${pzFactorKey}`}>
+            {pzFactorKey}
+          </span>
           <span
             className={`px-2 py-0.5 rounded text-[10px] font-mono ${
               pzEnabled === true
@@ -204,7 +250,7 @@ export default function SelfWeightSection() {
                 ? "bg-gray-600/40 text-gray-400"
                 : "bg-yellow-500/20 text-yellow-400"
             }`}
-            title="offs_factor=0 → 활성 ON, 0초과 1.0이하 → 활성 OFF"
+            title="0 → 활성 OFF, 0초과 1.0이하 → 활성 ON"
           >
             {pzEnabled === true ? "활성 ON" : pzEnabled === false ? "활성 OFF" : "범위 외"}
           </span>
@@ -218,10 +264,26 @@ export default function SelfWeightSection() {
           </button>
           {pzSaved && <SavedBadge />}
         </div>
-        <p className="text-[10px] text-gray-500">
-          모델 전체 1개 설정 · 0=활성, 0초과 1.0이하=비활성
-          {pzRaw == null && !pzError && " · (모델에 설정 없음)"}
-        </p>
+        <div className="flex items-center justify-between text-[10px] text-gray-500">
+          <span>
+            모델 전체 1개 설정 · 0=비활성, 0초과 1.0이하=활성
+            {pzRaw == null && !pzError && " · (모델에 설정 없음)"}
+          </span>
+          {pzRootData != null && (
+            <button
+              type="button"
+              onClick={() => setPzShowRaw((v) => !v)}
+              className="underline hover:text-gray-300"
+            >
+              {pzShowRaw ? "원본 닫기" : "원본 보기"}
+            </button>
+          )}
+        </div>
+        {pzShowRaw && pzRootData != null && (
+          <pre className="max-h-48 overflow-auto rounded border border-gray-600/50 bg-gray-900/60 p-2 text-[10px] text-gray-300">
+{JSON.stringify(pzRootData, null, 2)}
+          </pre>
+        )}
         {pzError && <p className="text-[10px] text-red-400">{pzError}</p>}
       </div>
 

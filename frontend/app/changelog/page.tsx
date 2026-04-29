@@ -10,6 +10,15 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.3.4",
+    date: "2026-04-29",
+    changes: [
+      "패널존 효과 활성 판정 정정: 0=비활성, 0초과 1.0이하=활성 (이전 버전 반대)",
+      "offs_factor 응답 키 변형 자동 매칭(대소문자 무시 폴백) — 입력 박스에 값이 안 보이던 문제 해결",
+      "원본 보기 토글 추가 — 응답 JSON을 직접 확인 가능",
+    ],
+  },
+  {
     version: "1.3.3",
     date: "2026-04-29",
     changes: [
