@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Settings2 } from "lucide-react";
 import { BACKEND_URL, SelfWeightRow, StructureMass, LoadToMassData } from "@/lib/types";
+import { authFetch } from "@/lib/auth";
 import SectionCard from "@/components/ui/SectionCard";
 import RefreshButton from "@/components/ui/RefreshButton";
-import { ErrorText } from "@/components/ui/StatusMessage";
+import { ErrorText, SavedBadge } from "@/components/ui/StatusMessage";
 
 export default function SelfWeightSection() {
   const [rows, setRows] = useState<SelfWeightRow[]>([]);
@@ -14,6 +15,45 @@ export default function SelfWeightSection() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 패널존 효과 (PZEF) — 모델 전체 1개 설정. offs_factor 표시/수정.
+  const [pzId, setPzId] = useState<string>("1");
+  const [pzRaw, setPzRaw] = useState<Record<string, unknown> | null>(null);
+  const [pzInput, setPzInput] = useState<string>("");
+  const [pzApplying, setPzApplying] = useState(false);
+  const [pzSaved, setPzSaved] = useState(false);
+  const [pzError, setPzError] = useState<string>("");
+
+  const loadPanelZone = useCallback(async () => {
+    setPzError("");
+    try {
+      const res = await authFetch(`${BACKEND_URL}/api/midas/db/PZEF`);
+      if (!res.ok) {
+        if (res.status === 404) {
+          setPzRaw(null); setPzInput("");
+          return;
+        }
+        throw new Error(`패널존 조회 실패 (${res.status})`);
+      }
+      const data = await res.json();
+      const root = data && typeof data === "object" && "PZEF" in data
+        ? (data as Record<string, unknown>).PZEF : data;
+      if (!root || typeof root !== "object") {
+        setPzRaw(null); setPzInput("");
+        return;
+      }
+      const map = root as Record<string, unknown>;
+      const firstKey = Object.keys(map)[0];
+      const first = firstKey && typeof map[firstKey] === "object"
+        ? (map[firstKey] as Record<string, unknown>) : null;
+      if (firstKey) setPzId(firstKey);
+      setPzRaw(first);
+      const v = first && typeof first.offs_factor === "number" ? (first.offs_factor as number) : 0;
+      setPzInput(String(v));
+    } catch (e) {
+      setPzError(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
   const fetchData = async () => {
     setLoading(true); setError(null);
     try {
@@ -21,6 +61,7 @@ export default function SelfWeightSection() {
         fetch(`${BACKEND_URL}/api/selfweight`).catch(() => null),
         fetch(`${BACKEND_URL}/api/structure-mass`).catch(() => null),
         fetch(`${BACKEND_URL}/api/load-to-mass`).catch(() => null),
+        loadPanelZone(),
       ]);
       if (swRes?.ok) setRows(await swRes.json());
       else if (swRes) setError(`자중 조회 오류: ${swRes.status}`);
@@ -32,6 +73,53 @@ export default function SelfWeightSection() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // 활성 자동 판정: offs_factor==0 → ON, 0<x<=1 → OFF, 그 외 → 범위 외
+  const pzNumber = parseFloat(pzInput);
+  const pzEnabled =
+    Number.isFinite(pzNumber) && pzNumber === 0
+      ? true
+      : Number.isFinite(pzNumber) && pzNumber > 0 && pzNumber <= 1.0
+      ? false
+      : null;
+  const pzInputValid =
+    Number.isFinite(pzNumber) && pzNumber >= 0 && pzNumber <= 1.0;
+  const pzDirty =
+    pzRaw != null &&
+    typeof pzRaw.offs_factor === "number" &&
+    Number.isFinite(pzNumber) &&
+    pzNumber !== (pzRaw.offs_factor as number);
+
+  const applyPanelZone = useCallback(async () => {
+    if (!pzInputValid) {
+      setPzError("offs_factor는 0 이상 1.0 이하 값이어야 합니다");
+      return;
+    }
+    setPzApplying(true);
+    setPzError("");
+    setPzSaved(false);
+    try {
+      // MIDAS API 표준 PUT 패턴: { Assign: { "<id>": { ...기존필드, offs_factor } } }
+      const merged: Record<string, unknown> = {
+        ...(pzRaw ?? {}),
+        offs_factor: pzNumber,
+      };
+      const body = { Assign: { [pzId]: merged } };
+      const res = await authFetch(`${BACKEND_URL}/api/midas/db/PZEF`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`적용 실패 (${res.status})`);
+      setPzSaved(true);
+      setTimeout(() => setPzSaved(false), 2000);
+      await loadPanelZone();
+    } catch (e) {
+      setPzError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPzApplying(false);
+    }
+  }, [pzId, pzInputValid, pzNumber, pzRaw, loadPanelZone]);
 
   return (
     <SectionCard>
@@ -85,6 +173,56 @@ export default function SelfWeightSection() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* 패널존 효과 (Panel Zone Effects) — offs_factor 표시/수정 */}
+      <div className="rounded-lg bg-gray-700/40 border border-gray-600/50 p-3 space-y-2">
+        <h3 className="text-xs font-semibold text-blue-400">패널존 효과 (Panel Zone Effects)</h3>
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            type="number"
+            step="0.05"
+            min="0"
+            max="1"
+            value={pzInput}
+            onChange={(e) => setPzInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (pzDirty && pzInputValid && !pzApplying) void applyPanelZone();
+              }
+            }}
+            placeholder="0.0 ~ 1.0"
+            className="w-24 rounded-md bg-gray-800/60 border border-gray-600/50 px-2 py-1 text-xs text-white focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400/40"
+          />
+          <span className="text-[10px] text-gray-500">offs_factor</span>
+          <span
+            className={`px-2 py-0.5 rounded text-[10px] font-mono ${
+              pzEnabled === true
+                ? "bg-green-500/20 text-green-400"
+                : pzEnabled === false
+                ? "bg-gray-600/40 text-gray-400"
+                : "bg-yellow-500/20 text-yellow-400"
+            }`}
+            title="offs_factor=0 → 활성 ON, 0초과 1.0이하 → 활성 OFF"
+          >
+            {pzEnabled === true ? "활성 ON" : pzEnabled === false ? "활성 OFF" : "범위 외"}
+          </span>
+          <button
+            type="button"
+            onClick={applyPanelZone}
+            disabled={!pzDirty || !pzInputValid || pzApplying}
+            className="ml-auto rounded-md bg-blue-500/80 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            {pzApplying ? "적용 중..." : "적용"}
+          </button>
+          {pzSaved && <SavedBadge />}
+        </div>
+        <p className="text-[10px] text-gray-500">
+          모델 전체 1개 설정 · 0=활성, 0초과 1.0이하=비활성
+          {pzRaw == null && !pzError && " · (모델에 설정 없음)"}
+        </p>
+        {pzError && <p className="text-[10px] text-red-400">{pzError}</p>}
       </div>
 
       {/* Loads to Masses */}

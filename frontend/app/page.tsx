@@ -4,7 +4,6 @@ import { useState } from "react";
 import { StoryRow } from "@/lib/types";
 import ProjectSection from "@/components/dashboard/ProjectSection";
 import SettingsSection from "@/components/dashboard/SettingsSection";
-import PanelZoneSection from "@/components/dashboard/PanelZoneSection";
 import MaterialSection from "@/components/dashboard/MaterialSection";
 import MapSection from "@/components/dashboard/MapSection";
 import SelfWeightSection from "@/components/dashboard/SelfWeightSection";
@@ -25,7 +24,6 @@ export default function DashboardPage() {
         <ProjectSection onAddressChange={setAddress} storyRows={storyRows} />
         <div className="space-y-6">
           <SettingsSection />
-          <PanelZoneSection />
           <MaterialSection storyRows={storyRows} />
         </div>
       </div>

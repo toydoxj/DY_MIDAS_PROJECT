@@ -10,6 +10,14 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.3.3",
+    date: "2026-04-29",
+    changes: [
+      "패널존 효과를 API 설정 카드 내부로 통합 (별도 카드 제거)",
+      "offs_factor 값 직접 편집 + 적용(PUT) 가능 — 활성은 0=ON, 0초과 1.0이하=OFF로 자동 판정",
+    ],
+  },
+  {
     version: "1.3.2",
     date: "2026-04-29",
     changes: [
