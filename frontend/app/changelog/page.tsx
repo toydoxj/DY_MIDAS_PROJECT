@@ -10,6 +10,15 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.4.3",
+    date: "2026-05-04",
+    changes: [
+      "대시보드 진입 직후 로그인 화면으로 튕기는 문제 수정 — 진짜 원인 (v1.4.1/v1.4.2 조치는 별개의 SSO 분리 작업)",
+      "근본 원인: MIDAS GEN 'client does not exist' 응답(401)을 sidecar 가 그대로 frontend 에 forward → authFetch 가 SSO 만료로 오해해 무차별 logout",
+      "수정: MidasAuthExpiredError 의 HTTP status 를 401 → 502(Bad Gateway) 로 변경. error_code 'AUTH_EXPIRED' 와 안내 메시지는 유지 — 사용자에게는 'MIDAS GEN 세션을 찾지 못했습니다…' 메시지가 그대로 노출",
+    ],
+  },
+  {
     version: "1.4.2",
     date: "2026-05-04",
     changes: [

@@ -72,10 +72,17 @@ class MidasAuthExpiredError(MidasError):
         401: MAPI-Key 자체가 무효 (오타/잘못된 값)
         404: MIDAS GEN의 Apps > Connect가 끊겼거나 Base URL의 지역 서버가
              GEN과 다름 (예: 한국 GEN 키를 글로벌 URL로 호출)
+
+    HTTP status 는 502 (Bad Gateway) — MIDAS GEN 이 외부 upstream 시스템이고
+    그 시스템의 인증 실패라는 의미. 401 을 그대로 frontend 에 보내면 frontend
+    의 authFetch 가 SSO 세션 만료로 오해해 무차별 logout 을 발동시킴 (사용자
+    가 대시보드 진입 직후 로그인 화면으로 튕기는 사고의 근본 원인).
+    error_code "AUTH_EXPIRED" 와 message 는 그대로 유지 — frontend 는 이를
+    보고 사용자에게 MAPI-Key 재설정 안내를 노출.
     """
 
     error_code = "AUTH_EXPIRED"
-    status_code = 401
+    status_code = 502
 
     def __init__(
         self,
