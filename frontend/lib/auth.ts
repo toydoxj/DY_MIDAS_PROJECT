@@ -6,6 +6,9 @@ const USER_KEY = "dy_auth_user";
 
 // NAVER WORKS SSO — task SSO 공유(시나리오 A) 기준 직접 redirect 대상
 const TASK_AUTH_BASE = AUTH_URL; // 보통 https://api.dyce.kr
+// task 백엔드의 (user_id, client) 단위 세션 분리 키.
+// task.dyce.kr 와 별개 활성 세션을 가지려면 반드시 'task' 가 아닌 값을 보내야 한다.
+const SSO_CLIENT = "dy-midas";
 
 export interface AuthUser {
   id: number;
@@ -68,11 +71,16 @@ export async function checkAuthStatus(): Promise<{ initialized: boolean }> {
  * - 브라우저 hard navigate 전용 (window.location.replace).
  * - task 백엔드(api.dyce.kr)가 state에 origin 포함 후 NAVER WORKS authorize로 302.
  * - Electron(app:// origin) 환경에서는 redirect 대상이 유효하지 않아 사용 불가.
+ * - client=dy-midas 로 task.dyce.kr 와 별도 활성 세션을 보유 (이중 로그인 방지 회피).
  */
 export function worksLoginUrl(next: string = "/"): string {
   const selfOrigin =
     typeof window !== "undefined" ? window.location.origin : "";
-  const qs = new URLSearchParams({ next, front: selfOrigin }).toString();
+  const qs = new URLSearchParams({
+    next,
+    front: selfOrigin,
+    client: SSO_CLIENT,
+  }).toString();
   return `${TASK_AUTH_BASE}/api/auth/works/login?${qs}`;
 }
 

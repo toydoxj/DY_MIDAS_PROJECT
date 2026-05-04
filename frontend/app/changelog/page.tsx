@@ -10,6 +10,15 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.4.1",
+    date: "2026-05-04",
+    changes: [
+      "로그인 후 대시보드 진입 직후 다시 로그인 화면으로 튕기는 문제 수정",
+      "task.dyce.kr 와 동시에 활성 세션 유지 — SSO 요청 시 client=dy-midas 전송으로 (user_id, client) 단위 세션 분리",
+      "task 백엔드(api.dyce.kr)에 user_sessions 테이블 신설 + cli claim 도입 필요 (Task_DY q6o7p8q90504)",
+    ],
+  },
+  {
     version: "1.4.0",
     date: "2026-04-30",
     changes: [

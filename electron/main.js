@@ -328,7 +328,10 @@ ipcMain.handle("sso-works-login", async (_event, options = {}) => {
   const authBase = (process.env.AUTH_API_URL || "https://api.dyce.kr").replace(/\/+$/, "");
   const explicitFront = options.front || process.env.SSO_FRONT_ORIGIN || "";
   const next = options.next || "/";
-  const params = new URLSearchParams({ next });
+  // task 백엔드의 (user_id, client) 단위 세션 분리 키.
+  // 'dy-midas' 로 보내야 task.dyce.kr 와 동시에 활성 세션을 유지할 수 있다.
+  const client = options.client || "dy-midas";
+  const params = new URLSearchParams({ next, client });
   if (explicitFront) params.set("front", explicitFront);
   const startUrl = `${authBase}/api/auth/works/login?${params.toString()}`;
   const isDev = !app.isPackaged;
