@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { consumeCallbackFragment, saveAuth, trackLogin } from "@/lib/auth";
+import {
+  awaitAuthPersistence,
+  consumeCallbackFragment,
+  saveAuth,
+  trackLogin,
+} from "@/lib/auth";
 
 export default function WorksCallbackPage() {
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +31,11 @@ export default function WorksCallbackPage() {
     // 본 앱 access log 기록은 silent — track 응답을 기다리지 않고 navigate.
     trackLogin();
     // SPA navigation으로는 AuthGuard 재검사가 안 돈다 — hard reload 필요.
-    window.location.replace(result.next || "/");
+    // Electron safeStorage IPC 영속화가 끝난 뒤 navigate 해야 새 페이지의
+    // bootstrap 이 토큰을 발견한다 (race 방지).
+    awaitAuthPersistence().finally(() => {
+      window.location.replace(result.next || "/");
+    });
   }, []);
 
   return (

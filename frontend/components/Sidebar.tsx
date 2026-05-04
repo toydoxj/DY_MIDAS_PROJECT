@@ -121,7 +121,14 @@ export default function Sidebar() {
                 </div>
               )}
               <button
-                onClick={() => { clearAuth(); window.location.href = "/login"; }}
+                onClick={() => {
+                  clearAuth();
+                  // 같은 창 세션 동안 silent SSO 자동 재시도 차단 (NAVER 세션이 살아있어
+                  // 즉시 다시 로그인되어 로그아웃이 무력화되는 것을 방지). 창 닫고 재실행
+                  // 시엔 sessionStorage 가 비워져 다시 자동 시도 가능.
+                  try { sessionStorage.setItem("dy_silent_sso_blocked", "1"); } catch { /* ignore */ }
+                  window.location.href = "/login";
+                }}
                 title="로그아웃"
                 className="text-gray-500 hover:text-red-400 transition p-1"
               >

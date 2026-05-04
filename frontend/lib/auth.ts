@@ -22,30 +22,107 @@ export interface AuthUser {
   has_midas_key: boolean;
 }
 
+// 모듈 캐시 — Electron 의 IPC 비동기성을 숨기고 getToken/getUser 동기 API 유지.
+// bootstrapAuth() 가 앱 시작 시 한 번 채운다.
+let _token: string | null = null;
+let _user: AuthUser | null = null;
+let _bootstrapped = false;
+// 마지막 saveAuth/clearAuth 의 IPC 영속화 promise. hard navigate 직전 await 가능.
+let _pendingPersist: Promise<unknown> | null = null;
+
+function isElectronAuth(): boolean {
+  return (
+    typeof window !== "undefined" && !!window.electronAPI?.auth
+  );
+}
+
+/** 앱 시작 시 1회 호출 — Electron 이면 safeStorage IPC, 웹이면 localStorage 에서 로드.
+ * AppShell/AuthGuard 가 이 promise 를 await 한 뒤 인증 분기를 시작해야 한다.
+ */
+export async function bootstrapAuth(): Promise<void> {
+  if (_bootstrapped) return;
+  if (typeof window === "undefined") {
+    _bootstrapped = true;
+    return;
+  }
+  if (isElectronAuth()) {
+    try {
+      const res = await window.electronAPI!.auth!.load();
+      // safeStorage 미지원 환경: 매 실행 재로그인 (보안 우선).
+      if (res.available && res.payload) {
+        _token = res.payload.token || null;
+        _user = (res.payload.user as AuthUser) || null;
+      }
+    } catch {
+      /* ignore — 캐시 비어있는 채로 진행 */
+    }
+  } else {
+    // 웹 브라우저: 기존 localStorage 동작 유지.
+    try {
+      _token = localStorage.getItem(TOKEN_KEY);
+      const s = localStorage.getItem(USER_KEY);
+      if (s) _user = JSON.parse(s) as AuthUser;
+    } catch {
+      /* ignore */
+    }
+  }
+  _bootstrapped = true;
+}
+
 export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+  return _token;
 }
 
 export function getUser(): AuthUser | null {
-  if (typeof window === "undefined") return null;
-  const s = localStorage.getItem(USER_KEY);
-  if (!s) return null;
-  try { return JSON.parse(s); } catch { return null; }
+  return _user;
 }
 
 export function saveAuth(token: string, user: AuthUser) {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  _token = token;
+  _user = user;
+  if (typeof window === "undefined") return;
+  if (isElectronAuth()) {
+    // 영속화는 비동기 — 실패해도 메모리 캐시는 유지된다(현재 세션은 동작).
+    // hard navigate 직전 호출자는 awaitAuthPersistence() 로 완료를 보장할 수 있다.
+    _pendingPersist = window
+      .electronAPI!.auth!.save({ token, user })
+      .catch(() => null);
+  } else {
+    try {
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 export function clearAuth() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+  _token = null;
+  _user = null;
+  if (typeof window === "undefined") return;
+  if (isElectronAuth()) {
+    _pendingPersist = window.electronAPI!.auth!.clear().catch(() => null);
+  } else {
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/** Electron safeStorage 영속화 직전 await — hard navigate 시 race 방지. */
+export async function awaitAuthPersistence(): Promise<void> {
+  if (_pendingPersist) {
+    try { await _pendingPersist; } catch { /* ignore */ }
+    _pendingPersist = null;
+  }
 }
 
 export function isLoggedIn(): boolean {
-  return !!getToken();
+  return !!_token;
 }
 
 /** 인증 헤더가 포함된 fetch 래퍼 */

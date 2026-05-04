@@ -1,6 +1,6 @@
 {
   "name": "midas-gen-nx-dashboard",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "MIDAS GEN NX API Dashboard",
   "main": "main.js",
   "scripts": {

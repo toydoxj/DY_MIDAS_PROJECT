@@ -93,11 +93,25 @@ declare global {
       getVersion: () => Promise<string>;
       // NAVER WORKS SSO — main process가 BrowserWindow로 OAuth dance를 진행하고
       // callback fragment의 raw token(base64url-json)을 그대로 반환.
-      // 사용자 취소 / 오류 시 reject.
+      // 사용자 취소 / 오류 시 reject. silent=true 면 hidden window 로 자동 시도.
       ssoWorksLogin?: (options?: {
         next?: string;
         front?: string;
+        client?: string;
+        silent?: boolean;
       }) => Promise<string>;
+      // safeStorage 기반 토큰 영속 저장 (OS 보호 영역).
+      auth?: {
+        load: () => Promise<{
+          available: boolean;
+          payload: { token: string; user: unknown } | null;
+        }>;
+        save: (payload: {
+          token: string;
+          user: unknown;
+        }) => Promise<{ ok: boolean }>;
+        clear: () => Promise<{ ok: boolean }>;
+      };
     };
   }
 }

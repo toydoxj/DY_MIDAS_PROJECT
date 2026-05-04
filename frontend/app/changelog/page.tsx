@@ -10,6 +10,15 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.4.2",
+    date: "2026-05-04",
+    changes: [
+      "자동 로그인 — 앱 시작 시 NAVER WORKS 세션이 살아있으면 사용자 클릭 없이 자동 로그인 (silent SSO, 7초 timeout)",
+      "토큰 보안 강화 — JWT/사용자 정보를 OS 보호 영역(Windows DPAPI / macOS Keychain)에 암호화 저장 (Electron safeStorage). 평문 localStorage 노출 제거",
+      "로그아웃 후 같은 창 세션 동안은 silent 자동 시도 차단 (NAVER 세션이 살아있어도 즉시 재로그인 안 됨)",
+    ],
+  },
+  {
     version: "1.4.1",
     date: "2026-05-04",
     changes: [

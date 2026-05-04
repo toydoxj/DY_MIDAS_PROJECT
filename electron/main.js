@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, safeStorage } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const fs = require("fs");
@@ -296,6 +296,54 @@ function setupAutoUpdater() {
   autoUpdater.checkForUpdates().catch(() => {});
 }
 
+// ── 자격 증명 안전 저장 (safeStorage 기반) ──
+//
+// localStorage 평문 저장을 OS 보호 영역(Windows DPAPI / macOS Keychain / libsecret)
+// 으로 대체. JWT 토큰 + 사용자 정보(JSON) 한 묶음을 단일 파일에 암호화 저장.
+//
+// 파일: %APPDATA%/MIDAS Dashboard/auth.bin
+//
+// safeStorage 미지원 환경(드물지만 일부 Linux desktop)이면 저장 자체를 거부 —
+// frontend는 이 경우 매 실행마다 사용자가 다시 로그인해야 한다(보안 우선).
+const authStorePath = () => path.join(app.getPath("userData"), "auth.bin");
+
+ipcMain.handle("auth-load", () => {
+  if (!safeStorage.isEncryptionAvailable()) {
+    return { available: false, payload: null };
+  }
+  const p = authStorePath();
+  if (!fs.existsSync(p)) return { available: true, payload: null };
+  try {
+    const enc = fs.readFileSync(p);
+    const json = safeStorage.decryptString(enc);
+    return { available: true, payload: JSON.parse(json) };
+  } catch (err) {
+    console.error("[auth] load failed:", err && err.message);
+    // 손상된 파일은 제거하여 다음 시도부터 깨끗한 상태가 되도록.
+    try { fs.unlinkSync(p); } catch (_) {}
+    return { available: true, payload: null };
+  }
+});
+
+ipcMain.handle("auth-save", (_event, payload) => {
+  if (!safeStorage.isEncryptionAvailable()) return { ok: false };
+  if (!payload || typeof payload !== "object") return { ok: false };
+  try {
+    const enc = safeStorage.encryptString(JSON.stringify(payload));
+    fs.writeFileSync(authStorePath(), enc);
+    return { ok: true };
+  } catch (err) {
+    console.error("[auth] save failed:", err && err.message);
+    return { ok: false };
+  }
+});
+
+ipcMain.handle("auth-clear", () => {
+  const p = authStorePath();
+  try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch (_) {}
+  return { ok: true };
+});
+
 // 버전 정보 IPC 핸들러
 ipcMain.handle("get-version", () => app.getVersion());
 
@@ -331,23 +379,28 @@ ipcMain.handle("sso-works-login", async (_event, options = {}) => {
   // task 백엔드의 (user_id, client) 단위 세션 분리 키.
   // 'dy-midas' 로 보내야 task.dyce.kr 와 동시에 활성 세션을 유지할 수 있다.
   const client = options.client || "dy-midas";
+  // silent=true → prompt=none 으로 hidden window 에서 자동 시도.
+  // NAVER 세션 살아있으면 즉시 callback, 없으면 error=login_required 로 reject.
+  const isSilent = options.silent === true;
   const params = new URLSearchParams({ next, client });
+  if (isSilent) params.set("silent", "1");
   if (explicitFront) params.set("front", explicitFront);
   const startUrl = `${authBase}/api/auth/works/login?${params.toString()}`;
   const isDev = !app.isPackaged;
   const log = (...args) => console.log("[sso]", ...args);
-  log("start", { startUrl, isDev });
+  log("start", { startUrl, isDev, silent: isSilent });
 
   return new Promise((resolve, reject) => {
     let settled = false;
     const parentAlive = mainWindow && !mainWindow.isDestroyed();
     const ssoWin = new BrowserWindow({
       // mainWindow가 살아있을 때만 parent 지정. parent가 없으면 modal 동작 X.
-      ...(parentAlive ? { parent: mainWindow, modal: true } : {}),
+      // silent 모드에선 parent/modal 지정 시 mainWindow 가 freeze 되므로 분리.
+      ...(parentAlive && !isSilent ? { parent: mainWindow, modal: true } : {}),
       width: 480,
       height: 720,
-      show: true,
-      alwaysOnTop: true,
+      show: !isSilent,
+      alwaysOnTop: !isSilent,
       autoHideMenuBar: true,
       backgroundColor: "#1a1a2e",
       title: "NAVER WORKS 로그인",
@@ -358,21 +411,35 @@ ipcMain.handle("sso-works-login", async (_event, options = {}) => {
       },
     });
     ssoWin.setMenuBarVisibility(false);
-    ssoWin.center();
-    ssoWin.focus();
-    if (isDev) {
+    if (!isSilent) {
+      ssoWin.center();
+      ssoWin.focus();
+    }
+    if (isDev && !isSilent) {
       try { ssoWin.webContents.openDevTools({ mode: "detach" }); } catch (_) {}
     }
+
+    // silent 모드는 NAVER 세션이 없거나 응답이 늦으면 사용자에게 보이지 않은 채
+    // 실패해야 한다 — 7초 timeout 후 reject 하여 호출자가 일반 LoginForm 으로 fallback.
+    // NAVER 세션 살아있으면 보통 1~2초 내 응답하므로 7초면 충분.
+    const silentTimeout = isSilent
+      ? setTimeout(() => {
+          log("silent timeout (7s)");
+          finishErr(new Error("login_required"));
+        }, 7000)
+      : null;
 
     const finishOk = (token) => {
       if (settled) return;
       settled = true;
+      if (silentTimeout) clearTimeout(silentTimeout);
       try { if (!ssoWin.isDestroyed()) ssoWin.close(); } catch (_) {}
       resolve(token);
     };
     const finishErr = (err) => {
       if (settled) return;
       settled = true;
+      if (silentTimeout) clearTimeout(silentTimeout);
       try { if (!ssoWin.isDestroyed()) ssoWin.close(); } catch (_) {}
       reject(err);
     };
@@ -386,21 +453,33 @@ ipcMain.handle("sso-works-login", async (_event, options = {}) => {
 
       const errParam = u.searchParams.get("error");
       const fragment = (u.hash && u.hash.startsWith("#")) ? u.hash.slice(1) : "";
-      const hashToken = fragment ? new URLSearchParams(fragment).get("token") : null;
+      const fragParams = fragment ? new URLSearchParams(fragment) : null;
+      const hashToken = fragParams ? fragParams.get("token") : null;
+      // silent SSO 실패 fragment (task 백엔드가 `#silent_error=login_required` 로 redirect).
+      const silentErr = fragParams ? fragParams.get("silent_error") : null;
 
       // task 백엔드(api.dyce.kr) 자체의 callback 처리(?code=&state=)는
       // fragment redirect를 발행하기 전 단계 — 가로채지 말고 통과시켜야 한다.
-      // 가로채기는 frontend 도메인의 fragment(`#token=...`) 또는 ?error= 도착 시에만.
-      if (!errParam && !hashToken) {
+      // 가로채기는 frontend 도메인의 fragment(`#token=...` / `#silent_error=...`)
+      // 또는 ?error= 도착 시에만.
+      if (!errParam && !hashToken && !silentErr) {
         log("callback passthrough (waiting for fragment)");
         return false;
       }
 
-      log("callback hit", { hasFragment: !!fragment, errorParam: errParam });
+      log("callback hit", {
+        hasFragment: !!fragment,
+        errorParam: errParam,
+        silentErr,
+      });
       if (ev && typeof ev.preventDefault === "function") {
         try { ev.preventDefault(); } catch (_) {}
       }
       try { if (!ssoWin.isDestroyed()) ssoWin.hide(); } catch (_) {}
+      if (silentErr) {
+        finishErr(new Error(decodeURIComponent(silentErr)));
+        return true;
+      }
       if (errParam) {
         finishErr(new Error(decodeURIComponent(errParam)));
         return true;
